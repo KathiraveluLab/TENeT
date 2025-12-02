@@ -126,7 +126,7 @@ const CommunityInfoPanel = ({ community, isOpen, onClose }) => {
                 <div className="raw-data">
                   <h4 className="subsection-title">Raw Connectivity Data</h4>
                   <pre className="json-display">
-                    {JSON.stringify(community.connectivity, null, 2)}
+                    {useMemo(() => JSON.stringify(community.connectivity, null, 2), [community.connectivity])}
                   </pre>
                 </div>
               )}
