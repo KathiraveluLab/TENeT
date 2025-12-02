@@ -7,17 +7,18 @@ const CommunityInfoPanel = ({ community, isOpen, onClose }) => {
 
   if (!community) return null
 
-  const formatCoordinates = (coordinates) => {
-    if (!coordinates) return 'N/A'
-    return `${coordinates.lat?.toFixed(4)}°, ${coordinates.lon?.toFixed(4)}°`
-  }
+const formatCoordinates = (coordinates) => {
+  if (!coordinates || coordinates.lat == null || coordinates.lon == null) return 'N/A'
+  return `${coordinates.lat.toFixed(4)}°, ${coordinates.lon.toFixed(4)}°`
+}
 
-  const formatAccessTypes = (types) => {
-    if (!types || types.length === 0) return 'No data available'
-    return types.map(type => 
-      type.charAt(0).toUpperCase() + type.slice(1)
-    ).join(', ')
-  }
+const formatAccessTypes = (types) => {
+  if (!types || types.length === 0) return 'No data available'
+  return types.map(type => 
+    type.charAt(0).toUpperCase() + type.slice(1)
+  ).join(', ')
+}
+
 
   return (
     <div className={`community-info-panel ${isOpen ? 'open' : ''}`}>
@@ -126,7 +127,7 @@ const CommunityInfoPanel = ({ community, isOpen, onClose }) => {
                 <div className="raw-data">
                   <h4 className="subsection-title">Raw Connectivity Data</h4>
                   <pre className="json-display">
-                    {JSON.stringify(community.connectivity, null, 2)}
+                    {useMemo(() => JSON.stringify(community.connectivity, null, 2), [community.connectivity])}
                   </pre>
                 </div>
               )}
