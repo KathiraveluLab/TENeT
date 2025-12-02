@@ -20,6 +20,12 @@ const ALASKA_DETAIL_ZOOM = 6.5
 const MIN_ZOOM = 3.5
 const MAX_ZOOM = 12
 
+// Zoom level thresholds for UI behavior
+const COMMUNITY_MARKERS_MIN_ZOOM = 6
+const BOUNDARY_HIDE_ZOOM = 7
+const DETAIL_VIEW_MAX_ZOOM = 6
+const REGION_VIEW_MAX_ZOOM = 9
+
 // Alaska bounds to restrict map movement - tighter bounds
 const ALASKA_BOUNDS = [
   [51.0, -179.0], // Southwest corner - closer to Alaska
@@ -99,16 +105,28 @@ const AlaskaRegionMarkers = ({ regions, onRegionClick, currentZoom }) => {
 // Community Markers Component
 const CommunityMarkers = ({ communities, onCommunityClick, selectedCommunityId, currentZoom }) => {
   const createCommunityIcon = (community, isSelected) => {
-    const iconHtml = `
-      <div class="community-marker ${isSelected ? 'selected' : ''}" data-community-id="${community.id}">
-        <div class="marker-dot"></div>
-        <div class="marker-pulse"></div>
-        ${currentZoom > 6 ? `<span class="community-label">${community.name}</span>` : ''}
-      </div>
-    `
+    // Create DOM elements programmatically to prevent XSS
+    const markerDiv = document.createElement('div')
+    markerDiv.className = `community-marker ${isSelected ? 'selected' : ''}`
+    markerDiv.setAttribute('data-community-id', community.id)
+    
+    const dotDiv = document.createElement('div')
+    dotDiv.className = 'marker-dot'
+    markerDiv.appendChild(dotDiv)
+    
+    const pulseDiv = document.createElement('div')
+    pulseDiv.className = 'marker-pulse'
+    markerDiv.appendChild(pulseDiv)
+    
+    if (currentZoom > 6) {
+      const labelSpan = document.createElement('span')
+      labelSpan.className = 'community-label'
+      labelSpan.textContent = community.name // Safe text assignment
+      markerDiv.appendChild(labelSpan)
+    }
     
     return L.divIcon({
-      html: iconHtml,
+      html: markerDiv.outerHTML,
       className: 'community-div-icon',
       iconSize: [20, 20],
       iconAnchor: [10, 10]
@@ -313,7 +331,7 @@ const MapView = ({ onCommunitySelect, selectedCommunityId }) => {
     setCurrentZoom(zoom)
     
     // Show/hide boundary and regions based on zoom level
-    if (zoom > 7) {
+    if (zoom > BOUNDARY_HIDE_ZOOM) {
       setShowBoundary(false)
       setShowRegions(true) // Keep regions visible when boundary disappears
     } else {
@@ -322,9 +340,9 @@ const MapView = ({ onCommunitySelect, selectedCommunityId }) => {
     }
     
     // Update view state based on zoom
-    if (zoom <= 6) {
+    if (zoom <= DETAIL_VIEW_MAX_ZOOM) {
       setCurrentView('overview')
-    } else if (zoom <= 9) {
+    } else if (zoom <= REGION_VIEW_MAX_ZOOM) {
       setCurrentView('detail')
     } else {
       setCurrentView('region')
@@ -333,7 +351,7 @@ const MapView = ({ onCommunitySelect, selectedCommunityId }) => {
 
   // Handle Alaska exploration animation
   const handleAlaskaExploration = useCallback(() => {
-    if (currentZoom <= 6) {
+    if (currentZoom <= DETAIL_VIEW_MAX_ZOOM) {
       // Zoom into Alaska for detailed view
       setTargetView({
         center: ALASKA_CENTER,
@@ -382,28 +400,16 @@ const MapView = ({ onCommunitySelect, selectedCommunityId }) => {
 
   if (loading) {
     return (
-      <div className="map-loading" style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100%',
-        background: '#e0f2e4',
-        color: '#2E7D32'
-      }}>
+      <div className="map-loading">
         <p>Loading Alaska map...</p>
       </div>
     )
   }
 
   return (
-    <div className="map-container" style={{ position: 'relative', height: '100%', width: '100%' }}>
+    <div className="map-container">
       {error && (
-        <div className="map-error" style={{
-          background: '#ffebee',
-          color: '#c62828',
-          padding: '20px',
-          textAlign: 'center'
-        }}>
+        <div className="map-error">
           <p>Map Error: {error}</p>
         </div>
       )}
@@ -453,7 +459,7 @@ const MapView = ({ onCommunitySelect, selectedCommunityId }) => {
           />
         )}
         
-        {currentZoom > 6 && (
+        {currentZoom > COMMUNITY_MARKERS_MIN_ZOOM && (
           <CommunityMarkers 
             communities={mockCommunityData.communities}
             onCommunityClick={onCommunitySelect}
@@ -475,14 +481,14 @@ const MapView = ({ onCommunitySelect, selectedCommunityId }) => {
             Zoom: {currentZoom.toFixed(1)} | {showBoundary ? 'Alaska Boundary' : 'Community View'}
           </small>
           <small className="interaction-hint">
-            {currentZoom <= 6 
+            {currentZoom <= DETAIL_VIEW_MAX_ZOOM 
               ? 'Click locations or boundary to explore Alaska communities' 
               : 'Click community markers to view details'}
           </small>
         </div>
         
         <div className="map-controls">
-          {currentZoom > 6 && (
+          {currentZoom > COMMUNITY_MARKERS_MIN_ZOOM && (
             <button 
               className="control-button reset-button"
               onClick={resetToOverview}
@@ -492,7 +498,7 @@ const MapView = ({ onCommunitySelect, selectedCommunityId }) => {
             </button>
           )}
           
-          {currentZoom <= 6 && (
+          {currentZoom <= DETAIL_VIEW_MAX_ZOOM && (
             <button 
               className="control-button detail-button"
               onClick={focusOnAlaska}
@@ -508,7 +514,7 @@ const MapView = ({ onCommunitySelect, selectedCommunityId }) => {
             </div>
           )}
           
-          {currentZoom > 7 && (
+          {currentZoom > BOUNDARY_HIDE_ZOOM && (
             <div className="navigation-info">
               <small>🏘️ Community markers visible - click to view details</small>
             </div>

@@ -41,21 +41,22 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 400px;
-  background-color: var(--surface-color);
-  border-radius: 0;
+  height: 100%;
+  background: #e0f2e4;
+  color: #2E7D32;
   margin: 0;
 }
 
 .map-loading p {
-  color: var(--text-secondary);
+  color: #2E7D32;
   font-size: 1.125rem;
 }
 
 .map-error {
-  background-color: #FFEBEE;
-  color: #C62828;
-  padding: 0.75rem 1rem;
+  background: #ffebee;
+  color: #c62828;
+  padding: 20px;
+  text-align: center;
   border-radius: 0;
   margin: 0;
   border-left: 4px solid #C62828;

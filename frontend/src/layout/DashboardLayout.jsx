@@ -1,12 +1,16 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import MapView from '../components/MapView'
 import CommunityInfoPanel from '../components/CommunityInfoPanel'
 import mockData from '../data/mockCommunityData.json'
 import '../styles/dashboard-layout.css'
 
+// Animation duration constant to match CSS
+const PANEL_ANIMATION_DURATION = 300
+
 const DashboardLayout = () => {
   const [selectedCommunity, setSelectedCommunity] = useState(null)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
+  const closeTimeoutRef = useRef(null)
 
   const handleCommunitySelect = (communityId) => {
     const community = mockData.communities.find(c => c.id === communityId)
@@ -18,9 +22,24 @@ const DashboardLayout = () => {
 
   const handleClosePanel = () => {
     setIsPanelOpen(false)
+    // Clear any existing timeout
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current)
+    }
     // Delay clearing the selected community to allow for exit animation
-    setTimeout(() => setSelectedCommunity(null), 300)
+    closeTimeoutRef.current = setTimeout(() => {
+      setSelectedCommunity(null)
+    }, PANEL_ANIMATION_DURATION)
   }
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current)
+      }
+    }
+  }, [])
 
   return (
     <div className="dashboard-layout">
