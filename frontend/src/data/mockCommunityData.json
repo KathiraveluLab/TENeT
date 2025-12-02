@@ -1,0 +1,73 @@
+{
+  "communities": [
+    {
+      "id": "ak-001",
+      "name": "Sample Village",
+      "region": "Kenai Peninsula Borough",
+      "population": 320,
+      "coordinates": { "lat": 60.123, "lon": -149.987 },
+      "clinic_count": 1,
+      "nearest_hub": { "name": "Anchorage", "distance_km": 145 },
+      "specialist_availability": "Limited - Monthly visits",
+      "connectivity": {
+        "download_mbps": 4.2,
+        "upload_mbps": 1.1,
+        "latency_ms": 85
+      },
+      "access": {
+        "types": ["air"],
+        "seasonality_note": "Road access unavailable during winter."
+      },
+      "metadata": {
+        "source": "Mock dataset",
+        "last_updated": "2025-11-01"
+      }
+    },
+    {
+      "id": "ak-002", 
+      "name": "Remote Settlement",
+      "region": "North Slope Borough",
+      "population": 150,
+      "coordinates": { "lat": 68.456, "lon": -155.234 },
+      "clinic_count": 0,
+      "nearest_hub": { "name": "Fairbanks", "distance_km": 320 },
+      "specialist_availability": null,
+      "connectivity": {
+        "download_mbps": 2.8,
+        "upload_mbps": 0.5,
+        "latency_ms": 120
+      },
+      "access": {
+        "types": ["air"],
+        "seasonality_note": "Weather-dependent access year-round."
+      },
+      "metadata": {
+        "source": "Mock dataset",
+        "last_updated": "2025-11-01"
+      }
+    },
+    {
+      "id": "ak-003",
+      "name": "Coastal Town",
+      "region": "Southeast Alaska",
+      "population": 890,
+      "coordinates": { "lat": 56.789, "lon": -132.456 },
+      "clinic_count": 2,
+      "nearest_hub": { "name": "Juneau", "distance_km": 80 },
+      "specialist_availability": "Good - Weekly clinic",
+      "connectivity": {
+        "download_mbps": 15.6,
+        "upload_mbps": 3.2,
+        "latency_ms": 45
+      },
+      "access": {
+        "types": ["ferry", "air"],
+        "seasonality_note": "Ferry service reduced in winter."
+      },
+      "metadata": {
+        "source": "Mock dataset",
+        "last_updated": "2025-11-01"
+      }
+    }
+  ]
+}

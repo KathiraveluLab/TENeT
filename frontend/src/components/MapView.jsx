@@ -3,22 +3,39 @@ import { MapContainer, TileLayer, GeoJSON, useMap, Marker, Popup } from 'react-l
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import '../styles/map.css'
+import mockCommunityData from '../data/mockCommunityData.json'
 
-// Alaska coordinates and zoom levels
-const ALASKA_CENTER = [64.0685, -152.2782]
-const ALASKA_OVERVIEW_ZOOM = 4
-const ALASKA_DETAIL_ZOOM = 6
+// Fix for default markers in React Leaflet
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+})
+
+// Alaska coordinates and zoom levels - properly centered
+const ALASKA_CENTER = [64.2008, -153.0000] // More accurate Alaska center
+const ALASKA_OVERVIEW_ZOOM = 4.5
+const ALASKA_DETAIL_ZOOM = 6.5
+const MIN_ZOOM = 3.5
+const MAX_ZOOM = 12
+
+// Alaska bounds to restrict map movement - tighter bounds
+const ALASKA_BOUNDS = [
+  [51.0, -179.0], // Southwest corner - closer to Alaska
+  [71.5, -129.0]  // Northeast corner - closer to Alaska
+]
 
 // Major Alaska cities and regions for detailed exploration
 const ALASKA_REGIONS = [
-  { name: 'Anchorage', coords: [61.2181, -149.9003], zoom: 10, type: 'city' },
-  { name: 'Fairbanks', coords: [64.8378, -147.7164], zoom: 10, type: 'city' },
-  { name: 'Juneau', coords: [58.3019, -134.4197], zoom: 10, type: 'city' },
-  { name: 'Sitka', coords: [57.0531, -135.3300], zoom: 10, type: 'city' },
-  { name: 'Ketchikan', coords: [55.3422, -131.6461], zoom: 10, type: 'city' },
-  { name: 'Nome', coords: [64.5011, -165.4064], zoom: 9, type: 'remote' },
-  { name: 'Barrow (Utqiagvik)', coords: [71.2906, -156.7886], zoom: 9, type: 'remote' },
-  { name: 'Kodiak', coords: [57.7900, -152.4044], zoom: 9, type: 'island' },
+  { name: 'Anchorage', coords: [61.2181, -149.9003], zoom: 9, type: 'city' },
+  { name: 'Fairbanks', coords: [64.8378, -147.7164], zoom: 9, type: 'city' },
+  { name: 'Juneau', coords: [58.3019, -134.4197], zoom: 9, type: 'city' },
+  { name: 'Sitka', coords: [57.0531, -135.3300], zoom: 9, type: 'city' },
+  { name: 'Ketchikan', coords: [55.3422, -131.6461], zoom: 9, type: 'city' },
+  { name: 'Nome', coords: [64.5011, -165.4064], zoom: 8, type: 'remote' },
+  { name: 'Barrow (Utqiagvik)', coords: [71.2906, -156.7886], zoom: 8, type: 'remote' },
+  { name: 'Kodiak', coords: [57.7900, -152.4044], zoom: 8, type: 'island' },
 ]
 
 // Custom marker icons for different region types
@@ -70,6 +87,56 @@ const AlaskaRegionMarkers = ({ regions, onRegionClick, currentZoom }) => {
                 className="explore-region-btn"
               >
                 🔍 Explore Region
+              </button>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+    </>
+  )
+}
+
+// Community Markers Component
+const CommunityMarkers = ({ communities, onCommunityClick, selectedCommunityId, currentZoom }) => {
+  const createCommunityIcon = (community, isSelected) => {
+    const iconHtml = `
+      <div class="community-marker ${isSelected ? 'selected' : ''}" data-community-id="${community.id}">
+        <div class="marker-dot"></div>
+        <div class="marker-pulse"></div>
+        ${currentZoom > 6 ? `<span class="community-label">${community.name}</span>` : ''}
+      </div>
+    `
+    
+    return L.divIcon({
+      html: iconHtml,
+      className: 'community-div-icon',
+      iconSize: [20, 20],
+      iconAnchor: [10, 10]
+    })
+  }
+
+  return (
+    <>
+      {communities.map((community) => (
+        <Marker
+          key={community.id}
+          position={[community.coordinates.lat, community.coordinates.lon]}
+          icon={createCommunityIcon(community, selectedCommunityId === community.id)}
+          eventHandlers={{
+            click: () => onCommunityClick(community.id)
+          }}
+        >
+          <Popup>
+            <div className="community-popup">
+              <h4>🏘️ {community.name}</h4>
+              <p><strong>Region:</strong> {community.region}</p>
+              <p><strong>Population:</strong> {community.population || 'N/A'}</p>
+              <p><strong>Coordinates:</strong> {community.coordinates.lat.toFixed(4)}, {community.coordinates.lon.toFixed(4)}</p>
+              <button 
+                onClick={() => onCommunityClick(community.id)}
+                className="explore-community-btn"
+              >
+                📊 View Community Details
               </button>
             </div>
           </Popup>
@@ -153,7 +220,7 @@ const alaskaBoundaryHoverStyle = {
   fillOpacity: 0.3
 }
 
-const MapView = () => {
+const MapView = ({ onCommunitySelect, selectedCommunityId }) => {
   const [alaskaBoundary, setAlaskaBoundary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -180,11 +247,11 @@ const MapView = () => {
             geometry: {
               type: "Polygon",
               coordinates: [[
-                [-179.148909, 51.214183],
-                [-179.148909, 71.365162],
-                [-129.979506, 71.365162],
-                [-129.979506, 51.214183],
-                [-179.148909, 51.214183]
+                [-178.0, 52.0],
+                [-178.0, 71.0],
+                [-130.0, 71.0],
+                [-130.0, 52.0],
+                [-178.0, 52.0]
               ]]
             }
           }
@@ -246,7 +313,7 @@ const MapView = () => {
     setCurrentZoom(zoom)
     
     // Show/hide boundary and regions based on zoom level
-    if (zoom > 6) {
+    if (zoom > 7) {
       setShowBoundary(false)
       setShowRegions(true) // Keep regions visible when boundary disappears
     } else {
@@ -255,9 +322,9 @@ const MapView = () => {
     }
     
     // Update view state based on zoom
-    if (zoom <= 5) {
+    if (zoom <= 6) {
       setCurrentView('overview')
-    } else if (zoom <= 8) {
+    } else if (zoom <= 9) {
       setCurrentView('detail')
     } else {
       setCurrentView('region')
@@ -266,7 +333,7 @@ const MapView = () => {
 
   // Handle Alaska exploration animation
   const handleAlaskaExploration = useCallback(() => {
-    if (currentZoom <= 5) {
+    if (currentZoom <= 6) {
       // Zoom into Alaska for detailed view
       setTargetView({
         center: ALASKA_CENTER,
@@ -302,12 +369,12 @@ const MapView = () => {
     })
   }
 
-  // Zoom out to world view
-  const zoomToWorld = () => {
+  // Focus on Alaska detail view
+  const focusOnAlaska = () => {
     setTargetView({
-      center: [20, 0], // World center
-      zoom: 2,
-      duration: 2500
+      center: ALASKA_CENTER,
+      zoom: ALASKA_DETAIL_ZOOM,
+      duration: 2000
     })
   }
 
@@ -315,17 +382,29 @@ const MapView = () => {
 
   if (loading) {
     return (
-      <div className="map-loading">
+      <div className="map-loading" style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100%',
+        background: '#e0f2e4',
+        color: '#2E7D32'
+      }}>
         <p>Loading Alaska map...</p>
       </div>
     )
   }
 
   return (
-    <div className="map-container">
+    <div className="map-container" style={{ position: 'relative', height: '100%', width: '100%' }}>
       {error && (
-        <div className="map-error">
-          <p>{error}</p>
+        <div className="map-error" style={{
+          background: '#ffebee',
+          color: '#c62828',
+          padding: '20px',
+          textAlign: 'center'
+        }}>
+          <p>Map Error: {error}</p>
         </div>
       )}
       
@@ -340,14 +419,15 @@ const MapView = () => {
         doubleClickZoom={true}
         keyboard={true}
         ref={mapRef}
-        worldCopyJump={true}
-        maxBounds={null}
+        worldCopyJump={false}
+        maxBounds={ALASKA_BOUNDS}
+        maxBoundsViscosity={1.0}
       >
         <TileLayer
           attribution={TILE_ATTRIBUTION}
           url={TILE_URL}
-          maxZoom={18}
-          minZoom={1}
+          maxZoom={MAX_ZOOM}
+          minZoom={MIN_ZOOM}
         />
         
         <ZoomTracker onZoomChange={handleZoomChange} />
@@ -372,44 +452,53 @@ const MapView = () => {
             currentZoom={currentZoom}
           />
         )}
+        
+        {currentZoom > 6 && (
+          <CommunityMarkers 
+            communities={mockCommunityData.communities}
+            onCommunityClick={onCommunitySelect}
+            selectedCommunityId={selectedCommunityId}
+            currentZoom={currentZoom}
+          />
+        )}
       </MapContainer>
       
       <div className="map-info">
         <div className="map-status">
           <h4>🗺️ TENeT Alaska Explorer</h4>
           <p className="current-view">
-            {currentView === 'overview' && '🌍 Overview Mode'}
-            {currentView === 'detail' && '🏔️ Alaska Detail Mode'}
-            {currentView === 'region' && '📍 Region Explorer'}
+            {currentView === 'overview' && '🏔️ Alaska Overview'}
+            {currentView === 'detail' && '🏘️ Alaska Communities'}
+            {currentView === 'region' && '📍 Community Details'}
           </p>
           <small className="zoom-info">
-            Zoom: {currentZoom.toFixed(1)} | {showBoundary ? 'Boundary Visible' : 'Free Navigation'}
+            Zoom: {currentZoom.toFixed(1)} | {showBoundary ? 'Alaska Boundary' : 'Community View'}
           </small>
           <small className="interaction-hint">
-            {currentZoom <= 5 
-              ? 'Click locations or boundary to explore Alaska' 
-              : 'Pan freely or use controls to navigate'}
+            {currentZoom <= 6 
+              ? 'Click locations or boundary to explore Alaska communities' 
+              : 'Click community markers to view details'}
           </small>
         </div>
         
         <div className="map-controls">
-          {currentZoom > 5 && (
+          {currentZoom > 6 && (
             <button 
               className="control-button reset-button"
               onClick={resetToOverview}
               title="Return to Alaska overview"
             >
-              🏔️ Alaska
+              🏔️ Alaska Overview
             </button>
           )}
           
-          {currentZoom > 3 && (
+          {currentZoom <= 6 && (
             <button 
-              className="control-button world-button"
-              onClick={zoomToWorld}
-              title="View world map"
+              className="control-button detail-button"
+              onClick={focusOnAlaska}
+              title="Focus on Alaska details"
             >
-              🌍 World
+              🔍 Explore Alaska
             </button>
           )}
           
@@ -419,9 +508,9 @@ const MapView = () => {
             </div>
           )}
           
-          {!showBoundary && (
+          {currentZoom > 7 && (
             <div className="navigation-info">
-              <small>🧭 Free navigation enabled - explore the world!</small>
+              <small>🏘️ Community markers visible - click to view details</small>
             </div>
           )}
         </div>

@@ -1,5 +1,5 @@
 import React from 'react'
-import MapView from './components/MapView'
+import DashboardLayout from './layout/DashboardLayout'
 import './styles/App.css'
 
 function App() {
@@ -10,7 +10,7 @@ function App() {
         <p>Telehealth Network Tool - Alaska</p>
       </header>
       <main className="app-main">
-        <MapView />
+        <DashboardLayout />
       </main>
     </div>
   )
