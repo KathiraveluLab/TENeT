@@ -64,7 +64,7 @@ class CATDataHandler:
         """Get data points within radius (simple distance calculation)"""
         # Simple bounding box calculation (for precise distance, use PostGIS)
         lat_delta = radius_km / 111.0  # 1 degree latitude ≈ 111 km
-        lon_delta = radius_km / (111.0 * abs(lat))
+        lon_delta = radius_km / (111.0 * math.cos(math.radians(lat)))
         
         return db.query(CATDataPoint).filter(
             and_(
