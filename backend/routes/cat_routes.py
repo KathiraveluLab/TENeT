@@ -24,16 +24,22 @@ def allowed_file(filename):
 @cat_bp.route('/regions', methods=['GET'])
 def get_regions():
     """Get all regions or filter by tier"""
+
+
+@cat_bp.route('/regions/<region_code>', methods=['GET'])
+def get_region(region_code):
+    """Get specific region by code"""
+    
+    db = SessionLocal()
     try:
         tier_level = request.args.get('tier', type=int)
-        db = SessionLocal()
-        
+
         if tier_level:
             regions = CATDataHandler.get_regions_by_tier(db, tier_level)
         else:
             from database.models import CATRegion
             regions = db.query(CATRegion).all()
-        
+
         result = []
         for region in regions:
             result.append({
@@ -46,43 +52,15 @@ def get_regions():
                 'access_score': region.access_score,
                 'created_at': region.created_at.isoformat() if region.created_at else None
             })
-        
-        db.close()
+
         return jsonify({'regions': result, 'count': len(result)}), 200
-        
+
     except Exception as e:
+        # optionally: db.rollback() if you use transactions
         return jsonify({'error': str(e)}), 500
 
-
-@cat_bp.route('/regions/<region_code>', methods=['GET'])
-def get_region(region_code):
-    """Get specific region by code"""
-    try:
-        db = SessionLocal()
-        region = CATDataHandler.get_region_by_code(db, region_code)
-        
-        if not region:
-            db.close()
-            return jsonify({'error': 'Region not found'}), 404
-        
-        result = {
-            'id': region.id,
-            'region_name': region.region_name,
-            'region_code': region.region_code,
-            'tier_level': region.tier_level,
-            'geometry': region.geometry,
-            'population': region.population,
-            'area_sqkm': region.area_sqkm,
-            'access_score': region.access_score,
-            'properties': region.properties,
-            'created_at': region.created_at.isoformat() if region.created_at else None
-        }
-        
+    finally:
         db.close()
-        return jsonify(result), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 
 # Data points endpoints
