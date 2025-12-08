@@ -10,6 +10,7 @@ from shapely.geometry import shape, mapping
 import os
 
 from database.handlers import CATDataHandler
+from database.models import CATDataPoint, CATRegion
 
 
 class CATDataImporter:
@@ -230,7 +231,3 @@ class CATDataImporter:
             
         except Exception as e:
             raise Exception(f"Error exporting to GeoJSON: {str(e)}")
-
-
-# Import CATDataPoint for export functions
-from database.models import CATDataPoint, CATRegion

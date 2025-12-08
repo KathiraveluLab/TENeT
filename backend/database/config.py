@@ -57,7 +57,8 @@ Base = declarative_base()
 
 def get_db():
     """
-    Dependency function to get database session
+    Dependency function to get database session.
+    Use with Flask's @app.teardown_appcontext to automatically close sessions.
     """
     db = SessionLocal()
     try:
