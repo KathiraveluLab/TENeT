@@ -63,7 +63,7 @@ class CATDataPoint(Base):
     
     # Access/Network metrics (for CAT analysis)
     access_type = Column(String(100), nullable=True)  # e.g., "healthcare", "education", "broadband"
-    access_quality = Column(String(50), nullable=True)  # e.g., "good", "poor", "excellent"
+    access_quality = Column(Float, nullable=True)  # e.g., 85.5 (0-100 scale)
     distance_km = Column(Float, nullable=True)  # Distance to nearest access point
     travel_time_minutes = Column(Float, nullable=True)
     
