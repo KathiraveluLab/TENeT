@@ -88,9 +88,6 @@ class CATDataImporter:
         Expected properties: region_name, region_code, tier_level, population, area_sqkm
         """
         try:
-            from geoalchemy2.shape import from_shape
-            from shapely.geometry import shape
-            
             # Read GeoJSON
             gdf = gpd.read_file(file_path)
             
@@ -110,8 +107,8 @@ class CATDataImporter:
             # Import regions
             count = 0
             for _, row in gdf.iterrows():
-                # Convert geometry to PostGIS-compatible format
-                geom_wkt = from_shape(row.geometry, srid=4326)
+                # Convert geometry to GeoJSON string for storage in a Text field
+                geom_wkt = json.dumps(mapping(row.geometry))
                 
                 region_data = {
                     'region_name': str(row['region_name']),
