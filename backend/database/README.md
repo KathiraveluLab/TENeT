@@ -240,6 +240,3 @@ API documentation is available at: GET /api/cat/statistics
 Sample data files are located in: backend/data/samples/
 Database model definitions are found in: backend/database/models.py
 
-License
-This component is part of the TENeT project. Please refer to the main LICENSE file for licensing information.
-Compress this readme file and remove all the unnecesaary things
