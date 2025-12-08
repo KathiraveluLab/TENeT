@@ -1,6 +1,7 @@
 """
 API routes for Community Access Tier (CAT) data management
 """
+from database.models import CATRegion
 from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
 import os
@@ -37,7 +38,7 @@ def get_region(region_code):
         if tier_level:
             regions = CATDataHandler.get_regions_by_tier(db, tier_level)
         else:
-            from database.models import CATRegion
+            
             regions = db.query(CATRegion).all()
 
         result = []
