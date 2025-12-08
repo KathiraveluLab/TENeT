@@ -43,6 +43,7 @@ class CATDataImporter:
             data_points = []
             for _, row in df.iterrows():
                 point_data = {
+                    'upload_id': upload_id,
                     'region_code': str(row['region_code']),
                     'latitude': float(row['latitude']),
                     'longitude': float(row['longitude']),
