@@ -1,0 +1,56 @@
+{
+  "type": "FeatureCollection",
+  "name": "Community_Transportation_Overview_Sample",
+  "crs": {
+    "type": "name",
+    "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 101,
+        "CommunityName": "Bethel",
+        "CommunityID": "{A1B2C3D4-E5F6-7890-1234-56789ABCDEF0}",
+        "Airport": "Yes",
+        "HarborDock": "Yes",
+        "StateFerry": "No",
+        "CargoBarge": "Yes",
+        "RoadConnection": "No",
+        "Coastal": "Yes",
+        "Description": "Bethel is a major regional hub for the Yukon-Kuskokwim Delta. It has a state-owned airport that serves as a cargo and passenger distribution center for over 50 villages. There is no road connection to the contiguous state highway system; however, an ice road is often established on the Kuskokwim River during winter months. The Port of Bethel is the northernmost medium-draft port in the U.S. and is a vital distinct hub for barge services.",
+        "AsOfDate": "2023-08-24T00:00:00Z"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -161.7558,
+          60.7933
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 102,
+        "CommunityName": "Cordova",
+        "CommunityID": "{F0E1D2C3-B4A5-6789-0123-456789ABCDEF}",
+        "Airport": "Yes",
+        "HarborDock": "Yes",
+        "StateFerry": "Yes",
+        "CargoBarge": "Yes",
+        "RoadConnection": "No",
+        "Coastal": "Yes",
+        "Description": "Cordova is accessible by plane or boat only. It is served by the Merle K. (Mudhole) Smith Airport which supports daily jet service. The community is a regular stop for the Alaska Marine Highway System (State Ferry), connecting it to Valdez and Whittier. The comprehensive harbor and dock facilities support a large commercial fishing fleet. While there is a local road system (Copper River Highway), it does not connect to the statewide road network.",
+        "AsOfDate": "2023-08-24T00:00:00Z"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -145.7575,
+          60.5428
+        ]
+      }
+    }
+  ]
+}
