@@ -43,8 +43,29 @@ def create_sample_gating_rules(db):
             'access_types': ['healthcare', 'education', 'transport', 'internet', 'emergency'],
             'is_active': True,
             'priority': 3
+        },
+        {
+            'rule_name': 'Tier 4 Extreme Access',
+            'tier_level': 4,
+            'min_access_score': 30.0,
+            'max_distance_km': 500.0,       # Fly-in only communities
+            'max_travel_time': 480.0,       # 8 hours (weather-dependent)
+            'access_types': ['healthcare', 'emergency', 'telehealth'],
+            'conditions': {
+                'min_bandwidth_mbps': 1.5,
+                'max_latency_ms': 600,
+                'satellite_dependent': True,
+                'telehealth_modes': {
+                    'video': {'min_bandwidth_mbps': 4.0, 'max_latency_ms': 300},
+                    'audio': {'min_bandwidth_mbps': 1.5, 'max_latency_ms': 600},
+                    'store_forward': {'min_bandwidth_mbps': 0.5}
+                }
+            },
+            'is_active': True,
+            'priority': 4
         }
     ]
+
     
     for rule_data in rules:
         try:
