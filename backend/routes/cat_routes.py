@@ -298,7 +298,7 @@ def evaluate_feasibility(region_code):
         data_point = db.query(CATDataPoint).filter(
             CATDataPoint.region_code == region_code,
             CATDataPoint.is_active == True
-        ).first()
+        ).order_by(CATDataPoint.timestamp.desc()).first()
         
         # Build base response
         response = {
