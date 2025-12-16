@@ -9,7 +9,15 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database.config import init_db, SessionLocal
-from database.handlers import CATDataHandler
+from database.handlers import (
+    CATDataHandler,
+    CAT4_MIN_BANDWIDTH_MBPS,
+    CAT4_MAX_LATENCY_MS,
+    CAT4_MIN_ACCESS_SCORE,
+    CAT4_VIDEO_MIN_BANDWIDTH_MBPS,
+    CAT4_VIDEO_MAX_LATENCY_MS,
+    CAT4_STORE_FORWARD_MIN_BANDWIDTH_MBPS
+)
 
 def create_sample_gating_rules(db):
     """Create sample gating rules for each tier"""
@@ -47,18 +55,26 @@ def create_sample_gating_rules(db):
         {
             'rule_name': 'Tier 4 Extreme Access',
             'tier_level': 4,
-            'min_access_score': 30.0,
+            'min_access_score': CAT4_MIN_ACCESS_SCORE,
             'max_distance_km': 500.0,       # Fly-in only communities
             'max_travel_time': 480.0,       # 8 hours (weather-dependent)
             'access_types': ['healthcare', 'emergency', 'telehealth'],
             'conditions': {
-                'min_bandwidth_mbps': 1.5,
-                'max_latency_ms': 600,
+                'min_bandwidth_mbps': CAT4_MIN_BANDWIDTH_MBPS,
+                'max_latency_ms': CAT4_MAX_LATENCY_MS,
                 'satellite_dependent': True,
                 'telehealth_modes': {
-                    'video': {'min_bandwidth_mbps': 4.0, 'max_latency_ms': 300},
-                    'audio': {'min_bandwidth_mbps': 1.5, 'max_latency_ms': 600},
-                    'store_forward': {'min_bandwidth_mbps': 0.5}
+                    'video': {
+                        'min_bandwidth_mbps': CAT4_VIDEO_MIN_BANDWIDTH_MBPS,
+                        'max_latency_ms': CAT4_VIDEO_MAX_LATENCY_MS
+                    },
+                    'audio': {
+                        'min_bandwidth_mbps': CAT4_MIN_BANDWIDTH_MBPS,
+                        'max_latency_ms': CAT4_MAX_LATENCY_MS
+                    },
+                    'store_forward': {
+                        'min_bandwidth_mbps': CAT4_STORE_FORWARD_MIN_BANDWIDTH_MBPS
+                    }
                 }
             },
             'is_active': True,
