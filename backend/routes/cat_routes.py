@@ -260,3 +260,116 @@ def get_statistics():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# =============================================================================
+# Feasibility Evaluation API (PR-3)
+# =============================================================================
+
+@cat_bp.route('/feasibility/<region_code>', methods=['GET'])
+def evaluate_feasibility(region_code):
+    """
+    Evaluate telehealth feasibility for a region.
+    
+    This is the authoritative domain-level API for feasibility decisions.
+    
+    Query params:
+        telehealth_mode: Optional - 'video', 'audio', 'store_forward' (CAT-4 only)
+    
+    Returns:
+        Structured feasibility decision with explanation suitable for
+        map visualization and policy interpretation.
+    """
+    db = SessionLocal()
+    try:
+        # Get telehealth mode (only applies to CAT-4)
+        telehealth_mode = request.args.get('telehealth_mode')
+        
+        # Look up the region
+        region = CATDataHandler.get_region_by_code(db, region_code)
+        if not region:
+            return jsonify({
+                'error': f"Region '{region_code}' not found",
+                'decision': 'ERROR'
+            }), 404
+        
+        # Get representative data point for this region
+        from database.models import CATDataPoint
+        data_point = db.query(CATDataPoint).filter(
+            CATDataPoint.region_code == region_code,
+            CATDataPoint.is_active == True
+        ).order_by(CATDataPoint.timestamp.desc()).first()
+        
+        # Build base response
+        response = {
+            'region_code': region.region_code,
+            'region_name': region.region_name,
+            'cat_tier': region.tier_level,
+            'telehealth_mode': telehealth_mode or 'all',
+            'metrics_used': {}
+        }
+        
+        # No data point available
+        if not data_point:
+            response.update({
+                'feasible': False,
+                'decision': 'INSUFFICIENT_DATA',
+                'failed_gate': None,
+                'explanation': 'No connectivity data available for this region'
+            })
+            return jsonify(response), 200
+        
+        # Add metrics to response
+        response['metrics_used'] = {
+            'bandwidth_mbps': data_point.throughput_mbps,
+            'latency_ms': data_point.latency_ms,
+            'access_score': data_point.access_quality
+        }
+        
+        # Apply tier-appropriate gating logic
+        if region.tier_level == 4:
+            # CAT-4: Use mode-aware telehealth feasibility
+            result = CATDataHandler.check_cat4_telehealth_feasibility(
+                data_point, telehealth_mode
+            )
+            
+            response['feasible'] = result['feasible']
+            response['decision'] = 'FEASIBLE' if result['feasible'] else 'NOT_FEASIBLE'
+            response['mode_results'] = result['mode_results']
+            
+            if not result['feasible'] and result['failure_reasons']:
+                response['explanation'] = result['failure_reasons'][0]
+                # Determine failed gate from explanation
+                explanation = response['explanation'].lower()
+                if 'bandwidth' in explanation:
+                    response['failed_gate'] = 'BANDWIDTH'
+                elif 'latency' in explanation:
+                    response['failed_gate'] = 'LATENCY'
+                elif 'access score' in explanation:
+                    response['failed_gate'] = 'ACCESS_SCORE'
+                else:
+                    response['failed_gate'] = 'UNKNOWN'
+            else:
+                response['failed_gate'] = None
+                response['explanation'] = 'Telehealth is feasible for this region'
+        else:
+            # CAT-1/2/3: Use standard gating logic
+            result = CATDataHandler.check_access_gating(db, data_point, region.tier_level)
+            
+            response['feasible'] = result['allowed']
+            response['decision'] = 'FEASIBLE' if result['allowed'] else 'NOT_FEASIBLE'
+            
+            if not result['allowed'] and result['failed_rules']:
+                first_failure = result['failed_rules'][0]
+                response['failed_gate'] = first_failure['rule']
+                response['explanation'] = first_failure['reasons'][0] if first_failure['reasons'] else 'Gating rule failed'
+            else:
+                response['failed_gate'] = None
+                response['explanation'] = 'All gating rules passed'
+        
+        return jsonify(response), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e), 'decision': 'ERROR'}), 500
+    finally:
+        db.close()

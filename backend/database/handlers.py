@@ -10,6 +10,35 @@ import json
 from database.models import CATRegion, CATDataPoint, CATUpload, CATGatingRule
 
 
+# =============================================================================
+# CAT-4 Telehealth Feasibility Thresholds
+# =============================================================================
+# CAT-4 represents extreme friction regions (fly-in only, e.g., Little Diomede)
+# These thresholds enforce HARD FAIL conditions - no averaging or trade-offs allowed
+
+# Minimum bandwidth for ANY telehealth mode (Mbps)
+CAT4_MIN_BANDWIDTH_MBPS = 1.5
+
+# Maximum acceptable latency for audio/general telehealth (ms)
+# Based on satellite communication tolerance
+CAT4_MAX_LATENCY_MS = 600
+
+# Minimum access reliability score (0-100 scale)
+CAT4_MIN_ACCESS_SCORE = 30.0
+
+# Real-time video specific thresholds (stricter)
+CAT4_VIDEO_MIN_BANDWIDTH_MBPS = 4.0
+CAT4_VIDEO_MAX_LATENCY_MS = 300
+
+# Store-and-forward thresholds (most lenient)
+CAT4_STORE_FORWARD_MIN_BANDWIDTH_MBPS = 0.5
+
+# Telehealth modes
+TELEHEALTH_MODE_VIDEO = 'video'
+TELEHEALTH_MODE_AUDIO = 'audio'
+TELEHEALTH_MODE_STORE_FORWARD = 'store_forward'
+
+
 class CATDataHandler:
     """Handler for CAT data operations"""
     
@@ -177,3 +206,162 @@ class CATDataHandler:
             'total_gating_rules': db.query(CATGatingRule).count(),
             'active_gating_rules': db.query(CATGatingRule).filter(CATGatingRule.is_active == True).count()
         }
+    
+    # =========================================================================
+    # CAT-4 Telehealth Feasibility Evaluation
+    # =========================================================================
+    
+    @staticmethod
+    def check_cat4_telehealth_feasibility(data_point: CATDataPoint, 
+                                          telehealth_mode: Optional[str] = None) -> Dict:
+        """
+        Evaluate telehealth feasibility for CAT-4 (Fly-in Only / Extreme Friction) regions.
+        
+        CAT-4 represents the most constrained environments (e.g., Little Diomede),
+        where telehealth feasibility must be evaluated conservatively with HARD CONSTRAINTS.
+        
+        CRITICAL: This function implements HARD FAIL conditions.
+        - Any threshold breach = NOT FEASIBLE
+        - No compensating trade-offs (no averaging, no soft scoring)
+        
+        Args:
+            data_point: CATDataPoint containing network metrics (throughput_mbps, latency_ms, access_quality)
+            telehealth_mode: Optional specific mode to evaluate ('video', 'audio', 'store_forward')
+                           If None, evaluates all modes
+        
+        Returns:
+            Dict with:
+                - feasible: Boolean indicating overall feasibility
+                - mode_results: Dict with per-mode feasibility results
+                - failure_reasons: List of human-readable failure messages
+                - evaluated_mode: The mode(s) evaluated
+        """
+        result = {
+            'feasible': False,
+            'mode_results': {
+                TELEHEALTH_MODE_VIDEO: {'feasible': False, 'failure_reasons': []},
+                TELEHEALTH_MODE_AUDIO: {'feasible': False, 'failure_reasons': []},
+                TELEHEALTH_MODE_STORE_FORWARD: {'feasible': False, 'failure_reasons': []}
+            },
+            'failure_reasons': [],
+            'evaluated_mode': telehealth_mode or 'all'
+        }
+        
+        # Extract network metrics from data point
+        bandwidth = data_point.throughput_mbps
+        latency = data_point.latency_ms
+        access_score = data_point.access_quality
+        
+        # ---------------------------------------------------------------------
+        # HARD FAIL: Check core access score (applies to ALL modes)
+        # ---------------------------------------------------------------------
+        if access_score is not None and access_score < CAT4_MIN_ACCESS_SCORE:
+            failure_msg = f"Access score {access_score} below CAT-4 minimum ({CAT4_MIN_ACCESS_SCORE})"
+            result['failure_reasons'].append(failure_msg)
+            # Mark all modes as failed due to access score
+            for mode in result['mode_results']:
+                result['mode_results'][mode]['failure_reasons'].append(failure_msg)
+            # Return early - access score failure affects all modes
+            return result
+        
+        # ---------------------------------------------------------------------
+        # Evaluate VIDEO mode (strictest requirements)
+        # ---------------------------------------------------------------------
+        video_result = result['mode_results'][TELEHEALTH_MODE_VIDEO]
+        video_feasible = True
+        
+        # Check bandwidth for video
+        if bandwidth is None:
+            video_result['failure_reasons'].append("Bandwidth data unavailable for video evaluation")
+            video_feasible = False
+        elif bandwidth < CAT4_VIDEO_MIN_BANDWIDTH_MBPS:
+            video_result['failure_reasons'].append(
+                f"Bandwidth {bandwidth} Mbps below CAT-4 video minimum ({CAT4_VIDEO_MIN_BANDWIDTH_MBPS} Mbps)"
+            )
+            video_feasible = False
+        
+        # Check latency for video
+        if latency is None:
+            video_result['failure_reasons'].append("Latency data unavailable for video evaluation")
+            video_feasible = False
+        elif latency > CAT4_VIDEO_MAX_LATENCY_MS:
+            video_result['failure_reasons'].append(
+                f"Latency {latency} ms exceeds CAT-4 video maximum ({CAT4_VIDEO_MAX_LATENCY_MS} ms)"
+            )
+            video_feasible = False
+        
+        video_result['feasible'] = video_feasible
+        
+        # ---------------------------------------------------------------------
+        # Evaluate AUDIO mode (moderate requirements)
+        # ---------------------------------------------------------------------
+        audio_result = result['mode_results'][TELEHEALTH_MODE_AUDIO]
+        audio_feasible = True
+        
+        # Check bandwidth for audio
+        if bandwidth is None:
+            audio_result['failure_reasons'].append("Bandwidth data unavailable for audio evaluation")
+            audio_feasible = False
+        elif bandwidth < CAT4_MIN_BANDWIDTH_MBPS:
+            audio_result['failure_reasons'].append(
+                f"Bandwidth {bandwidth} Mbps below CAT-4 audio minimum ({CAT4_MIN_BANDWIDTH_MBPS} Mbps)"
+            )
+            audio_feasible = False
+        
+        # Check latency for audio (uses general CAT-4 latency limit)
+        if latency is None:
+            audio_result['failure_reasons'].append("Latency data unavailable for audio evaluation")
+            audio_feasible = False
+        elif latency > CAT4_MAX_LATENCY_MS:
+            audio_result['failure_reasons'].append(
+                f"Latency {latency} ms exceeds satellite tolerance ({CAT4_MAX_LATENCY_MS} ms)"
+            )
+            audio_feasible = False
+        
+        audio_result['feasible'] = audio_feasible
+        
+        # ---------------------------------------------------------------------
+        # Evaluate STORE-AND-FORWARD mode (most lenient)
+        # ---------------------------------------------------------------------
+        store_forward_result = result['mode_results'][TELEHEALTH_MODE_STORE_FORWARD]
+        store_forward_feasible = True
+        
+        # Check bandwidth for store-and-forward (lowest requirement)
+        if bandwidth is None:
+            store_forward_result['failure_reasons'].append("Bandwidth data unavailable for store-forward evaluation")
+            store_forward_feasible = False
+        elif bandwidth < CAT4_STORE_FORWARD_MIN_BANDWIDTH_MBPS:
+            store_forward_result['failure_reasons'].append(
+                f"Bandwidth {bandwidth} Mbps below store-forward minimum ({CAT4_STORE_FORWARD_MIN_BANDWIDTH_MBPS} Mbps)"
+            )
+            store_forward_feasible = False
+        
+        # Note: Store-and-forward has NO latency requirement (asynchronous by nature)
+        
+        store_forward_result['feasible'] = store_forward_feasible
+        
+        # ---------------------------------------------------------------------
+        # Determine overall feasibility based on requested mode
+        # ---------------------------------------------------------------------
+        if telehealth_mode == TELEHEALTH_MODE_VIDEO:
+            result['feasible'] = video_feasible
+            if not video_feasible:
+                result['failure_reasons'] = video_result['failure_reasons']
+        elif telehealth_mode == TELEHEALTH_MODE_AUDIO:
+            result['feasible'] = audio_feasible
+            if not audio_feasible:
+                result['failure_reasons'] = audio_result['failure_reasons']
+        elif telehealth_mode == TELEHEALTH_MODE_STORE_FORWARD:
+            result['feasible'] = store_forward_feasible
+            if not store_forward_feasible:
+                result['failure_reasons'] = store_forward_result['failure_reasons']
+        else:
+            # No specific mode requested - feasible if ANY mode works
+            result['feasible'] = video_feasible or audio_feasible or store_forward_feasible
+            if not result['feasible']:
+                result['failure_reasons'] = [
+                    "No telehealth mode feasible for this CAT-4 location",
+                    *store_forward_result['failure_reasons']  # Show most lenient mode's failures
+                ]
+        
+        return result
