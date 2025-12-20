@@ -10,16 +10,42 @@
 
 ```
 TENeT/
-├── frontend/          # React application with interactive Alaska map
+├── frontend/                   # React application with interactive Alaska map
 │   ├── src/
-│   │   ├── App.tsx    # Main map component
-│   │   └── main.tsx   # Entry point
+│   │   ├── api/                # API client functions
+│   │   ├── components/         # Reusable UI components
+│   │   ├── types/              # TypeScript type definitions
+│   │   ├── App.tsx             # Main map component
+│   │   └── main.tsx            # Entry point
 │   ├── package.json
 │   ├── vite.config.ts
 │   └── tsconfig.json
 │
-└── backend/           # Flask API Gateway
-    ├── app.py         # Flask application
+└── backend/                    # Flask API Gateway
+    ├── data/
+    │   ├── raw/                # Original transportation CSV files
+    │   │   ├── Airways.csv
+    │   │   ├── Roadways.csv
+    │   │   └── Waterways.csv
+    │   ├── processed_data/     # Combined/cleaned datasets
+    │   ├── scripts/            # Data preprocessing scripts
+    │   ├── samples/            # Sample data files
+    │   └── uploads/            # User uploaded files
+    │
+    ├── database/
+    │   ├── config.py           # Database configuration
+    │   ├── models.py           # SQLAlchemy models
+    │   ├── handlers.py         # CRUD operations & CAT logic
+    │   ├── init_db.py          # Database initialization
+    │   └── README.md           # Database documentation
+    │
+    ├── routes/
+    │   └── cat_routes.py       # CAT API endpoints
+    │
+    ├── services/
+    │   └── data_importer.py    # CSV/GeoJSON import service
+    │
+    ├── app.py                  # Flask application entry point
     └── requirements.txt
 ```
 
