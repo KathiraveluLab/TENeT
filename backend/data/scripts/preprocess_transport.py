@@ -204,30 +204,18 @@ def inspect(df: pd.DataFrame, name: str):
 
 def alaska_albers_to_latlon(x, y):
     """
-    Approximate conversion from Alaska Albers (EPSG:3338) to WGS84.
-    This is a simplified approximation - for production use pyproj.
-    
-    Alaska Albers parameters:
-    - Central meridian: -154.0
-    - Standard parallels: 55.0, 65.0
-    - False easting: 0
-    - False northing: 0
+    Accurate conversion from Alaska Albers (EPSG:3338) to WGS84 using pyproj.
     """
     if pd.isna(x) or pd.isna(y):
         return np.nan, np.nan
-    
-    # Approximate inverse projection
-    # These are rough coefficients for Alaska region
-    central_meridian = -154.0
-    lat_origin = 50.0
-    
-    # Rough scaling factors (meters to degrees)
-    lat = lat_origin + (y / 111000)  # ~111km per degree latitude
-    
-    # Longitude varies with latitude
-    cos_lat = math.cos(math.radians(lat))
-    lon = central_meridian + (x / (111000 * cos_lat))
-    
+
+    # Define transformer from Alaska Albers to WGS84
+    # always_xy=True ensures (longitude, latitude) order for input and output
+    transformer = Transformer.from_crs("EPSG:3338", "EPSG:4326", always_xy=True)
+
+    # Transform coordinates
+    lon, lat = transformer.transform(x, y)
+
     return round(lat, 6), round(lon, 6)
 
 
