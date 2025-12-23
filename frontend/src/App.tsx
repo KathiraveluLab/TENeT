@@ -1,7 +1,10 @@
-import React from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import React, { useEffect, useState } from 'react';
+import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { fetchRegions, CATRegion } from './api/catApi';
+import RegionMarker from './components/RegionMarker';
+import Legend from './components/Legend';
 
 // Fix for default marker icons in React-Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -22,12 +25,34 @@ const ALASKA_BOUNDS: [[number, number], [number, number]] = [
 ];
 
 function App() {
+  const [regions, setRegions] = useState<CATRegion[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true);
+        const data = await fetchRegions();
+        setRegions(data);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load data');
+        console.error('Error loading regions:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadData();
+  }, []);
+
   return (
     <div style={{ height: '100vh', width: '100%', margin: 0, padding: 0, display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <div style={{ 
-        padding: '20px', 
-        backgroundColor: '#1e40af', 
+      <div style={{
+        padding: '20px',
+        backgroundColor: '#1e40af',
         color: 'white',
         boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
       }}>
@@ -40,91 +65,93 @@ function App() {
       </div>
 
       {/* Map Container */}
-      <MapContainer
-        center={ALASKA_CENTER}
-        zoom={ALASKA_ZOOM}
-        maxBounds={ALASKA_BOUNDS}
-        maxBoundsViscosity={1.0}
-        minZoom={4}
-        style={{ flex: 1, width: '100%' }}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+      <div style={{ flex: 1, position: 'relative' }}>
+        {/* Loading/Error overlay */}
+        {loading && (
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 1000,
+            backgroundColor: 'white',
+            padding: '20px 40px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            fontSize: '16px',
+            fontWeight: '500'
+          }}>
+            Loading community data...
+          </div>
+        )}
 
-        {/* Anchorage - Largest city */}
-        <Marker position={[61.2181, -149.9003]}>
-          <Popup>
-            <strong>Anchorage</strong><br />
-            Population: ~290,000<br />
-            <em>Demo location</em>
-          </Popup>
-        </Marker>
+        {error && (
+          <div style={{
+            position: 'absolute',
+            top: '10px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            backgroundColor: '#fee2e2',
+            color: '#dc2626',
+            padding: '12px 24px',
+            borderRadius: '6px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            fontSize: '14px'
+          }}>
+            ⚠️ {error}
+          </div>
+        )}
 
-        {/* Fairbanks - Interior Alaska */}
-        <Marker position={[64.8378, -147.7164]}>
-          <Popup>
-            <strong>Fairbanks</strong><br />
-            Population: ~32,000<br />
-            <em>Demo location</em>
-          </Popup>
-        </Marker>
+        <MapContainer
+          center={ALASKA_CENTER}
+          zoom={ALASKA_ZOOM}
+          maxBounds={ALASKA_BOUNDS}
+          maxBoundsViscosity={1.0}
+          minZoom={4}
+          style={{ height: '100%', width: '100%' }}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
 
-        {/* Juneau - State Capital */}
-        <Marker position={[58.3019, -134.4197]}>
-          <Popup>
-            <strong>Juneau</strong><br />
-            State Capital<br />
-            <em>Demo location</em>
-          </Popup>
-        </Marker>
+          {/* Render markers for all regions */}
+          {regions.map(region => (
+            <RegionMarker key={region.region_code} region={region} />
+          ))}
+        </MapContainer>
 
-        {/* Nome - Remote coastal community */}
-        <Marker position={[64.5011, -165.4064]}>
-          <Popup>
-            <strong>Nome</strong><br />
-            Remote coastal village<br />
-            <em>Demo location</em>
-          </Popup>
-        </Marker>
-
-        {/* Utqiaġvik (Barrow) - Northernmost city */}
-        <Marker position={[71.2906, -156.7886]}>
-          <Popup>
-            <strong>Utqiaġvik (Barrow)</strong><br />
-            Northernmost US city<br />
-            <em>Demo location</em>
-          </Popup>
-        </Marker>
-      </MapContainer>
+        {/* Legend */}
+        {!loading && <Legend totalRegions={regions.length} />}
+      </div>
 
       {/* Footer */}
-      <div style={{ 
-        padding: '12px 20px', 
-        backgroundColor: '#1f2937', 
+      <div style={{
+        padding: '12px 20px',
+        backgroundColor: '#1f2937',
         color: '#9ca3af',
         fontSize: '12px',
         borderTop: '1px solid #374151'
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <strong style={{ color: '#e5e7eb' }}>Mentors:</strong> Pradeeban Kathiravelu & David Moxley | 
+            <strong style={{ color: '#e5e7eb' }}>Mentors:</strong> Pradeeban Kathiravelu & David Moxley |
             <span style={{ marginLeft: '10px' }}>University of Alaska</span>
           </div>
           <div>
-            <a 
-              href="https://github.com/KathiraveluLab/TENeT" 
-              target="_blank" 
+            <a
+              href="https://github.com/KathiraveluLab/TENeT"
+              target="_blank"
               rel="noopener noreferrer"
               style={{ color: '#60a5fa', textDecoration: 'none' }}
             >
               GitHub
             </a>
             {' | '}
-            <a 
-              href="https://github.com/KathiraveluLab/TENeT/discussions" 
-              target="_blank" 
+            <a
+              href="https://github.com/KathiraveluLab/TENeT/discussions"
+              target="_blank"
               rel="noopener noreferrer"
               style={{ color: '#60a5fa', textDecoration: 'none' }}
             >

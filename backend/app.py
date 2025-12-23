@@ -27,6 +27,6 @@ def health():
     return jsonify({"status": "ok", "message": "TENeT Backend is running"})
 
 if __name__ == '__main__':
-    print("Starting TENeT Backend on http://localhost:5000")
-    print("CAT API available at http://localhost:5000/api/cat")
-    app.run(debug=True, port=5000)
+    print("Starting TENeT Backend on http://localhost:5001")
+    print("CAT API available at http://localhost:5001/api/cat")
+    app.run(debug=True, port=5001)

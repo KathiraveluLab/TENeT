@@ -27,6 +27,10 @@ class CATRegion(Base):
     area_sqkm = Column(Float, nullable=True)
     access_score = Column(Float, nullable=True)
     
+    # Centroid coordinates for map display
+    centroid_lat = Column(Float, nullable=True)
+    centroid_lon = Column(Float, nullable=True)
+    
     # Additional properties stored as JSON
     properties = Column(JSON, nullable=True)
     
@@ -157,3 +161,63 @@ class CATGatingRule(Base):
     
     def __repr__(self):
         return f"<CATGatingRule {self.rule_name} (Tier {self.tier_level})>"
+
+
+class HealthcareSite(Base):
+    """
+    Healthcare facilities, clinics, hospitals for healthcare desert analysis
+    """
+    __tablename__ = 'healthcare_sites'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False, index=True)
+    site_type = Column(String(100), nullable=False, index=True)  # hospital, clinic, health_center
+    
+    # Service capabilities
+    has_emergency = Column(Boolean, default=False)
+    has_specialists = Column(Boolean, default=False)
+    
+    # Location
+    latitude = Column(Float, nullable=False)
+    longitude = Column(Float, nullable=False)
+    address = Column(String(500), nullable=True)
+    
+    # Region association
+    region_code = Column(String(50), ForeignKey('cat_regions.region_code'), nullable=True, index=True)
+    
+    # Services offered (stored as JSON array)
+    # e.g., ["emergency", "primary_care", "specialist", "dental", "pharmacy"]
+    services = Column(JSON, nullable=True)
+    
+    # Contact info
+    phone = Column(String(50), nullable=True)
+    website = Column(String(255), nullable=True)
+    
+    # Operating details
+    operating_hours = Column(JSON, nullable=True)  # {"monday": "8:00-17:00", ...}
+    beds = Column(Integer, nullable=True)  # For hospitals
+    
+    # Telehealth capability
+    has_telehealth = Column(Boolean, default=False, index=True)
+    telehealth_services = Column(JSON, nullable=True)  # ["video_consult", "remote_monitoring"]
+    
+    # Status
+    is_active = Column(Boolean, default=True)
+    verified = Column(Boolean, default=False)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationship to region
+    region = relationship('CATRegion', backref='healthcare_sites')
+    
+    # Indexes for geospatial queries
+    __table_args__ = (
+        Index('idx_healthcare_location', 'latitude', 'longitude'),
+        Index('idx_healthcare_type_active', 'site_type', 'is_active'),
+    )
+    
+    def __repr__(self):
+        return f"<HealthcareSite {self.name} ({self.site_type})>"
+
