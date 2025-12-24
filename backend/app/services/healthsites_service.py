@@ -1,31 +1,35 @@
-import requests
-from app.clients.nppes_client import query_nppes
+import json
+from pathlib import Path
 
-ALASKA_ZIP_PREFIXES = ["995", "996", "997", "998", "999"]
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BASE_DIR / "data"
 
-def fetch_healthsites(state: str = None, city: str = None):
-    # primary query
-    primary_results = query_nppes(state=state, city=city)
+def load_healthsites():
+    with open(DATA_DIR / "healthsites_alaska.geojson") as f:
+        return json.load(f)["features"]
 
-    # Alaska fallback logic
-    if state and state.upper() == "AK" and len(primary_results) == 0:
-        zip_relaxed_results = []
-        for prefix in ALASKA_ZIP_PREFIXES:
-            zip_relaxed_results.extend(
-                query_nppes(postal_code=f"{prefix}*")
-            )
 
-        combined = primary_results + zip_relaxed_results
-        deduped = {item["npi"]: item for item in combined}.values()
+def fetch_healthsites():
+    raw = load_healthsites()
+    sites = []
 
-        return {
-            "count": len(deduped),
-            "data": list(deduped),
-            "fallback_used": True
-        }
+    for feature in raw:
+        props = feature["properties"]
+        geom = feature["geometry"]
+
+        sites.append({
+            "id": props.get("id"),
+            "name": props.get("name"),
+            "amenity": props.get("amenity"),
+            "healthcare": props.get("healthcare"),
+            "care_mode": "physical",
+            "location": {
+                "lat": geom["coordinates"][1],
+                "lon": geom["coordinates"][0],
+            }
+        })
 
     return {
-        "count": len(primary_results),
-        "data": primary_results,
-        "fallback_used": False,
+        "count": len(sites),
+        "data": sites
     }

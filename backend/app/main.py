@@ -1,17 +1,20 @@
 from fastapi import FastAPI
 from dotenv import load_dotenv
 load_dotenv()
-from .routers.healthsites import router as healthsites_router
 from .routers.metrics import router as metrics_router
 from .routers.transport import router as transport_router
-from .routers.specialists import router as specialist_router
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="TENeT Healthcare Desert Metrics API")
-
-app.include_router(healthsites_router, prefix="/healthsites")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # frontend origin
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(metrics_router, prefix="/metrics")
 app.include_router(transport_router, prefix="/transport")
-app.include_router(specialist_router, prefix="/specialists")
 
 @app.get("/")
 def root():
