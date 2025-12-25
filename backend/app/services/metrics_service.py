@@ -1,13 +1,14 @@
 import math
 from .regions_service import generate_alaska_grid
 
+PHYSICAL_SCORE_LOG_DIVISOR = 3
 def physical_desert_score(items):
     n = len(items)
     if n == 0:
         return 1.0
-    return round(max(0.0, 1 - math.log(n + 1) /3), 3)
+    return round(max(0.0, 1 - math.log(n + 1) / PHYSICAL_SCORE_LOG_DIVISOR), 3)
 
-
+TELEHEALTH_PROVIDER_DIVISOR = 2
 def telehealth_desert_score(items, broadband):
     n = len(items)
 
@@ -15,7 +16,7 @@ def telehealth_desert_score(items, broadband):
         return 1.0
     internet_penalty = 1 - broadband["overall"]
 
-    provider_bonus = min(math.log(n + 1) / 2, 1)
+    provider_bonus = min(math.log(n + 1) / TELEHEALTH_PROVIDER_DIVISOR, 1)
 
     score = internet_penalty * (1 - provider_bonus)
 
@@ -86,6 +87,7 @@ def compute_desert_index(
     for r in regions:
         broadband = region_broadband_metrics(r, h3_broadband_map)
         results.append({
+            "h3": r["h3"],
             "center": r["center"],
             "physical_desert": physical_desert_score(r["physical_items"]),
             "telehealth_desert": telehealth_desert_score(

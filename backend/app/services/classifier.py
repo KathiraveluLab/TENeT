@@ -1,23 +1,3 @@
-def classify_specialist(taxonomy: str) -> set[str]:
-    categories = set()
-
-    if not taxonomy:
-        return {"physical"} 
-
-    taxonomy = taxonomy.lower()
-    if any(t in taxonomy for t in PHYSICAL_TAXONOMIES):
-        categories.add("physical")
-
-    if any(t in taxonomy for t in TELEHEALTH_TAXONOMIES):
-        categories.add("telehealth")
-
-    if any(t in taxonomy for t in EXCLUDED_TAXONOMIES) and not categories:
-        return set()
-
-    if not categories:
-        categories.add("physical") 
-
-    return categories
 PHYSICAL_TAXONOMIES = {
     "emergency medicine",
     "surgery",
@@ -84,3 +64,24 @@ EXCLUDED_TAXONOMIES = {
     "pharmacy technician",
     "clinic pharmacy",
 }
+
+def classify_specialist(taxonomy: str) -> set[str]:
+    categories = set()
+
+    if not taxonomy:
+        return {"physical"} 
+
+    taxonomy = taxonomy.lower()
+    if any(t in taxonomy for t in PHYSICAL_TAXONOMIES):
+        categories.add("physical")
+
+    if any(t in taxonomy for t in TELEHEALTH_TAXONOMIES):
+        categories.add("telehealth")
+
+    if any(t in taxonomy for t in EXCLUDED_TAXONOMIES) and not categories:
+        return set()
+
+    if not categories:
+        categories.add("physical") 
+
+    return categories

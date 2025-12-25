@@ -1,7 +1,8 @@
+from pathlib import Path
 import json
 from shapely.geometry import Point, shape
 import h3
-with open("/Users/vritti/tenetd/TENeT/backend/app/data/alaska_boundary.geojson") as f:
+with open(Path(__file__).resolve().parent.parent / "data" / "alaska_boundary.geojson") as f:
     alaska_geojson = json.load(f)
 
 alaska_geom = shape(alaska_geojson["features"][0]["geometry"])

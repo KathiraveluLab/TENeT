@@ -6,6 +6,7 @@ import { getColor } from "../utils/colour";
 type Mode = "physical" | "telehealth";
 
 export interface Region {
+  h3: string;
   center: {
     lat: number;
     lon: number;
@@ -50,16 +51,14 @@ export default function DesertMap({ data, mode }: DesertMapProps) {
             typeof r.center?.lat === "number" &&
             typeof r.center?.lon === "number"
         )
-        .map((r, i) => {
+        .map((r) => {
           const score =
             mode === "physical"
               ? r.physical_desert
               : r.telehealth_desert;
 
-          // clamp score just in case
           const safeScore = Math.max(0, Math.min(1, score));
 
-          // radius reflects provider availability, not constant blobs
           const radius =
             mode === "physical"
               ? Math.min(10, 3 + r.physical_count)
@@ -67,16 +66,16 @@ export default function DesertMap({ data, mode }: DesertMapProps) {
 
           return (
             <CircleMarker
-              key={i}
+              key={r.h3}
               center={[
                 r.center.lat + jitter(),
                 r.center.lon + jitter(),
               ]}
               radius={radius}
               pathOptions={{
-                stroke: false,              // 🔑 removes ugly outlines
+                stroke: false,              
                 fillColor: getColor(safeScore),
-                fillOpacity: 0.6,           // 🔑 softer blending
+                fillOpacity: 0.6,           
               }}
             >
               <Popup>

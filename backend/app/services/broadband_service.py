@@ -1,5 +1,15 @@
 import csv
 from collections import defaultdict
+from pathlib import Path
+
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+
+BROADBAND_SOURCES = [
+    ("bdc_02_FibertothePremises_fixed_broadband_latest.csv", "fiber"),
+    ("bdc_02_Cable_fixed_broadband_latest.csv", "cable"),
+    ("bdc_02_LicensedFixedWireless_fixed_broadband_latest.csv", "licensed_fixed_wireless"),
+    ("bdc_02_Copper_fixed_broadband_latest.csv", "copper"),
+]
 
 TECH_QUALITY_WEIGHT = {
     "fiber": 1.0,
@@ -8,10 +18,16 @@ TECH_QUALITY_WEIGHT = {
     "copper": 0.45,
 }
 
+DOWNLOAD_CAP_MBPS = 100.0
+UPLOAD_CAP_MBPS = 20.0
+
+DOWNLOAD_WEIGHT = 0.7
+UPLOAD_WEIGHT = 0.3
+
 def speed_score(download, upload):
-    d = min(download / 100, 1.0)   # cap at 100 Mbps
-    u = min(upload / 20, 1.0)      # cap at 20 Mbps
-    return round((0.7 * d + 0.3 * u), 3)
+    d = min(download / DOWNLOAD_CAP_MBPS, 1.0)   # cap at 100 Mbps
+    u = min(upload / UPLOAD_CAP_MBPS, 1.0)      # cap at 20 Mbps
+    return round((DOWNLOAD_WEIGHT * d + UPLOAD_WEIGHT * u), 3)
 
 def load_broadband_by_h3(csv_files):
     h3_map = defaultdict(lambda: defaultdict(float))
