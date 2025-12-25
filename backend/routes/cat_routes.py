@@ -1,15 +1,22 @@
 """
 API routes for Community Access Tier (CAT) data management
 """
-from database.models import CATRegion
+from database.models import CATRegion, HealthcareSite
 from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
 import os
 from database.config import SessionLocal
 from database.handlers import CATDataHandler
 from services.data_importer import CATDataImporter
+from services.healthcare_desert_calculator import HealthcareDesertCalculator
 
 cat_bp = Blueprint('cat', __name__, url_prefix='/api/cat')
+
+# Priority classification thresholds
+HIGH_NECESSITY_THRESHOLD = 70
+MODERATE_NECESSITY_THRESHOLD = 50
+HIGH_CONNECTIVITY_THRESHOLD = 60
+LOW_CONNECTIVITY_THRESHOLD = 40
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'uploads')
 ALLOWED_EXTENSIONS = {'csv', 'geojson', 'json'}
@@ -25,12 +32,6 @@ def allowed_file(filename):
 @cat_bp.route('/regions', methods=['GET'])
 def get_regions():
     """Get all regions or filter by tier"""
-
-
-@cat_bp.route('/regions/<region_code>', methods=['GET'])
-def get_region(region_code):
-    """Get specific region by code"""
-    
     db = SessionLocal()
     try:
         tier_level = request.args.get('tier', type=int)
@@ -38,7 +39,6 @@ def get_region(region_code):
         if tier_level:
             regions = CATDataHandler.get_regions_by_tier(db, tier_level)
         else:
-            
             regions = db.query(CATRegion).all()
 
         result = []
@@ -51,13 +51,48 @@ def get_region(region_code):
                 'population': region.population,
                 'area_sqkm': region.area_sqkm,
                 'access_score': region.access_score,
+                'centroid_lat': region.centroid_lat,
+                'centroid_lon': region.centroid_lon,
+                'description': region.properties.get('tier_justification', '') if region.properties else '',
                 'created_at': region.created_at.isoformat() if region.created_at else None
             })
 
-        return jsonify({'regions': result, 'count': len(result)}), 200
+        return jsonify({'regions': result, 'total': len(result)}), 200
 
     except Exception as e:
-        # optionally: db.rollback() if you use transactions
+        return jsonify({'error': str(e)}), 500
+
+    finally:
+        db.close()
+
+
+@cat_bp.route('/regions/<region_code>', methods=['GET'])
+def get_region(region_code):
+    """Get specific region by code"""
+    db = SessionLocal()
+    try:
+        region = CATDataHandler.get_region_by_code(db, region_code)
+        
+        if not region:
+            return jsonify({'error': f'Region not found: {region_code}'}), 404
+        
+        result = {
+            'id': region.id,
+            'region_name': region.region_name,
+            'region_code': region.region_code,
+            'tier_level': region.tier_level,
+            'population': region.population,
+            'area_sqkm': region.area_sqkm,
+            'access_score': region.access_score,
+            'centroid_lat': region.centroid_lat,
+            'centroid_lon': region.centroid_lon,
+            'description': region.properties.get('tier_justification', '') if region.properties else '',
+            'created_at': region.created_at.isoformat() if region.created_at else None
+        }
+
+        return jsonify(result), 200
+
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
     finally:
@@ -373,3 +408,227 @@ def evaluate_feasibility(region_code):
         return jsonify({'error': str(e), 'decision': 'ERROR'}), 500
     finally:
         db.close()
+
+
+# =============================================================================
+# Healthcare Sites & Desert Score API
+# =============================================================================
+
+@cat_bp.route('/healthcare-sites', methods=['GET'])
+def get_healthcare_sites():
+    """Get all healthcare sites, optionally filtered by region"""
+    db = SessionLocal()
+    try:
+        region_code = request.args.get('region_code')
+        site_type = request.args.get('site_type')
+        
+        query = db.query(HealthcareSite)
+        
+        if region_code:
+            query = query.filter(HealthcareSite.region_code == region_code)
+        if site_type:
+            query = query.filter(HealthcareSite.site_type == site_type)
+        
+        sites = query.all()
+        
+        result = [{
+            'id': site.id,
+            'name': site.name,
+            'site_type': site.site_type,
+            'latitude': site.latitude,
+            'longitude': site.longitude,
+            'region_code': site.region_code,
+            'has_emergency': site.has_emergency,
+            'has_specialists': site.has_specialists,
+            'services': site.services,
+            'address': site.address
+        } for site in sites]
+        
+        return jsonify({'sites': result, 'count': len(result)}), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@cat_bp.route('/healthcare-sites', methods=['POST'])
+def create_healthcare_site():
+    """Create a new healthcare site"""
+    db = SessionLocal()
+    try:
+        data = request.json
+        
+        if not data.get('name') or not data.get('latitude') or not data.get('longitude'):
+            return jsonify({'error': 'name, latitude, and longitude are required'}), 400
+        
+        site = HealthcareSite(
+            name=data['name'],
+            site_type=data.get('site_type', 'clinic'),
+            latitude=data['latitude'],
+            longitude=data['longitude'],
+            region_code=data.get('region_code'),
+            has_emergency=data.get('has_emergency', False),
+            has_specialists=data.get('has_specialists', False),
+            services=data.get('services'),
+            address=data.get('address')
+        )
+        
+        db.add(site)
+        db.commit()
+        
+        return jsonify({
+            'id': site.id,
+            'message': 'Healthcare site created'
+        }), 201
+        
+    except Exception as e:
+        db.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@cat_bp.route('/healthcare-necessity/<region_code>', methods=['GET'])
+def get_healthcare_necessity(region_code):
+    """
+    Get healthcare necessity score for a region.
+    Higher score = greater need for telehealth (0-100).
+    """
+    db = SessionLocal()
+    try:
+        result = HealthcareDesertCalculator.calculate_healthcare_necessity_score(
+            db, region_code
+        )
+        
+        return jsonify(result), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@cat_bp.route('/healthcare-necessity', methods=['GET'])
+def get_all_healthcare_necessity():
+    """Get necessity scores for all regions, sorted by score (highest first)"""
+    db = SessionLocal()
+    try:
+        results = HealthcareDesertCalculator.get_all_region_scores(db)
+        
+        return jsonify({
+            'regions': results,
+            'count': len(results)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@cat_bp.route('/telehealth-priority/<region_code>', methods=['GET'])
+def get_telehealth_priority(region_code):
+    """
+    Calculate telehealth deployment priority by combining:
+    - Healthcare necessity (desert score)
+    - Internet feasibility (CAT tier score)
+    
+    Returns priority classification: HIGH, CRITICAL, MODERATE, LOW
+    """
+    db = SessionLocal()
+    try:
+        # Get region
+        region = CATDataHandler.get_region_by_code(db, region_code)
+        if not region:
+            return jsonify({'error': f'Region {region_code} not found'}), 404
+        
+        # 1. Calculate healthcare necessity
+        necessity = HealthcareDesertCalculator.calculate_healthcare_necessity_score(
+            db, region_code
+        )
+        necessity_score = necessity['necessity_score']
+        
+        # 2. Get internet feasibility
+        from database.models import CATDataPoint
+        data_point = db.query(CATDataPoint).filter(
+            CATDataPoint.region_code == region_code,
+            CATDataPoint.is_active == True
+        ).first()
+        
+        if data_point:
+            feasibility_result = CATDataHandler.check_cat4_telehealth_feasibility(
+                data_point, telehealth_mode='video'
+            )
+            connectivity_score = 100 if feasibility_result['feasible'] else 0
+        else:
+            connectivity_score = 0
+        
+        # 3. Determine priority classification
+        if necessity_score > HIGH_NECESSITY_THRESHOLD:
+            if connectivity_score > HIGH_CONNECTIVITY_THRESHOLD:
+                priority = 'HIGH'
+                color = '#22c55e'  # Green
+                label = 'Telehealth Recommended'
+                recommendation = 'Deploy telehealth services immediately. High need + capable infrastructure.'
+            elif connectivity_score < LOW_CONNECTIVITY_THRESHOLD:
+                priority = 'CRITICAL'
+                color = '#ef4444'  # Red
+                label = 'Infrastructure Gap'
+                recommendation = 'Critical need but insufficient connectivity. Prioritize infrastructure investment.'
+            else:  # Moderate connectivity (40-60)
+                priority = 'MODERATE'
+                color = '#f97316'  # Orange
+                label = 'Mixed Priority'
+                recommendation = 'High need with moderate connectivity. Consider store-and-forward telehealth.'
+                
+        elif necessity_score > MODERATE_NECESSITY_THRESHOLD:
+            if connectivity_score > HIGH_CONNECTIVITY_THRESHOLD:
+                priority = 'MODERATE'
+                color = '#eab308'  # Yellow
+                label = 'Consider Telehealth'
+                recommendation = 'Moderate need with good connectivity. Good candidate for pilot programs.'
+            else:
+                priority = 'LOW'
+                color = '#3b82f6'  # Blue
+                label = 'Lower Priority'
+                recommendation = 'Moderate need with limited connectivity. Monitor for changes.'
+                
+        else:
+            priority = 'LOW'
+            color = '#3b82f6'  # Blue
+            label = 'Adequate In-Person Access'
+            recommendation = 'In-person care is accessible. Telehealth not priority.'
+        
+        response = {
+            'region_code': region_code,
+            'region_name': region.region_name,
+            'cat_tier': region.tier_level,
+            
+            # Scores
+            'necessity_score': necessity_score,
+            'connectivity_score': connectivity_score,
+            'combined_priority': round((necessity_score * connectivity_score) / 100, 2),
+            
+            # Classification
+            'priority': priority,
+            'color': color,
+            'label': label,
+            'recommendation': recommendation,
+            
+            # Details
+            'healthcare_details': necessity,
+            'connectivity_details': {
+                'bandwidth_mbps': data_point.throughput_mbps if data_point else None,
+                'latency_ms': data_point.latency_ms if data_point else None,
+                'feasible_for_video': connectivity_score > 60
+            }
+        }
+        
+        return jsonify(response), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+

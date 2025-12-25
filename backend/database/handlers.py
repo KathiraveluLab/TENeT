@@ -198,13 +198,18 @@ class CATDataHandler:
     @staticmethod
     def get_statistics(db: Session) -> dict:
         """Get database statistics"""
+        from database.models import HealthcareSite
+        
         return {
             'total_regions': db.query(CATRegion).count(),
             'total_uploads': db.query(CATUpload).count(),
             'total_data_points': db.query(CATDataPoint).count(),
             'completed_uploads': db.query(CATUpload).filter(CATUpload.status == 'completed').count(),
             'total_gating_rules': db.query(CATGatingRule).count(),
-            'active_gating_rules': db.query(CATGatingRule).filter(CATGatingRule.is_active == True).count()
+            'active_gating_rules': db.query(CATGatingRule).filter(CATGatingRule.is_active == True).count(),
+            'total_healthcare_sites': db.query(HealthcareSite).count(),
+            'hospitals': db.query(HealthcareSite).filter(HealthcareSite.site_type == 'hospital').count(),
+            'clinics': db.query(HealthcareSite).filter(HealthcareSite.site_type == 'clinic').count()
         }
     
     # =========================================================================

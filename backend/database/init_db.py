@@ -109,8 +109,24 @@ def main():
     finally:
         db.close()
     
+    # Seed healthcare sites
+    print("\n3. Seeding healthcare sites...")
+    try:
+        from database.seed_healthcare_sites import seed_sample_healthcare_sites
+        seed_sample_healthcare_sites()
+    except Exception as e:
+        print(f"   Warning: Could not seed healthcare sites: {e}")
+    
+    # Seed CAT data from preprocessed CSV
+    print("\n4. Seeding CAT regions and data points...")
+    try:
+        from database.seed_cat_data import seed_cat_data
+        seed_cat_data()
+    except Exception as e:
+        print(f"   Warning: Could not seed CAT data: {e}")
+    
     # Get statistics
-    print("\n3. Database Statistics:")
+    print("\n5. Database Statistics:")
     db = SessionLocal()
     try:
         stats = CATDataHandler.get_statistics(db)
@@ -120,6 +136,9 @@ def main():
         print(f"   - Completed uploads: {stats['completed_uploads']}")
         print(f"   - Total gating rules: {stats['total_gating_rules']}")
         print(f"   - Active gating rules: {stats['active_gating_rules']}")
+        print(f"   - Total healthcare sites: {stats.get('total_healthcare_sites', 0)}")
+        print(f"   - Hospitals: {stats.get('hospitals', 0)}")
+        print(f"   - Clinics: {stats.get('clinics', 0)}")
     finally:
         db.close()
     
@@ -130,6 +149,7 @@ def main():
     print("1. Upload CSV data: POST /api/cat/upload")
     print("2. Upload GeoJSON regions: POST /api/cat/upload")
     print("3. View statistics: GET /api/cat/statistics")
+    print("4. View healthcare sites: GET /api/cat/healthcare-sites")
     print("\nSample data templates are available in data/samples/")
     print("=" * 60)
 
