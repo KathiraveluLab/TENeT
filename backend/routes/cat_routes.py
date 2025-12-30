@@ -732,41 +732,54 @@ def get_telehealth_priority(region_code):
         else:
             connectivity_score = 0
         
-        # 3. Determine priority classification
+        # 3. Determine priority classification with season-contextual recommendations
+        season_display = get_season_display_name(season)
+        
+        # Season-specific context for recommendations
+        if season == SEASON_WINTER:
+            season_context = "Winter conditions limit transport options. "
+            transport_note = "Seasonal roads/water frozen."
+        elif season == SEASON_SUMMER:
+            season_context = "Summer provides optimal access. "
+            transport_note = "All transport modes available."
+        else:
+            season_context = "Year-round average conditions. "
+            transport_note = "Conservative transport assumptions."
+        
         if necessity_score > HIGH_NECESSITY_THRESHOLD:
             if connectivity_score > HIGH_CONNECTIVITY_THRESHOLD:
                 priority = 'HIGH'
                 color = '#22c55e'  # Green
-                label = 'Telehealth Recommended'
-                recommendation = 'Deploy telehealth services immediately. High need + capable infrastructure.'
+                label = f'Telehealth Recommended ({season_display})'
+                recommendation = f'{season_context}High need + capable infrastructure. Deploy telehealth immediately.'
             elif connectivity_score < LOW_CONNECTIVITY_THRESHOLD:
                 priority = 'CRITICAL'
                 color = '#ef4444'  # Red
-                label = 'Infrastructure Gap'
-                recommendation = 'Critical need but insufficient connectivity. Prioritize infrastructure investment.'
+                label = f'Infrastructure Gap ({season_display})'
+                recommendation = f'{season_context}Critical need but insufficient connectivity. {transport_note} Prioritize infrastructure investment.'
             else:  # Moderate connectivity (40-60)
                 priority = 'MODERATE'
                 color = '#f97316'  # Orange
-                label = 'Mixed Priority'
-                recommendation = 'High need with moderate connectivity. Consider store-and-forward telehealth.'
+                label = f'Mixed Priority ({season_display})'
+                recommendation = f'{season_context}High need with moderate connectivity. Consider store-and-forward telehealth.'
                 
         elif necessity_score > MODERATE_NECESSITY_THRESHOLD:
             if connectivity_score > HIGH_CONNECTIVITY_THRESHOLD:
                 priority = 'MODERATE'
                 color = '#eab308'  # Yellow
-                label = 'Consider Telehealth'
-                recommendation = 'Moderate need with good connectivity. Good candidate for pilot programs.'
+                label = f'Consider Telehealth ({season_display})'
+                recommendation = f'{season_context}Moderate need with good connectivity. Good candidate for pilot programs.'
             else:
                 priority = 'LOW'
                 color = '#3b82f6'  # Blue
-                label = 'Lower Priority'
-                recommendation = 'Moderate need with limited connectivity. Monitor for changes.'
+                label = f'Lower Priority ({season_display})'
+                recommendation = f'{season_context}Moderate need with limited connectivity. {transport_note}'
                 
         else:
             priority = 'LOW'
             color = '#3b82f6'  # Blue
-            label = 'Adequate In-Person Access'
-            recommendation = 'In-person care is accessible. Telehealth not priority.'
+            label = f'Adequate Access ({season_display})'
+            recommendation = f'{season_context}In-person care is accessible. Telehealth not priority.'
         
         response = {
             'region_code': region_code,
