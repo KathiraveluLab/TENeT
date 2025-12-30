@@ -52,9 +52,9 @@ function App() {
   // Get season display info
   const getSeasonInfo = () => {
     switch (season) {
-      case 'summer': return { icon: '☀️', label: 'Summer', note: 'All transport modes available' };
-      case 'winter': return { icon: '❄️', label: 'Winter', note: 'Seasonal roads/water routes restricted' };
-      case 'year_round': return { icon: '📅', label: 'Year-Round Average', note: 'Conservative average assumptions' };
+      case 'summer': return { label: 'Summer', note: 'All transport modes available' };
+      case 'winter': return { label: 'Winter', note: 'Seasonal roads/water routes restricted' };
+      case 'year_round': return { label: 'Year-Round Average', note: 'Conservative average assumptions' };
     }
   };
 
@@ -93,7 +93,6 @@ function App() {
         alignItems: 'center',
         gap: '8px',
       }}>
-        <span style={{ fontSize: '16px' }}>{seasonInfo.icon}</span>
         <span>
           <strong>Active Scenario:</strong> {seasonInfo.label} — {seasonInfo.note}
         </span>

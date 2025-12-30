@@ -12,10 +12,10 @@ interface SeasonSelectorProps {
  * User-selected season controls transport difficulty assumptions in API queries.
  */
 export default function SeasonSelector({ season, onChange }: SeasonSelectorProps) {
-    const seasons: { id: Season; label: string; icon: string }[] = [
-        { id: 'summer', label: 'Summer', icon: '☀️' },
-        { id: 'winter', label: 'Winter', icon: '❄️' },
-        { id: 'year_round', label: 'Year-Round', icon: '📅' },
+    const seasons: { id: Season; label: string }[] = [
+        { id: 'summer', label: 'Summer' },
+        { id: 'winter', label: 'Winter' },
+        { id: 'year_round', label: 'Year-Round' },
     ];
 
     return (
@@ -36,7 +36,7 @@ export default function SeasonSelector({ season, onChange }: SeasonSelectorProps
                 Season Scenario:
             </span>
 
-            {seasons.map(({ id, label, icon }) => (
+            {seasons.map(({ id, label }) => (
                 <button
                     key={id}
                     onClick={() => onChange(id)}
@@ -44,7 +44,7 @@ export default function SeasonSelector({ season, onChange }: SeasonSelectorProps
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px',
-                        padding: '6px 12px',
+                        padding: '6px 14px',
                         fontSize: '13px',
                         fontWeight: season === id ? '600' : '400',
                         color: season === id ? '#1e40af' : 'white',
@@ -67,8 +67,7 @@ export default function SeasonSelector({ season, onChange }: SeasonSelectorProps
                     aria-pressed={season === id}
                     title={`Set season scenario to ${label}`}
                 >
-                    <span style={{ fontSize: '14px' }}>{icon}</span>
-                    <span>{label}</span>
+                    {label}
                 </button>
             ))}
         </div>
