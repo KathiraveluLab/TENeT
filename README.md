@@ -15,10 +15,11 @@ TENeT/
 │   │   ├── api/
 │   │   │   └── catApi.ts       # API client for CAT endpoints
 │   │   ├── components/
-│   │   │   ├── RegionMarker.tsx  # Map marker component
-│   │   │   └── Legend.tsx        # CAT tier legend
+│   │   │   ├── RegionMarker.tsx    # Map marker with season-adjusted popup
+│   │   │   ├── SeasonSelector.tsx  # Season toggle (Summer/Winter/Year-Round)
+│   │   │   └── Legend.tsx          # CAT tier legend
 │   │   ├── types/              # TypeScript type definitions
-│   │   ├── App.tsx             # Main map component
+│   │   ├── App.tsx             # Main map component with season state
 │   │   └── main.tsx            # Entry point
 │   ├── package.json
 │   ├── vite.config.ts
@@ -50,7 +51,8 @@ TENeT/
     │
     ├── services/
     │   ├── data_importer.py    # CSV/GeoJSON import service
-    │   └── healthcare_desert_calculator.py  # Necessity scoring
+    │   ├── healthcare_desert_calculator.py  # Season-adjusted necessity scoring
+    │   └── season_constants.py # Seasonal transport modifiers
     │
     ├── app.py                  # Flask application entry point
     └── requirements.txt
@@ -85,10 +87,14 @@ The backend will start at `http://localhost:5001`
 
 **Available endpoints:**
 - `GET /api/health` - Health check
-- `GET /api/cat/regions` - List all 421 communities
+- `GET /api/cat/regions?season=winter` - List all 421 communities (season-adjusted tiers)
 - `GET /api/cat/statistics` - Database statistics
 - `GET /api/cat/healthcare-sites` - Healthcare facilities
 - `GET /api/cat/feasibility/<region_code>` - Telehealth feasibility
+- `GET /api/cat/healthcare-necessity/<region_code>?season=summer` - Healthcare desert score
+- `GET /api/cat/telehealth-priority/<region_code>?season=winter` - Priority classification
+
+**Season parameter**: `summer`, `winter`, or `year_round` (default)
 
 ### Frontend Setup
 

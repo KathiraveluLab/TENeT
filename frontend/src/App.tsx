@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { fetchRegions, CATRegion } from './api/catApi';
+import { fetchRegions, CATRegion, Season } from './api/catApi';
 import RegionMarker from './components/RegionMarker';
 import Legend from './components/Legend';
+import SeasonSelector from './components/SeasonSelector';
 
 // Fix for default marker icons in React-Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -28,12 +29,13 @@ function App() {
   const [regions, setRegions] = useState<CATRegion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [season, setSeason] = useState<Season>('year_round');
 
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        const data = await fetchRegions();
+        const data = await fetchRegions(season);  // Pass season to get adjusted tiers
         setRegions(data);
         setError(null);
       } catch (err) {
@@ -45,23 +47,63 @@ function App() {
     }
 
     loadData();
-  }, []);
+  }, [season]);  // Re-fetch when season changes
+
+  // Get season display info
+  const getSeasonInfo = () => {
+    switch (season) {
+      case 'summer': return { label: 'Summer', note: 'All transport modes available' };
+      case 'winter': return { label: 'Winter', note: 'Seasonal roads/water routes restricted' };
+      case 'year_round': return { label: 'Year-Round Average', note: 'Conservative average assumptions' };
+    }
+  };
+
+  const seasonInfo = getSeasonInfo();
 
   return (
     <div style={{ height: '100vh', width: '100%', margin: 0, padding: 0, display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <div style={{
-        padding: '20px',
+        padding: '16px 20px',
         backgroundColor: '#1e40af',
         color: 'white',
         boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
       }}>
-        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>
-          TENeT - Telehealth Effectiveness and Necessity Tracker
-        </h1>
-        <p style={{ margin: '5px 0 0 0', fontSize: '14px', opacity: 0.9 }}>
-          Identifying healthcare deserts and assessing network feasibility for telehealth in Alaska
-        </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>
+              TENeT - Telehealth Effectiveness and Necessity Tracker
+            </h1>
+            <p style={{ margin: '5px 0 0 0', fontSize: '14px', opacity: 0.9 }}>
+              Identifying healthcare deserts and assessing network feasibility for telehealth in Alaska
+            </p>
+          </div>
+          <SeasonSelector season={season} onChange={setSeason} />
+        </div>
+      </div>
+
+      {/* Season Indicator Banner */}
+      <div style={{
+        padding: '8px 20px',
+        backgroundColor: '#dbeafe',
+        borderBottom: '1px solid #bfdbfe',
+        fontSize: '13px',
+        color: '#1e40af',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+      }}>
+        <span>
+          <strong>Active Scenario:</strong> {seasonInfo.label} — {seasonInfo.note}
+        </span>
+        <span style={{
+          marginLeft: 'auto',
+          fontSize: '11px',
+          color: '#6b7280',
+          fontStyle: 'italic'
+        }}>
+          Click a community marker for season-adjusted telehealth priority
+        </span>
       </div>
 
       {/* Map Container */}
@@ -116,9 +158,9 @@ function App() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {/* Render markers for all regions */}
+          {/* Render markers for all regions with season prop */}
           {regions.map(region => (
-            <RegionMarker key={region.region_code} region={region} />
+            <RegionMarker key={region.region_code} region={region} season={season} />
           ))}
         </MapContainer>
 
@@ -165,3 +207,4 @@ function App() {
 }
 
 export default App;
+

@@ -9,6 +9,11 @@ from database.config import SessionLocal
 from database.handlers import CATDataHandler
 from services.data_importer import CATDataImporter
 from services.healthcare_desert_calculator import HealthcareDesertCalculator
+from services.season_constants import (
+    SEASON_SUMMER, SEASON_WINTER, SEASON_YEAR_ROUND, VALID_SEASONS, 
+    ROAD_QUALITY_LOCAL, VALID_ROAD_QUALITIES,
+    get_season_display_name
+)
 
 cat_bp = Blueprint('cat', __name__, url_prefix='/api/cat')
 
@@ -31,10 +36,20 @@ def allowed_file(filename):
 # Region endpoints
 @cat_bp.route('/regions', methods=['GET'])
 def get_regions():
-    """Get all regions or filter by tier"""
+    """
+    Get all regions with optional season adjustment.
+    
+    Query params:
+        tier: Filter by base tier level
+        season: 'summer', 'winter', or 'year_round' (adjusts tier levels)
+    """
     db = SessionLocal()
     try:
         tier_level = request.args.get('tier', type=int)
+        season = request.args.get('season', SEASON_YEAR_ROUND)
+        
+        if season not in VALID_SEASONS:
+            season = SEASON_YEAR_ROUND
 
         if tier_level:
             regions = CATDataHandler.get_regions_by_tier(db, tier_level)
@@ -43,27 +58,138 @@ def get_regions():
 
         result = []
         for region in regions:
+            base_tier = region.tier_level
+            base_score = region.access_score or 50
+            
+            # Calculate season-adjusted tier and score
+            adjusted_tier, adjusted_score, explanation = _calculate_seasonal_tier(
+                base_tier, base_score, region.properties, season
+            )
+            
             result.append({
                 'id': region.id,
                 'region_name': region.region_name,
                 'region_code': region.region_code,
-                'tier_level': region.tier_level,
+                'tier_level': adjusted_tier,  # Season-adjusted tier
+                'base_tier': base_tier,  # Original tier for reference
                 'population': region.population,
                 'area_sqkm': region.area_sqkm,
-                'access_score': region.access_score,
+                'access_score': adjusted_score,  # Season-adjusted score
+                'base_access_score': base_score,
                 'centroid_lat': region.centroid_lat,
                 'centroid_lon': region.centroid_lon,
-                'description': region.properties.get('tier_justification', '') if region.properties else '',
+                'description': explanation,  # Season-adjusted explanation
+                'season': season,
                 'created_at': region.created_at.isoformat() if region.created_at else None
             })
 
-        return jsonify({'regions': result, 'total': len(result)}), 200
+        return jsonify({
+            'regions': result, 
+            'total': len(result),
+            'season': season,
+            'season_display': get_season_display_name(season)
+        }), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
     finally:
         db.close()
+
+
+def _calculate_seasonal_tier(base_tier: int, base_score: float, properties: dict, season: str):
+    """
+    Calculate season-adjusted CAT tier and access score.
+    
+    Winter: Reduces access (tiers can go up: worse)
+    Summer: Maintains or improves access (tiers can go down: better)
+    Year-round: Uses base values
+    
+    Returns: (adjusted_tier, adjusted_score, explanation)
+    """
+    # Get original justification
+    base_explanation = ''
+    if properties:
+        base_explanation = properties.get('tier_justification', '')
+    
+    if season == SEASON_YEAR_ROUND:
+        return base_tier, base_score, base_explanation
+    
+    # Check access modes from properties
+    primary_modes = []
+    if properties:
+        modes_str = properties.get('primary_access_modes', '')
+        primary_modes = [m.strip() for m in modes_str.split(',') if m.strip()]
+    
+    has_road = 'road' in primary_modes
+    has_air = 'air' in primary_modes
+    has_water = 'water' in primary_modes
+    
+    if season == SEASON_WINTER:
+        # Winter restricts seasonal transport
+        tier_penalty = 0
+        score_penalty = 0
+        restricted_modes = []
+        
+        # Water is mostly unavailable in winter
+        if has_water and not has_air:
+            tier_penalty += 1
+            score_penalty += 25
+            restricted_modes.append('water (frozen)')
+        elif has_water:
+            score_penalty += 10
+            restricted_modes.append('water (limited)')
+        
+        # Seasonal roads are unavailable
+        if has_road:
+            score_penalty += 5  # Roads harder but not impossible
+        
+        # No air = significant penalty
+        if not has_air and base_tier < 4:
+            tier_penalty += 1
+            score_penalty += 20
+        
+        adjusted_tier = min(4, base_tier + tier_penalty)
+        adjusted_score = max(0, base_score - score_penalty)
+        
+        if tier_penalty > 0:
+            explanation = f"Winter access: {', '.join(restricted_modes) if restricted_modes else 'Limited transport'}"
+        else:
+            explanation = f"Winter access: Air available; {base_explanation}"
+        
+        return adjusted_tier, round(adjusted_score, 1), explanation
+    
+    elif season == SEASON_SUMMER:
+        # Summer can improve access slightly for communities with seasonal routes
+        tier_bonus = 0
+        score_bonus = 0
+        
+        # Multi-modal access in summer
+        if has_water and has_air:
+            score_bonus += 10
+        
+        if has_road and has_water:
+            score_bonus += 5
+        
+        # Tier 4 with some access can become Tier 3 in summer
+        if base_tier == 4 and (has_water or has_air):
+            tier_bonus = -1
+        
+        adjusted_tier = max(1, base_tier + tier_bonus)
+        adjusted_score = min(100, base_score + score_bonus)
+        
+        if tier_bonus < 0:
+            explanation = f"Summer access: Seasonal routes available; improved from Tier {base_tier}"
+        elif score_bonus > 0:
+            explanation = f"Summer access: All modes available; {base_explanation}"
+        else:
+            explanation = base_explanation
+        
+        return adjusted_tier, round(adjusted_score, 1), explanation
+    
+    return base_tier, base_score, base_explanation
+
+
 
 
 @cat_bp.route('/regions/<region_code>', methods=['GET'])
@@ -494,11 +620,24 @@ def get_healthcare_necessity(region_code):
     """
     Get healthcare necessity score for a region.
     Higher score = greater need for telehealth (0-100).
+    
+    Query params:
+        season: 'summer', 'winter', or 'year_round' (default: year_round)
+        road_quality: 'highway', 'local', or 'seasonal' (default: local)
     """
     db = SessionLocal()
     try:
+        # Get season from query params (user-selected)
+        season = request.args.get('season', SEASON_YEAR_ROUND)
+        if season not in VALID_SEASONS:
+            season = SEASON_YEAR_ROUND
+        
+        road_quality = request.args.get('road_quality', ROAD_QUALITY_LOCAL)
+        if road_quality not in VALID_ROAD_QUALITIES:
+            road_quality = ROAD_QUALITY_LOCAL
+        
         result = HealthcareDesertCalculator.calculate_healthcare_necessity_score(
-            db, region_code
+            db, region_code, season, road_quality
         )
         
         return jsonify(result), 200
@@ -511,14 +650,30 @@ def get_healthcare_necessity(region_code):
 
 @cat_bp.route('/healthcare-necessity', methods=['GET'])
 def get_all_healthcare_necessity():
-    """Get necessity scores for all regions, sorted by score (highest first)"""
+    """
+    Get necessity scores for all regions, sorted by score (highest first).
+    
+    Query params:
+        season: 'summer', 'winter', or 'year_round' (default: year_round)
+        road_quality: 'highway', 'local', or 'seasonal' (default: local)
+    """
     db = SessionLocal()
     try:
-        results = HealthcareDesertCalculator.get_all_region_scores(db)
+        season = request.args.get('season', SEASON_YEAR_ROUND)
+        if season not in VALID_SEASONS:
+            season = SEASON_YEAR_ROUND
+        
+        road_quality = request.args.get('road_quality', ROAD_QUALITY_LOCAL)
+        if road_quality not in VALID_ROAD_QUALITIES:
+            road_quality = ROAD_QUALITY_LOCAL
+        
+        results = HealthcareDesertCalculator.get_all_region_scores(db, season, road_quality)
         
         return jsonify({
             'regions': results,
-            'count': len(results)
+            'count': len(results),
+            'season_applied': season,
+            'season_display': get_season_display_name(season)
         }), 200
         
     except Exception as e:
@@ -531,21 +686,34 @@ def get_all_healthcare_necessity():
 def get_telehealth_priority(region_code):
     """
     Calculate telehealth deployment priority by combining:
-    - Healthcare necessity (desert score)
+    - Healthcare necessity (desert score) - season-adjusted
     - Internet feasibility (CAT tier score)
+    
+    Query params:
+        season: 'summer', 'winter', or 'year_round' (default: year_round)
+        road_quality: 'highway', 'local', or 'seasonal' (default: local)
     
     Returns priority classification: HIGH, CRITICAL, MODERATE, LOW
     """
     db = SessionLocal()
     try:
+        # Get season from query params (user-selected)
+        season = request.args.get('season', SEASON_YEAR_ROUND)
+        if season not in VALID_SEASONS:
+            season = SEASON_YEAR_ROUND
+        
+        road_quality = request.args.get('road_quality', ROAD_QUALITY_LOCAL)
+        if road_quality not in VALID_ROAD_QUALITIES:
+            road_quality = ROAD_QUALITY_LOCAL
+        
         # Get region
         region = CATDataHandler.get_region_by_code(db, region_code)
         if not region:
             return jsonify({'error': f'Region {region_code} not found'}), 404
         
-        # 1. Calculate healthcare necessity
+        # 1. Calculate healthcare necessity (season-adjusted)
         necessity = HealthcareDesertCalculator.calculate_healthcare_necessity_score(
-            db, region_code
+            db, region_code, season, road_quality
         )
         necessity_score = necessity['necessity_score']
         
@@ -564,41 +732,54 @@ def get_telehealth_priority(region_code):
         else:
             connectivity_score = 0
         
-        # 3. Determine priority classification
+        # 3. Determine priority classification with season-contextual recommendations
+        season_display = get_season_display_name(season)
+        
+        # Season-specific context for recommendations
+        if season == SEASON_WINTER:
+            season_context = "Winter conditions limit transport options. "
+            transport_note = "Seasonal roads/water frozen."
+        elif season == SEASON_SUMMER:
+            season_context = "Summer provides optimal access. "
+            transport_note = "All transport modes available."
+        else:
+            season_context = "Year-round average conditions. "
+            transport_note = "Conservative transport assumptions."
+        
         if necessity_score > HIGH_NECESSITY_THRESHOLD:
             if connectivity_score > HIGH_CONNECTIVITY_THRESHOLD:
                 priority = 'HIGH'
                 color = '#22c55e'  # Green
-                label = 'Telehealth Recommended'
-                recommendation = 'Deploy telehealth services immediately. High need + capable infrastructure.'
+                label = f'Telehealth Recommended ({season_display})'
+                recommendation = f'{season_context}High need + capable infrastructure. Deploy telehealth immediately.'
             elif connectivity_score < LOW_CONNECTIVITY_THRESHOLD:
                 priority = 'CRITICAL'
                 color = '#ef4444'  # Red
-                label = 'Infrastructure Gap'
-                recommendation = 'Critical need but insufficient connectivity. Prioritize infrastructure investment.'
+                label = f'Infrastructure Gap ({season_display})'
+                recommendation = f'{season_context}Critical need but insufficient connectivity. {transport_note} Prioritize infrastructure investment.'
             else:  # Moderate connectivity (40-60)
                 priority = 'MODERATE'
                 color = '#f97316'  # Orange
-                label = 'Mixed Priority'
-                recommendation = 'High need with moderate connectivity. Consider store-and-forward telehealth.'
+                label = f'Mixed Priority ({season_display})'
+                recommendation = f'{season_context}High need with moderate connectivity. Consider store-and-forward telehealth.'
                 
         elif necessity_score > MODERATE_NECESSITY_THRESHOLD:
             if connectivity_score > HIGH_CONNECTIVITY_THRESHOLD:
                 priority = 'MODERATE'
                 color = '#eab308'  # Yellow
-                label = 'Consider Telehealth'
-                recommendation = 'Moderate need with good connectivity. Good candidate for pilot programs.'
+                label = f'Consider Telehealth ({season_display})'
+                recommendation = f'{season_context}Moderate need with good connectivity. Good candidate for pilot programs.'
             else:
                 priority = 'LOW'
                 color = '#3b82f6'  # Blue
-                label = 'Lower Priority'
-                recommendation = 'Moderate need with limited connectivity. Monitor for changes.'
+                label = f'Lower Priority ({season_display})'
+                recommendation = f'{season_context}Moderate need with limited connectivity. {transport_note}'
                 
         else:
             priority = 'LOW'
             color = '#3b82f6'  # Blue
-            label = 'Adequate In-Person Access'
-            recommendation = 'In-person care is accessible. Telehealth not priority.'
+            label = f'Adequate Access ({season_display})'
+            recommendation = f'{season_context}In-person care is accessible. Telehealth not priority.'
         
         response = {
             'region_code': region_code,
@@ -615,6 +796,15 @@ def get_telehealth_priority(region_code):
             'color': color,
             'label': label,
             'recommendation': recommendation,
+            
+            # Season context (explicit)
+            'season_scenario': {
+                'active_season': season,
+                'season_display': get_season_display_name(season),
+                'road_quality': road_quality,
+                'assumption': 'User-selected seasonal scenario for planning. '
+                             'Transport difficulty is adjusted based on season.'
+            },
             
             # Details
             'healthcare_details': necessity,

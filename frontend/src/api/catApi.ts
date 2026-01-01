@@ -4,6 +4,9 @@
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api/cat';
 
+// Season type for user-selected seasonal scenario
+export type Season = 'summer' | 'winter' | 'year_round';
+
 export interface CATRegion {
     region_code: string;
     region_name: string;
@@ -33,13 +36,53 @@ export interface StatisticsResponse {
     clinics: number;
 }
 
+export interface SeasonScenario {
+    active_season: Season;
+    season_display: string;
+    road_quality: string;
+    assumption: string;
+}
+
+export interface TelehealthPriorityResponse {
+    region_code: string;
+    region_name: string;
+    cat_tier: number;
+    necessity_score: number;
+    connectivity_score: number;
+    combined_priority: number;
+    priority: 'HIGH' | 'CRITICAL' | 'MODERATE' | 'LOW';
+    color: string;
+    label: string;
+    recommendation: string;
+    season_scenario: SeasonScenario;
+    healthcare_details: {
+        necessity_score: number;
+        distance_to_nearest_clinic_km: number;
+        num_healthcare_sites: number;
+        has_specialist_access: boolean;
+        breakdown: {
+            distance_component: number;
+            density_component: number;
+            specialist_component: number;
+            transport_component: number;
+            transport_season_adjusted: boolean;
+        };
+    };
+    connectivity_details: {
+        bandwidth_mbps: number | null;
+        latency_ms: number | null;
+        feasible_for_video: boolean;
+    };
+}
+
 /**
- * Fetch all CAT regions
+ * Fetch all CAT regions with optional season adjustment
  */
-export async function fetchRegions(tier?: number): Promise<CATRegion[]> {
-    const url = tier
-        ? `${API_BASE}/regions?tier=${tier}`
-        : `${API_BASE}/regions`;
+export async function fetchRegions(season: Season = 'year_round', tier?: number): Promise<CATRegion[]> {
+    let url = `${API_BASE}/regions?season=${season}`;
+    if (tier) {
+        url += `&tier=${tier}`;
+    }
 
     const response = await fetch(url);
     if (!response.ok) {
@@ -58,6 +101,23 @@ export async function fetchStatistics(): Promise<StatisticsResponse> {
     if (!response.ok) {
         throw new Error(`Failed to fetch statistics: ${response.statusText}`);
     }
+    return response.json();
+}
+
+/**
+ * Fetch telehealth priority for a region with season adjustment
+ */
+export async function fetchTelehealthPriority(
+    regionCode: string,
+    season: Season = 'year_round'
+): Promise<TelehealthPriorityResponse> {
+    const url = `${API_BASE}/telehealth-priority/${regionCode}?season=${season}`;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch telehealth priority: ${response.statusText}`);
+    }
+
     return response.json();
 }
 
@@ -86,3 +146,17 @@ export function getTierLabel(tier: number): string {
         default: return 'Unknown';
     }
 }
+
+/**
+ * Get priority color for telehealth classification
+ */
+export function getPriorityColor(priority: string): string {
+    switch (priority) {
+        case 'HIGH': return '#22c55e';      // Green
+        case 'CRITICAL': return '#ef4444';   // Red
+        case 'MODERATE': return '#f97316';   // Orange
+        case 'LOW': return '#3b82f6';        // Blue
+        default: return '#6b7280';           // Gray
+    }
+}
+
