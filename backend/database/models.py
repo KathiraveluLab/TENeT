@@ -221,3 +221,62 @@ class HealthcareSite(Base):
     def __repr__(self):
         return f"<HealthcareSite {self.name} ({self.site_type})>"
 
+
+class BroadbandCoverage(Base):
+    """
+    FCC Broadband coverage data for Alaska communities.
+    Supports the 'data coverage/confidence' layer for telehealth feasibility.
+    
+    Data source: FCC Broadband Availability Data
+    """
+    __tablename__ = 'broadband_coverage'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Place identification (FCC Census Place ID)
+    place_id = Column(String(20), nullable=False, index=True)
+    place_name = Column(String(255), nullable=False, index=True)
+    
+    # Unit count (for confidence weighting)
+    residential_units = Column(Integer, nullable=True)
+    
+    # Coverage percentages at telehealth-relevant speed tiers
+    # 25 Mbps down / 3 Mbps up - minimum for video telehealth
+    any_tech_25mbps_pct = Column(Float, nullable=True)
+    any_tech_100mbps_pct = Column(Float, nullable=True)
+    wired_25mbps_pct = Column(Float, nullable=True)
+    ngso_satellite_25mbps_pct = Column(Float, nullable=True)
+    fiber_25mbps_pct = Column(Float, nullable=True)
+    
+    # Data quality & confidence indicators
+    confidence = Column(String(20), nullable=False, default='MEDIUM')  # HIGH, MEDIUM, LOW
+    data_gaps = Column(String(500), nullable=True)  # Semicolon-separated flags
+    
+    # Derived assessments
+    telehealth_viable = Column(String(20), nullable=True)  # YES, NO, UNCERTAIN
+    primary_access = Column(String(20), nullable=True)  # WIRED, SATELLITE, LIMITED
+    
+    # Link to CAT region (if mapping exists)
+    region_code = Column(String(50), ForeignKey('cat_regions.region_code'), nullable=True, index=True)
+    
+    # Data source tracking
+    data_source = Column(String(100), default='FCC')
+    data_date = Column(DateTime, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationship to region
+    region = relationship('CATRegion', backref='broadband_coverage')
+    
+    # Indexes for common queries
+    __table_args__ = (
+        Index('idx_broadband_place', 'place_id', 'place_name'),
+        Index('idx_broadband_confidence', 'confidence'),
+        Index('idx_broadband_viable', 'telehealth_viable'),
+    )
+    
+    def __repr__(self):
+        return f"<BroadbandCoverage {self.place_name} ({self.confidence})>"
+
