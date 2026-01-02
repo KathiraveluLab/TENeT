@@ -160,3 +160,137 @@ export function getPriorityColor(priority: string): string {
     }
 }
 
+// =============================================================================
+// Broadband Coverage & Data Gaps API (Data Coverage Layer)
+// =============================================================================
+
+export interface BroadbandCoverage {
+    place_id: string;
+    place_name: string;
+    residential_units: number | null;
+    coverage: {
+        any_tech_25mbps_pct: number | null;
+        any_tech_100mbps_pct: number | null;
+        wired_25mbps_pct: number | null;
+        ngso_satellite_25mbps_pct: number | null;
+        fiber_25mbps_pct: number | null;
+    };
+    confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+    data_gaps: string[];
+    telehealth_viable: 'YES' | 'NO' | 'UNCERTAIN';
+    primary_access: 'WIRED' | 'SATELLITE' | 'LIMITED';
+    region_code: string | null;
+    data_source: string;
+}
+
+export interface DataGapsSummary {
+    total_places: number;
+    places_with_gaps: number;
+    gap_breakdown: {
+        [key: string]: {
+            count: number;
+            percentage: number;
+            places: { place_id: string; place_name: string; confidence: string }[];
+        };
+    };
+    confidence_distribution: {
+        HIGH: number;
+        MEDIUM: number;
+        LOW: number;
+    };
+    telehealth_viability: {
+        YES: number;
+        NO: number;
+        UNCERTAIN: number;
+    };
+    primary_access: {
+        WIRED: number;
+        SATELLITE: number;
+        LIMITED: number;
+    };
+}
+
+export interface BroadbandResponse {
+    broadband: BroadbandCoverage[];
+    count: number;
+    summary: {
+        by_confidence: { HIGH: number; MEDIUM: number; LOW: number };
+        satellite_dependent: number;
+        with_data_gaps: number;
+        low_confidence: number;
+    };
+}
+
+/**
+ * Fetch broadband coverage data
+ */
+export async function fetchBroadbandCoverage(filters?: {
+    confidence?: string;
+    telehealth_viable?: string;
+    primary_access?: string;
+    has_gaps?: boolean;
+}): Promise<BroadbandResponse> {
+    let url = `${API_BASE}/broadband`;
+    const params = new URLSearchParams();
+
+    if (filters?.confidence) params.append('confidence', filters.confidence);
+    if (filters?.telehealth_viable) params.append('telehealth_viable', filters.telehealth_viable);
+    if (filters?.primary_access) params.append('primary_access', filters.primary_access);
+    if (filters?.has_gaps) params.append('has_gaps', 'true');
+
+    if (params.toString()) {
+        url += `?${params.toString()}`;
+    }
+
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch broadband data: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+/**
+ * Fetch data gaps summary for dashboard display
+ */
+export async function fetchDataGapsSummary(): Promise<DataGapsSummary> {
+    const response = await fetch(`${API_BASE}/data-gaps`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch data gaps: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+/**
+ * Get confidence color for data quality visualization
+ */
+export function getConfidenceColor(confidence: string): string {
+    switch (confidence) {
+        case 'HIGH': return '#22c55e';    // Green
+        case 'MEDIUM': return '#eab308';   // Yellow
+        case 'LOW': return '#ef4444';      // Red
+        default: return '#6b7280';         // Gray
+    }
+}
+
+/**
+ * Get icon/label for data gap types
+ */
+export function getDataGapInfo(gap: string): { icon: string; label: string; severity: 'warning' | 'error' | 'info' } {
+    switch (gap) {
+        case 'SATELLITE_DEPENDENT':
+            return { icon: '📡', label: 'Satellite Only', severity: 'warning' };
+        case 'LOW_TERRESTRIAL':
+            return { icon: '📶', label: 'Low Wired Coverage', severity: 'warning' };
+        case 'LOW_CONFIDENCE':
+            return { icon: '❓', label: 'Low Data Confidence', severity: 'info' };
+        case 'INTERNET_DESERT':
+            return { icon: '🚫', label: 'No Internet Coverage', severity: 'error' };
+        case 'MISSING_WIRED_DATA':
+            return { icon: '📊', label: 'Missing Wired Data', severity: 'info' };
+        case 'MISSING_SATELLITE_DATA':
+            return { icon: '📊', label: 'Missing Satellite Data', severity: 'info' };
+        default:
+            return { icon: '⚠️', label: gap, severity: 'info' };
+    }
+}
+
