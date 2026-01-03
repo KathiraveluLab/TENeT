@@ -424,11 +424,6 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
                                     ) : (
                                         <div style={{ color: '#dc2626' }}>❌ No hospital data available</div>
                                     )}
-                                    {healthcare?.count !== undefined && healthcare.count > 0 ? (
-                                        <div style={{ color: '#166534' }}>✅ Nearby facilities: {healthcare.count}</div>
-                                    ) : (
-                                        <div style={{ color: '#dc2626' }}>❌ Healthcare facility count missing</div>
-                                    )}
                                     {healthcare?.facilities && healthcare.facilities.some(f => f.has_emergency) ? (
                                         <div style={{ color: '#166534' }}>
                                             ✅ Emergency services: Yes ({healthcare.facilities.filter(f => f.has_emergency).length} facilities)
