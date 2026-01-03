@@ -1198,9 +1198,9 @@ def get_healthcare_by_region(region_code):
                 'phone': f.phone
             })
         
-        # Summary
-        nearest_hospital = next((f for f, d in facilities_with_dist if f.site_type == 'hospital'), None)
-        nearest_clinic = next((f for f, d in facilities_with_dist if f.site_type == 'clinic'), None)
+        # Summary - find nearest hospital and clinic with their distances
+        nearest_hospital_tuple = next(((f, d) for f, d in facilities_with_dist if f.site_type == 'hospital'), None)
+        nearest_clinic_tuple = next(((f, d) for f, d in facilities_with_dist if f.site_type == 'clinic'), None)
         
         return jsonify({
             'region_code': region_code,
@@ -1208,14 +1208,15 @@ def get_healthcare_by_region(region_code):
             'facilities': result,
             'count': len(result),
             'nearest_hospital': {
-                'name': nearest_hospital[0].name if nearest_hospital else None,
-                'distance_km': round(next((d for f, d in facilities_with_dist if f.site_type == 'hospital'), 0), 1)
-            } if nearest_hospital else None,
+                'name': nearest_hospital_tuple[0].name,
+                'distance_km': round(nearest_hospital_tuple[1], 1)
+            } if nearest_hospital_tuple else None,
             'nearest_clinic': {
-                'name': nearest_clinic[0].name if nearest_clinic else None,
-                'distance_km': round(next((d for f, d in facilities_with_dist if f.site_type == 'clinic'), 0), 1)
-            } if nearest_clinic else None
+                'name': nearest_clinic_tuple[0].name,
+                'distance_km': round(nearest_clinic_tuple[1], 1)
+            } if nearest_clinic_tuple else None
         }), 200
+
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
