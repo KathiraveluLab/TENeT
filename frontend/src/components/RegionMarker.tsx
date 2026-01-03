@@ -11,7 +11,10 @@ import {
     getPriorityColor,
     BroadbandCoverage,
     getConfidenceColor,
-    getDataGapInfo
+    getDataGapInfo,
+    HealthcareByRegion,
+    fetchHealthcareByRegion,
+    getFacilityTypeInfo
 } from '../api/catApi';
 
 interface RegionMarkerProps {
@@ -53,10 +56,11 @@ function createTierIcon(tier: number): L.DivIcon {
 export default function RegionMarker({ region, season }: RegionMarkerProps) {
     const [priority, setPriority] = useState<TelehealthPriorityResponse | null>(null);
     const [broadband, setBroadband] = useState<BroadbandCoverage | null>(null);
+    const [healthcare, setHealthcare] = useState<HealthcareByRegion | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Fetch priority and broadband data when popup opens
+    // Fetch priority, broadband, and healthcare data when popup opens
     const handlePopupOpen = useCallback(async () => {
         setLoading(true);
         setError(null);
@@ -83,6 +87,14 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
                 }
             } catch (bbErr) {
                 console.warn('Could not fetch broadband data:', bbErr);
+            }
+
+            // Fetch healthcare facilities near this region
+            try {
+                const healthcareData = await fetchHealthcareByRegion(region.region_code, 5);
+                setHealthcare(healthcareData);
+            } catch (hcErr) {
+                console.warn('Could not fetch healthcare data:', hcErr);
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to fetch priority');
@@ -394,26 +406,35 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
                                 </div>
                             </div>
 
-                            {/* Healthcare Access */}
+                            {/* Healthcare Access - Now using real OSM data */}
                             <div style={{ marginBottom: '6px' }}>
                                 <strong style={{ color: '#374151' }}>Healthcare Access:</strong>
                                 <div style={{ marginLeft: '8px' }}>
-                                    {priority?.healthcare_details?.distance_to_nearest_clinic_km !== undefined ? (
-                                        <div style={{ color: '#166534' }}>✅ Distance to clinic: {priority.healthcare_details.distance_to_nearest_clinic_km.toFixed(1)} km</div>
+                                    {healthcare?.nearest_clinic ? (
+                                        <div style={{ color: '#166534' }}>
+                                            ✅ Nearest clinic: {healthcare.nearest_clinic.name.substring(0, 25)}{healthcare.nearest_clinic.name.length > 25 ? '...' : ''} ({healthcare.nearest_clinic.distance_km} km)
+                                        </div>
                                     ) : (
-                                        <div style={{ color: '#dc2626' }}>❌ Clinic distance missing <em>(need healthsites.io)</em></div>
+                                        <div style={{ color: '#dc2626' }}>❌ No clinic data available</div>
                                     )}
-                                    {priority?.healthcare_details?.num_healthcare_sites !== undefined && priority.healthcare_details.num_healthcare_sites > 0 ? (
-                                        <div style={{ color: '#166534' }}>✅ Healthcare sites: {priority.healthcare_details.num_healthcare_sites}</div>
+                                    {healthcare?.nearest_hospital ? (
+                                        <div style={{ color: '#166534' }}>
+                                            ✅ Nearest hospital: {healthcare.nearest_hospital.name.substring(0, 25)}{healthcare.nearest_hospital.name.length > 25 ? '...' : ''} ({healthcare.nearest_hospital.distance_km} km)
+                                        </div>
+                                    ) : (
+                                        <div style={{ color: '#dc2626' }}>❌ No hospital data available</div>
+                                    )}
+                                    {healthcare?.count !== undefined && healthcare.count > 0 ? (
+                                        <div style={{ color: '#166534' }}>✅ Nearby facilities: {healthcare.count}</div>
                                     ) : (
                                         <div style={{ color: '#dc2626' }}>❌ Healthcare facility count missing</div>
                                     )}
-                                    {priority?.healthcare_details?.has_specialist_access !== undefined ? (
-                                        <div style={{ color: priority.healthcare_details.has_specialist_access ? '#166534' : '#f97316' }}>
-                                            {priority.healthcare_details.has_specialist_access ? '✅' : '⚠️'} Specialist access: {priority.healthcare_details.has_specialist_access ? 'Yes' : 'No'}
+                                    {healthcare?.facilities && healthcare.facilities.some(f => f.has_emergency) ? (
+                                        <div style={{ color: '#166534' }}>
+                                            ✅ Emergency services: Yes ({healthcare.facilities.filter(f => f.has_emergency).length} facilities)
                                         </div>
                                     ) : (
-                                        <div style={{ color: '#dc2626' }}>❌ Specialist data missing</div>
+                                        <div style={{ color: '#f97316' }}>⚠️ No emergency services found nearby</div>
                                     )}
                                 </div>
                             </div>

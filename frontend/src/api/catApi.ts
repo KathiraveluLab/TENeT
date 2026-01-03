@@ -294,3 +294,94 @@ export function getDataGapInfo(gap: string): { icon: string; label: string; seve
     }
 }
 
+// =============================================================================
+// Healthcare Facility API
+// =============================================================================
+
+export interface HealthcareFacility {
+    id: number;
+    name: string;
+    type: 'hospital' | 'clinic' | 'pharmacy' | 'health_center';
+    distance_km?: number;
+    latitude: number;
+    longitude: number;
+    has_emergency: boolean;
+    has_specialists: boolean;
+    has_telehealth: boolean;
+    phone?: string;
+    website?: string;
+    address?: string;
+    beds?: number;
+}
+
+export interface HealthcareByRegion {
+    region_code: string;
+    region_name: string;
+    facilities: HealthcareFacility[];
+    count: number;
+    nearest_hospital: {
+        name: string;
+        distance_km: number;
+    } | null;
+    nearest_clinic: {
+        name: string;
+        distance_km: number;
+    } | null;
+}
+
+export interface HealthcareSummary {
+    total_facilities: number;
+    by_type: {
+        hospital: number;
+        clinic: number;
+        pharmacy: number;
+        health_center: number;
+    };
+    features: {
+        with_emergency: number;
+        with_specialists: number;
+        with_telehealth: number;
+    };
+    data_source: string;
+}
+
+/**
+ * Fetch healthcare facilities near a specific region
+ */
+export async function fetchHealthcareByRegion(regionCode: string, limit = 10): Promise<HealthcareByRegion> {
+    const response = await fetch(`${API_BASE}/healthcare/by-region/${regionCode}?limit=${limit}`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch healthcare data: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+/**
+ * Fetch healthcare summary statistics
+ */
+export async function fetchHealthcareSummary(): Promise<HealthcareSummary> {
+    const response = await fetch(`${API_BASE}/healthcare/summary`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch healthcare summary: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+/**
+ * Get facility type icon and color
+ */
+export function getFacilityTypeInfo(type: string): { icon: string; color: string; label: string } {
+    switch (type) {
+        case 'hospital':
+            return { icon: '🏥', color: '#dc2626', label: 'Hospital' };
+        case 'clinic':
+            return { icon: '🩺', color: '#2563eb', label: 'Clinic' };
+        case 'pharmacy':
+            return { icon: '💊', color: '#16a34a', label: 'Pharmacy' };
+        case 'health_center':
+            return { icon: '🏨', color: '#7c3aed', label: 'Health Center' };
+        default:
+            return { icon: '🏥', color: '#6b7280', label: type };
+    }
+}
+
