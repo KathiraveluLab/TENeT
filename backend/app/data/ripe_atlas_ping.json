@@ -1,0 +1,62 @@
+[
+  {
+    "probe_id": 3588,
+    "asn": 7782,
+    "measurement_id": 147010525,
+    "target": "8.8.8.8",
+    "sent": 10,
+    "received": 10,
+    "packet_loss_pct": 0,
+    "rtt_ms": {
+      "min": 52.916747,
+      "avg": 58.3074936,
+      "max": 67.759885
+    },
+    "timestamp": 1767521223
+  },
+  {
+    "probe_id": 1012539,
+    "asn": 22079,
+    "measurement_id": 147014089,
+    "target": "8.8.8.8",
+    "sent": 10,
+    "received": 10,
+    "packet_loss_pct": 0,
+    "rtt_ms": {
+      "min": 55.953864,
+      "avg": 56.0247597,
+      "max": 56.141292
+    },
+    "timestamp": 1767523009
+  },
+  {
+    "probe_id": 61113,
+    "asn": 14593,
+    "measurement_id": 147048639,
+    "target": "8.8.8.8",
+    "sent": 10,
+    "received": 10,
+    "packet_loss_pct": 0,
+    "rtt_ms": {
+      "min": 46.499436,
+      "avg": 56.1335863,
+      "max": 65.921431
+    },
+    "timestamp": 1767540988
+  },
+  {
+    "probe_id": 60259,
+    "asn": null,
+    "measurement_id": 147050112,
+    "target": "8.8.8.8",
+    "sent": 10,
+    "received": 10,
+    "packet_loss_pct": 0,
+    "rtt_ms": {
+      "min": 34.771708,
+      "avg": 40.8124899,
+      "max": 44.727168
+    },
+    "timestamp": 1767541604
+  }
+]
