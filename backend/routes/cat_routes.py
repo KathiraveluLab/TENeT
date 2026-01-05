@@ -822,3 +822,442 @@ def get_telehealth_priority(region_code):
     finally:
         db.close()
 
+
+# =============================================================================
+# Broadband Coverage & Data Gaps API (Data Coverage Layer)
+# =============================================================================
+
+@cat_bp.route('/broadband', methods=['GET'])
+def get_broadband_coverage():
+    """
+    Get broadband coverage data with data gap indicators.
+    
+    Query params:
+        confidence: Filter by confidence level (HIGH, MEDIUM, LOW)
+        telehealth_viable: Filter by viability (YES, NO, UNCERTAIN)
+        primary_access: Filter by access type (WIRED, SATELLITE, LIMITED)
+        has_gaps: If 'true', return only places with data gaps
+    
+    Returns:
+        List of broadband coverage records with data quality flags
+    """
+    from database.models import BroadbandCoverage
+    
+    db = SessionLocal()
+    try:
+        query = db.query(BroadbandCoverage)
+        
+        # Apply filters
+        confidence = request.args.get('confidence')
+        if confidence:
+            query = query.filter(BroadbandCoverage.confidence == confidence.upper())
+        
+        telehealth_viable = request.args.get('telehealth_viable')
+        if telehealth_viable:
+            query = query.filter(BroadbandCoverage.telehealth_viable == telehealth_viable.upper())
+        
+        primary_access = request.args.get('primary_access')
+        if primary_access:
+            query = query.filter(BroadbandCoverage.primary_access == primary_access.upper())
+        
+        has_gaps = request.args.get('has_gaps')
+        if has_gaps and has_gaps.lower() == 'true':
+            query = query.filter(BroadbandCoverage.data_gaps.isnot(None))
+        
+        # Order by place name
+        records = query.order_by(BroadbandCoverage.place_name).all()
+        
+        result = []
+        for r in records:
+            result.append({
+                'place_id': r.place_id,
+                'place_name': r.place_name,
+                'residential_units': r.residential_units,
+                'coverage': {
+                    'any_tech_25mbps_pct': r.any_tech_25mbps_pct,
+                    'any_tech_100mbps_pct': r.any_tech_100mbps_pct,
+                    'wired_25mbps_pct': r.wired_25mbps_pct,
+                    'ngso_satellite_25mbps_pct': r.ngso_satellite_25mbps_pct,
+                    'fiber_25mbps_pct': r.fiber_25mbps_pct
+                },
+                'confidence': r.confidence,
+                'data_gaps': r.data_gaps.split(';') if r.data_gaps else [],
+                'telehealth_viable': r.telehealth_viable,
+                'primary_access': r.primary_access,
+                'region_code': r.region_code,
+                'data_source': r.data_source
+            })
+        
+        # Summary statistics
+        total = len(result)
+        by_confidence = {
+            'HIGH': sum(1 for r in result if r['confidence'] == 'HIGH'),
+            'MEDIUM': sum(1 for r in result if r['confidence'] == 'MEDIUM'),
+            'LOW': sum(1 for r in result if r['confidence'] == 'LOW')
+        }
+        with_gaps = sum(1 for r in result if r['data_gaps'])
+        
+        return jsonify({
+            'broadband': result,
+            'count': total,
+            'summary': {
+                'by_confidence': by_confidence,
+                'satellite_dependent': sum(1 for r in result if 'SATELLITE_DEPENDENT' in r['data_gaps']),
+                'with_data_gaps': with_gaps,
+                'low_confidence': by_confidence['LOW']
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@cat_bp.route('/broadband/<place_id>', methods=['GET'])
+def get_broadband_by_place(place_id):
+    """Get broadband coverage for a specific place by ID."""
+    from database.models import BroadbandCoverage
+    
+    db = SessionLocal()
+    try:
+        record = db.query(BroadbandCoverage).filter(
+            BroadbandCoverage.place_id == place_id
+        ).first()
+        
+        if not record:
+            return jsonify({'error': f'Place not found: {place_id}'}), 404
+        
+        return jsonify({
+            'place_id': record.place_id,
+            'place_name': record.place_name,
+            'residential_units': record.residential_units,
+            'coverage': {
+                'any_tech_25mbps_pct': record.any_tech_25mbps_pct,
+                'any_tech_100mbps_pct': record.any_tech_100mbps_pct,
+                'wired_25mbps_pct': record.wired_25mbps_pct,
+                'ngso_satellite_25mbps_pct': record.ngso_satellite_25mbps_pct,
+                'fiber_25mbps_pct': record.fiber_25mbps_pct
+            },
+            'confidence': record.confidence,
+            'data_gaps': record.data_gaps.split(';') if record.data_gaps else [],
+            'telehealth_viable': record.telehealth_viable,
+            'primary_access': record.primary_access,
+            'region_code': record.region_code,
+            'data_source': record.data_source
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@cat_bp.route('/data-gaps', methods=['GET'])
+def get_data_gaps_summary():
+    """
+    Get a summary of all data gaps across the system.
+    
+    Returns counts and lists of places with specific data quality issues,
+    supporting the 'data coverage/confidence' layer visualization.
+    """
+    from database.models import BroadbandCoverage
+    
+    db = SessionLocal()
+    try:
+        all_records = db.query(BroadbandCoverage).all()
+        
+        # Aggregate gap statistics
+        gap_stats = {
+            'SATELLITE_DEPENDENT': [],
+            'LOW_TERRESTRIAL': [],
+            'LOW_CONFIDENCE': [],
+            'INTERNET_DESERT': [],
+            'MISSING_WIRED_DATA': [],
+            'MISSING_SATELLITE_DATA': []
+        }
+        
+        for r in all_records:
+            if r.data_gaps:
+                gaps = r.data_gaps.split(';')
+                for gap in gaps:
+                    gap = gap.strip()
+                    if gap in gap_stats:
+                        gap_stats[gap].append({
+                            'place_id': r.place_id,
+                            'place_name': r.place_name,
+                            'confidence': r.confidence
+                        })
+        
+        # Build response
+        summary = {
+            'total_places': len(all_records),
+            'places_with_gaps': sum(1 for r in all_records if r.data_gaps),
+            'gap_breakdown': {}
+        }
+        
+        for gap_type, places in gap_stats.items():
+            summary['gap_breakdown'][gap_type] = {
+                'count': len(places),
+                'percentage': round(len(places) / len(all_records) * 100, 1) if all_records else 0,
+                'places': places[:10]  # Return first 10 for each gap type
+            }
+        
+        # Confidence distribution
+        summary['confidence_distribution'] = {
+            'HIGH': sum(1 for r in all_records if r.confidence == 'HIGH'),
+            'MEDIUM': sum(1 for r in all_records if r.confidence == 'MEDIUM'),
+            'LOW': sum(1 for r in all_records if r.confidence == 'LOW')
+        }
+        
+        # Telehealth viability
+        summary['telehealth_viability'] = {
+            'YES': sum(1 for r in all_records if r.telehealth_viable == 'YES'),
+            'NO': sum(1 for r in all_records if r.telehealth_viable == 'NO'),
+            'UNCERTAIN': sum(1 for r in all_records if r.telehealth_viable == 'UNCERTAIN')
+        }
+        
+        # Primary access type
+        summary['primary_access'] = {
+            'WIRED': sum(1 for r in all_records if r.primary_access == 'WIRED'),
+            'SATELLITE': sum(1 for r in all_records if r.primary_access == 'SATELLITE'),
+            'LIMITED': sum(1 for r in all_records if r.primary_access == 'LIMITED')
+        }
+        
+        return jsonify(summary), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+# =============================================================================
+# Healthcare Facility Endpoints
+# =============================================================================
+
+@cat_bp.route('/healthcare', methods=['GET'])
+def get_healthcare_facilities():
+    """
+    Get all healthcare facilities with optional filtering.
+    
+    Query params:
+        type: Filter by facility type (hospital, clinic, pharmacy)
+        region: Filter by CAT region code
+        emergency: Filter to only emergency facilities (true/false)
+        limit: Max results to return (default 100)
+    """
+    db = SessionLocal()
+    try:
+        query = db.query(HealthcareSite).filter(HealthcareSite.is_active == True)
+        
+        # Apply filters
+        facility_type = request.args.get('type')
+        if facility_type:
+            query = query.filter(HealthcareSite.site_type == facility_type)
+        
+        region_code = request.args.get('region')
+        if region_code:
+            query = query.filter(HealthcareSite.region_code == region_code)
+        
+        emergency_only = request.args.get('emergency')
+        if emergency_only and emergency_only.lower() == 'true':
+            query = query.filter(HealthcareSite.has_emergency == True)
+        
+        limit = request.args.get('limit', 100, type=int)
+        sites = query.limit(limit).all()
+        
+        result = []
+        for s in sites:
+            result.append({
+                'id': s.id,
+                'name': s.name,
+                'type': s.site_type,
+                'latitude': s.latitude,
+                'longitude': s.longitude,
+                'address': s.address,
+                'region_code': s.region_code,
+                'has_emergency': s.has_emergency,
+                'has_specialists': s.has_specialists,
+                'has_telehealth': s.has_telehealth,
+                'phone': s.phone,
+                'website': s.website,
+                'beds': s.beds,
+                'services': s.services
+            })
+        
+        # Summary stats
+        all_sites = db.query(HealthcareSite).filter(HealthcareSite.is_active == True).all()
+        summary = {
+            'total': len(all_sites),
+            'hospitals': sum(1 for s in all_sites if s.site_type == 'hospital'),
+            'clinics': sum(1 for s in all_sites if s.site_type == 'clinic'),
+            'pharmacies': sum(1 for s in all_sites if s.site_type == 'pharmacy'),
+            'with_emergency': sum(1 for s in all_sites if s.has_emergency),
+            'with_telehealth': sum(1 for s in all_sites if s.has_telehealth)
+        }
+        
+        return jsonify({
+            'facilities': result,
+            'count': len(result),
+            'summary': summary
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@cat_bp.route('/healthcare/<int:facility_id>', methods=['GET'])
+def get_healthcare_facility(facility_id):
+    """Get details for a specific healthcare facility."""
+    db = SessionLocal()
+    try:
+        site = db.query(HealthcareSite).filter(HealthcareSite.id == facility_id).first()
+        
+        if not site:
+            return jsonify({'error': 'Facility not found'}), 404
+        
+        return jsonify({
+            'id': site.id,
+            'name': site.name,
+            'type': site.site_type,
+            'latitude': site.latitude,
+            'longitude': site.longitude,
+            'address': site.address,
+            'region_code': site.region_code,
+            'has_emergency': site.has_emergency,
+            'has_specialists': site.has_specialists,
+            'has_telehealth': site.has_telehealth,
+            'phone': site.phone,
+            'website': site.website,
+            'beds': site.beds,
+            'services': site.services,
+            'operating_hours': site.operating_hours,
+            'is_active': site.is_active,
+            'verified': site.verified
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@cat_bp.route('/healthcare/by-region/<region_code>', methods=['GET'])
+def get_healthcare_by_region(region_code):
+    """
+    Get healthcare facilities near a specific region.
+    Calculates distance from region centroid to each facility.
+    """
+    db = SessionLocal()
+    try:
+        from math import radians, sin, cos, sqrt, atan2
+        
+        def haversine(lat1, lon1, lat2, lon2):
+            R = 6371  # km
+            lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+            dlat, dlon = lat2 - lat1, lon2 - lon1
+            a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+            return R * 2 * atan2(sqrt(a), sqrt(1-a))
+        
+        # Get region
+        region = db.query(CATRegion).filter(CATRegion.region_code == region_code).first()
+        if not region:
+            return jsonify({'error': 'Region not found'}), 404
+        
+        if not region.centroid_lat or not region.centroid_lon:
+            return jsonify({'error': 'Region has no centroid coordinates'}), 400
+        
+        # Get all facilities
+        facilities = db.query(HealthcareSite).filter(HealthcareSite.is_active == True).all()
+        
+        # Calculate distances and sort
+        facilities_with_dist = []
+        for f in facilities:
+            dist = haversine(region.centroid_lat, region.centroid_lon, f.latitude, f.longitude)
+            facilities_with_dist.append((f, dist))
+        
+        # Sort by distance
+        facilities_with_dist.sort(key=lambda x: x[1])
+        
+        # Return top 20 nearest
+        limit = request.args.get('limit', 20, type=int)
+        result = []
+        for f, dist in facilities_with_dist[:limit]:
+            result.append({
+                'id': f.id,
+                'name': f.name,
+                'type': f.site_type,
+                'distance_km': round(dist, 1),
+                'latitude': f.latitude,
+                'longitude': f.longitude,
+                'has_emergency': f.has_emergency,
+                'has_specialists': f.has_specialists,
+                'phone': f.phone
+            })
+        
+        # Summary - find nearest hospital and clinic with their distances
+        nearest_hospital_tuple = next(((f, d) for f, d in facilities_with_dist if f.site_type == 'hospital'), None)
+        nearest_clinic_tuple = next(((f, d) for f, d in facilities_with_dist if f.site_type == 'clinic'), None)
+        
+        return jsonify({
+            'region_code': region_code,
+            'region_name': region.region_name,
+            'facilities': result,
+            'count': len(result),
+            'nearest_hospital': {
+                'name': nearest_hospital_tuple[0].name,
+                'distance_km': round(nearest_hospital_tuple[1], 1)
+            } if nearest_hospital_tuple else None,
+            'nearest_clinic': {
+                'name': nearest_clinic_tuple[0].name,
+                'distance_km': round(nearest_clinic_tuple[1], 1)
+            } if nearest_clinic_tuple else None
+        }), 200
+
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@cat_bp.route('/healthcare/summary', methods=['GET'])
+def get_healthcare_summary():
+    """Get overall healthcare coverage summary."""
+    db = SessionLocal()
+    try:
+        facilities = db.query(HealthcareSite).filter(HealthcareSite.is_active == True).all()
+        
+        summary = {
+            'total_facilities': len(facilities),
+            'by_type': {
+                'hospital': sum(1 for f in facilities if f.site_type == 'hospital'),
+                'clinic': sum(1 for f in facilities if f.site_type == 'clinic'),
+                'pharmacy': sum(1 for f in facilities if f.site_type == 'pharmacy'),
+                'health_center': sum(1 for f in facilities if f.site_type == 'health_center'),
+                'other': sum(1 for f in facilities if f.site_type not in ['hospital', 'clinic', 'pharmacy', 'health_center'])
+            },
+            'features': {
+                'with_emergency': sum(1 for f in facilities if f.has_emergency),
+                'with_specialists': sum(1 for f in facilities if f.has_specialists),
+                'with_telehealth': sum(1 for f in facilities if f.has_telehealth),
+                'with_phone': sum(1 for f in facilities if f.phone),
+                'with_website': sum(1 for f in facilities if f.website)
+            },
+            'data_source': 'OpenStreetMap via Overpass Turbo',
+            'data_quality': {
+                'verified': sum(1 for f in facilities if f.verified),
+                'unverified': sum(1 for f in facilities if not f.verified)
+            }
+        }
+        
+        return jsonify(summary), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+

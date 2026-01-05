@@ -6,6 +6,7 @@ import { fetchRegions, CATRegion, Season } from './api/catApi';
 import RegionMarker from './components/RegionMarker';
 import Legend from './components/Legend';
 import SeasonSelector from './components/SeasonSelector';
+import DataCoveragePanel from './components/DataCoveragePanel';
 
 // Fix for default marker icons in React-Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -30,6 +31,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [season, setSeason] = useState<Season>('year_round');
+  const [dataPanelExpanded, setDataPanelExpanded] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -166,6 +168,14 @@ function App() {
 
         {/* Legend */}
         {!loading && <Legend totalRegions={regions.length} />}
+
+        {/* Data Coverage Panel */}
+        {!loading && (
+          <DataCoveragePanel
+            isExpanded={dataPanelExpanded}
+            onToggle={() => setDataPanelExpanded(!dataPanelExpanded)}
+          />
+        )}
       </div>
 
       {/* Footer */}
