@@ -812,7 +812,7 @@ def get_combined_analysis():
     """
     db = SessionLocal()
     try:
-        monthly_cost = request.args.get('monthly_cost', type=float, default=RURAL_INTERNET_COST)
+        monthly_cost = request.args.get('monthly_cost', type=float, default=ISP_PRICING.get('starlink', {}).get('cost', 120))
         
         # Get latest performance data by ZCTA area
         # This joins performance tiles with census income data by proximity

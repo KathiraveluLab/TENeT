@@ -452,7 +452,7 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
                 marker.on('popupopen', async () => {
                     try {
                         const response = await fetch(
-                            `http://localhost:5001/api/cat/performance/location?lat=${data.lat}&lon=${data.lon}`
+                            `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api/cat'}/performance/location?lat=${data.lat}&lon=${data.lon}`
                         );
                         const location = await response.json();
                         const nameEl = document.getElementById(`${popupId}-name`);
