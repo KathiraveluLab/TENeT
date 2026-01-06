@@ -2,6 +2,7 @@ from flask import Flask, jsonify, g
 from flask_cors import CORS
 from database.config import init_db, get_db
 from routes.cat_routes import cat_bp
+from routes.performance_routes import performance_bp
 
 app = Flask(__name__)
 CORS(app)
@@ -19,8 +20,9 @@ def shutdown_session(exception=None):
     if db is not None:
         db.close()
 
-# Register CAT routes
+# Register blueprints
 app.register_blueprint(cat_bp)
+app.register_blueprint(performance_bp)
 
 @app.route('/api/health', methods=['GET'])
 def health():

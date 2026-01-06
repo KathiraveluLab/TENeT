@@ -385,3 +385,343 @@ export function getFacilityTypeInfo(type: string): { icon: string; color: string
     }
 }
 
+// =============================================================================
+// Ookla Performance Layer API (Measured Network Performance)
+// =============================================================================
+
+export interface PerformanceTile {
+    quadkey: string;
+    lat: number;
+    lon: number;
+    avg_d_mbps: number | null;
+    avg_u_mbps: number | null;
+    avg_lat_ms: number | null;
+    tests: number;
+    devices: number;
+    color: string;
+    label: string;
+}
+
+export interface PerformanceResponse {
+    tiles: PerformanceTile[];
+    count: number;
+    year: number;
+    quarter: number;
+    summary: {
+        avg_download_mbps: number | null;
+        avg_latency_ms: number | null;
+        total_tests: number;
+        total_devices: number;
+        tiles_excellent: number;
+        tiles_good: number;
+        tiles_poor: number;
+    };
+}
+
+export interface ServiceGap {
+    place_id: string;
+    place_name: string;
+    region_code: string | null;
+    lat: number;
+    lon: number;
+    fcc_claimed_pct: number;
+    fcc_advertised_mbps: number;
+    ookla_measured_mbps: number;
+    reliability_score: number;  // Ookla / FCC ratio (0-1+)
+    gap_severity: 'CRITICAL' | 'MAJOR' | 'MINOR';
+    gap_color: string;
+    sample_size: number;
+    gap_explanation: string;
+}
+
+export interface ServiceGapsResponse {
+    gaps: ServiceGap[];
+    count: number;
+    critical_gaps: number;
+    major_gaps: number;
+    description: string;
+    methodology: {
+        reliability_formula: string;
+        critical_threshold: string;
+        major_threshold: string;
+        minor_threshold: string;
+    };
+}
+
+export interface RegionPerformance {
+    region_code: string;
+    region_name: string;
+    has_data: boolean;
+    performance?: {
+        avg_download_mbps: number;
+        avg_upload_mbps: number | null;
+        avg_latency_ms: number;
+        total_tests: number;
+        total_devices: number;
+        tile_count: number;
+        speed_label: string;
+        speed_color: string;
+    };
+    fcc_comparison?: {
+        fcc_claimed_coverage_pct: number | null;
+        is_service_gap: boolean;
+        gap_explanation: string | null;
+    };
+}
+
+export interface PerformanceSummary {
+    has_data: boolean;
+    period: {
+        year: number;
+        quarter: number;
+        label: string;
+    };
+    coverage: {
+        total_tiles: number;
+        tiles_with_speed_data: number;
+        total_tests: number;
+        total_devices: number;
+    };
+    speeds: {
+        avg_download_mbps: number | null;
+        max_download_mbps: number | null;
+        min_download_mbps: number | null;
+        median_download_mbps: number | null;
+    };
+    distribution: {
+        excellent: number;
+        good: number;
+        moderate: number;
+        poor: number;
+        critical: number;
+    };
+    telehealth_viable_pct: number;
+}
+
+/**
+ * Fetch Ookla performance tiles
+ */
+export async function fetchPerformance(
+    year?: number,
+    quarter?: number,
+    minTests: number = 1
+): Promise<PerformanceResponse> {
+    let url = `${API_BASE}/performance?min_tests=${minTests}`;
+    if (year) url += `&year=${year}`;
+    if (quarter) url += `&quarter=${quarter}`;
+
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch performance: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+/**
+ * Fetch service gaps (FCC claims vs Ookla measured)
+ */
+export async function fetchServiceGaps(): Promise<ServiceGapsResponse> {
+    const response = await fetch(`${API_BASE}/performance/gaps`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch service gaps: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+/**
+ * Fetch performance for a specific region
+ */
+export async function fetchRegionPerformance(regionCode: string): Promise<RegionPerformance> {
+    const response = await fetch(`${API_BASE}/performance/by-region/${regionCode}`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch region performance: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+/**
+ * Fetch performance summary
+ */
+export async function fetchPerformanceSummary(): Promise<PerformanceSummary> {
+    const response = await fetch(`${API_BASE}/performance/summary`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch performance summary: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+/**
+ * Get speed color for visualization
+ */
+export function getSpeedColor(speedMbps: number | null): string {
+    if (speedMbps === null) return '#6b7280';  // Gray - no data
+    if (speedMbps >= 50) return '#22c55e';     // Green - excellent
+    if (speedMbps >= 25) return '#84cc16';     // Lime - good
+    if (speedMbps >= 10) return '#eab308';     // Yellow - moderate
+    if (speedMbps >= 5) return '#f97316';      // Orange - poor
+    return '#ef4444';                           // Red - critical
+}
+
+/**
+ * Get speed label
+ */
+export function getSpeedLabel(speedMbps: number | null): string {
+    if (speedMbps === null) return 'No Data';
+    if (speedMbps >= 50) return 'Excellent';
+    if (speedMbps >= 25) return 'Good';
+    if (speedMbps >= 10) return 'Moderate';
+    if (speedMbps >= 5) return 'Poor';
+    return 'Critical';
+}
+
+// ============================================================================
+// TOP GAPS (Gap Hunter)
+// ============================================================================
+
+export interface TopGap {
+    rank: number;
+    name: string;
+    region: string;
+    lat: number;
+    lon: number;
+    quadkey: string;
+    speed_mbps: number;
+    tests: number;
+    devices: number;
+    severity: 'critical' | 'poor' | 'moderate';
+    severity_label: string;
+    color: string;
+    gap_from_threshold: number;
+}
+
+export interface TopGapsResponse {
+    gaps: TopGap[];
+    count: number;
+    period: string;
+    threshold_mbps: number;
+}
+
+/**
+ * Fetch top priority gaps with location names
+ */
+export async function fetchTopGaps(limit: number = 10): Promise<TopGapsResponse> {
+    const response = await fetch(`${API_BASE}/performance/top-gaps?limit=${limit}`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch top gaps: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+export interface LocationInfo {
+    name: string;
+    region: string;
+    country: string;
+    lat: number;
+    lon: number;
+}
+
+/**
+ * Fetch location name for given coordinates (reverse geocoding)
+ */
+export async function fetchLocationName(lat: number, lon: number): Promise<LocationInfo> {
+    const response = await fetch(`${API_BASE}/performance/location?lat=${lat}&lon=${lon}`);
+    if (!response.ok) {
+        return { name: 'Unknown', region: '', country: '', lat, lon };
+    }
+    return response.json();
+}
+
+// =============================================================================
+// AFFORDABILITY ANALYSIS
+// =============================================================================
+
+export interface AffordabilityZone {
+    zcta: string;
+    lat: number | null;
+    lon: number | null;
+    median_income: number;
+    monthly_income: number;
+    internet_cost: number;
+    isp: string;
+    isp_description: string;
+    burden_pct: number;
+    status: 'AFFORDABLE' | 'UNAFFORDABLE';
+    is_affordable: boolean;
+    color: string;
+    population: number | null;
+    households: number | null;
+}
+
+export interface AffordabilityResponse {
+    zones: AffordabilityZone[];
+    count: number;
+    monthly_cost: number;
+    threshold_pct: number;
+    summary: {
+        affordable: number;
+        unaffordable: number;
+        affordable_pct: number;
+    };
+}
+
+export interface CombinedAccessZone {
+    zcta: string;
+    lat: number | null;
+    lon: number | null;
+    avg_speed_mbps: number;
+    has_coverage: boolean;
+    median_income: number;
+    monthly_income: number;
+    burden_pct: number;
+    is_affordable: boolean;
+    status: 'TRUE_ACCESS' | 'COVERAGE_NO_ACCESS' | 'INFRASTRUCTURE_GAP';
+    status_label: string;
+    color: string;
+    population: number | null;
+    tests: number;
+}
+
+export interface CombinedAccessResponse {
+    combined: CombinedAccessZone[];
+    count: number;
+    monthly_cost: number;
+    summary: {
+        true_access: number;
+        coverage_without_access: number;
+        infrastructure_gap: number;
+        true_access_pct: number;
+    };
+}
+
+/**
+ * Fetch affordability analysis by ZCTA
+ * @param monthlyCost - Internet cost per month (default: $120 for Starlink)
+ * @param threshold - Affordability threshold as % of income (default: 2.0)
+ */
+export async function fetchAffordability(
+    monthlyCost: number = 120,
+    threshold: number = 2.0
+): Promise<AffordabilityResponse> {
+    const response = await fetch(
+        `${API_BASE}/performance/affordability?monthly_cost=${monthlyCost}&threshold=${threshold}`
+    );
+    if (!response.ok) {
+        throw new Error(`Failed to fetch affordability data: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+/**
+ * Fetch combined speed + affordability analysis
+ * Shows TRUE_ACCESS, COVERAGE_NO_ACCESS, and INFRASTRUCTURE_GAP zones
+ * @param monthlyCost - Internet cost per month (default: $120)
+ */
+export async function fetchCombinedAccess(monthlyCost: number = 120): Promise<CombinedAccessResponse> {
+    const response = await fetch(
+        `${API_BASE}/performance/affordability/combined?monthly_cost=${monthlyCost}`
+    );
+    if (!response.ok) {
+        throw new Error(`Failed to fetch combined access data: ${response.statusText}`);
+    }
+    return response.json();
+}

@@ -280,3 +280,111 @@ class BroadbandCoverage(Base):
     def __repr__(self):
         return f"<BroadbandCoverage {self.place_name} ({self.confidence})>"
 
+
+class OoklaPerformance(Base):
+    """
+    Ookla Speedtest data for measured network performance layer.
+    
+    Data source: Ookla Open Data (s3://ookla-open-data/)
+    Aggregated to zoom level 16 tiles (~610m x 610m at equator).
+    """
+    __tablename__ = 'ookla_performance'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Tile identification (Bing Maps Tile System)
+    quadkey = Column(String(20), nullable=False, index=True)
+    tile_x = Column(Integer, nullable=True)
+    tile_y = Column(Integer, nullable=True)
+    
+    # Performance metrics
+    avg_d_kbps = Column(Float, nullable=True)  # Average download speed (kbps)
+    avg_u_kbps = Column(Float, nullable=True)  # Average upload speed (kbps)
+    avg_lat_ms = Column(Float, nullable=True)  # Average latency (ms)
+    
+    # Sample size
+    tests = Column(Integer, nullable=True)     # Number of speed tests
+    devices = Column(Integer, nullable=True)   # Unique devices
+    
+    # Time period
+    year = Column(Integer, nullable=False, index=True)
+    quarter = Column(Integer, nullable=False)
+    
+    # Centroid coordinates for map display
+    centroid_lat = Column(Float, nullable=True)
+    centroid_lon = Column(Float, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Indexes for common queries
+    __table_args__ = (
+        Index('idx_ookla_quadkey', 'quadkey'),
+        Index('idx_ookla_location', 'centroid_lat', 'centroid_lon'),
+        Index('idx_ookla_period', 'year', 'quarter'),
+    )
+    
+    def __repr__(self):
+        return f"<OoklaPerformance {self.quadkey} ({self.avg_d_kbps/1000:.1f} Mbps)>"
+
+
+class CensusIncome(Base):
+    """
+    Census ACS income data by ZCTA (ZIP Code Tabulation Area)
+    Used for affordability analysis - identifying areas where internet
+    may be available but economically inaccessible.
+    
+    Source: US Census Bureau ACS 5-Year Estimates (B19013_001E)
+    """
+    __tablename__ = 'census_income'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # ZCTA identification
+    zcta = Column(String(10), unique=True, nullable=False, index=True)
+    state_fips = Column(String(2), nullable=True)  # '02' for Alaska
+    
+    # Income data
+    median_income = Column(Float, nullable=True)  # Annual median household income (B19013_001E)
+    income_margin_of_error = Column(Float, nullable=True)  # Margin of error
+    
+    # Population data
+    total_households = Column(Integer, nullable=True)
+    population = Column(Integer, nullable=True)
+    
+    # Centroid coordinates for geographic matching
+    centroid_lat = Column(Float, nullable=True)
+    centroid_lon = Column(Float, nullable=True)
+    
+    # Data metadata
+    acs_year = Column(Integer, nullable=False)  # e.g., 2022 for 2018-2022 ACS 5-Year
+    data_source = Column(String(100), default='ACS 5-Year Estimates')
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Indexes
+    __table_args__ = (
+        Index('idx_census_zcta', 'zcta'),
+        Index('idx_census_location', 'centroid_lat', 'centroid_lon'),
+        Index('idx_census_income', 'median_income'),
+    )
+    
+    def __repr__(self):
+        return f"<CensusIncome ZCTA {self.zcta} (${self.median_income:,.0f}/yr)>"
+    
+    def monthly_income(self):
+        """Return monthly income for affordability calculations."""
+        return self.median_income / 12 if self.median_income else None
+    
+    def is_affordable(self, monthly_cost: float, threshold_pct: float = 2.0) -> bool:
+        """
+        Check if internet service at given monthly cost is affordable.
+        Uses UN/ITU standard: affordable if cost < 2% of monthly income.
+        """
+        monthly = self.monthly_income()
+        if not monthly or monthly <= 0:
+            return False
+        burden_pct = (monthly_cost / monthly) * 100
+        return burden_pct < threshold_pct
