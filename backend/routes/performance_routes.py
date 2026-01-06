@@ -6,8 +6,33 @@ from database.config import SessionLocal
 from database.models import OoklaPerformance, BroadbandCoverage, CATRegion, CensusIncome
 from sqlalchemy import func
 import math
+import json
+import os
 
 performance_bp = Blueprint('performance', __name__, url_prefix='/api/cat')
+
+# Load ISP pricing configuration from external file
+def load_isp_config():
+    """Load ISP pricing configuration from JSON file."""
+    config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'isp_pricing.json')
+    try:
+        with open(config_path, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        # Fallback to defaults if config file not found
+        return {
+            'isp_pricing': {
+                'gci': {'name': 'GCI', 'cost': 125, 'description': 'Major city pricing'},
+                'fastwyre': {'name': 'FastWyre/Rural', 'cost': 350, 'description': 'Rural pricing'},
+                'starlink': {'name': 'Starlink', 'cost': 120, 'description': 'Satellite'},
+                'extreme_rural': {'name': 'Extreme Rural', 'cost': 450, 'description': 'Remote villages'}
+            },
+            'zcta_mappings': {'gci_urban': [], 'extreme_rural': []},
+            'thresholds': {'affordability_burden_pct': 2.0}
+        }
+
+# Load config once at startup
+ISP_CONFIG = load_isp_config()
 
 # Speed thresholds (kbps)
 SPEED_EXCELLENT = 50000   # 50 Mbps
@@ -632,8 +657,8 @@ def get_location_name():
 # AFFORDABILITY ANALYSIS ENDPOINTS
 # =============================================================================
 
-# Regional ISP Pricing Model for Alaska
-# Based on real-world data from Alaska ISPs
+# Regional ISP Pricing Model for Alaska - LOADED FROM CONFIG
+# Config file: backend/config/isp_pricing.json
 #
 # GCI - largest ISP, serves major cities (Anchorage, Fairbanks, Juneau)
 # FastWyre - smaller provider, serves Interior Alaska rural areas  
@@ -642,69 +667,29 @@ def get_location_name():
 # EXTREME INEQUITY EXAMPLE: Fort Yukon pays $450/mo for capped internet
 # while Anchorage pays $125/mo for unlimited
 
-# ZCTAs served by GCI (major cities) - lower prices
-GCI_SERVED_ZCTAS = {
-    # Anchorage area
-    '99501', '99502', '99503', '99504', '99505', '99506', '99507', '99508', 
-    '99509', '99510', '99515', '99516', '99517', '99518', '99577',
-    # Fairbanks area
-    '99701', '99702', '99703', '99705', '99709', '99712',
-    # Juneau
-    '99801', '99824',
-    # Other major towns (Kenai Peninsula, Kodiak, etc.)
-    '99611', '99615', '99654', '99669', '99686',
-}
-
-# Pricing by ISP/region (monthly)
-ISP_PRICING = {
-    'gci': {
-        'name': 'GCI',
-        'cost': 125,  # Anchorage unlimited
-        'description': 'Major city pricing (GCI unlimited)'
-    },
-    'fastwyre': {
-        'name': 'FastWyre/Rural',
-        'cost': 350,  # Interior Alaska average (Fort Yukon is $450)
-        'description': 'Rural Interior Alaska (capped plans)'
-    },
-    'starlink': {
-        'name': 'Starlink',
-        'cost': 120,  # Standard Starlink residential
-        'description': 'Satellite (available everywhere)'
-    },
-    'extreme_rural': {
-        'name': 'Extreme Rural',
-        'cost': 450,  # Fort Yukon pricing
-        'description': 'Very remote villages (capped, expensive)'
-    }
-}
-
-# ZCTAs with extreme rural pricing (only option is expensive capped service)
-EXTREME_RURAL_ZCTAS = {
-    '99559',  # Bethel
-    '99723',  # Barrow/Utqiagvik
-    '99762',  # Nome
-    '99741',  # Nenana
-}
-
-AFFORDABLE_THRESHOLD_PCT = 2.0  # UN/ITU standard: < 2% of income
+# Get pricing and ZCTA mappings from config
+GCI_SERVED_ZCTAS = set(ISP_CONFIG.get('zcta_mappings', {}).get('gci_urban', []))
+EXTREME_RURAL_ZCTAS = set(ISP_CONFIG.get('zcta_mappings', {}).get('extreme_rural', []))
+ISP_PRICING = ISP_CONFIG.get('isp_pricing', {})
+AFFORDABLE_THRESHOLD_PCT = ISP_CONFIG.get('thresholds', {}).get('affordability_burden_pct', 2.0)
 
 
 def get_regional_internet_cost(zcta: str) -> tuple:
     """
     Get the realistic internet cost for a ZCTA based on regional ISP availability.
+    Reads pricing from config/isp_pricing.json.
     
     Returns: (cost, isp_name, description)
     """
     if zcta in EXTREME_RURAL_ZCTAS:
-        pricing = ISP_PRICING['extreme_rural']
+        pricing = ISP_PRICING.get('extreme_rural', {'cost': 450, 'name': 'Extreme Rural', 'description': 'Remote'})
         return (pricing['cost'], pricing['name'], pricing['description'])
     elif zcta in GCI_SERVED_ZCTAS:
-        pricing = ISP_PRICING['gci']
+        pricing = ISP_PRICING.get('gci', {'cost': 125, 'name': 'GCI', 'description': 'Urban'})
         return (pricing['cost'], pricing['name'], pricing['description'])
     else:
         # Rural areas not served by GCI - use FastWyre/rural pricing
-        pricing = ISP_PRICING['fastwyre']
+        pricing = ISP_PRICING.get('fastwyre', {'cost': 350, 'name': 'FastWyre', 'description': 'Rural'})
         return (pricing['cost'], pricing['name'], pricing['description'])
 
 
