@@ -12,7 +12,12 @@
       "avg": 58.3074936,
       "max": 67.759885
     },
-    "timestamp": 1767521223
+    "timestamp": 1767521223,
+    "location": {
+      "lat": 64.84,
+      "lon": -147.72,
+      "area": "Fairbanks, Alaska"
+    }
   },
   {
     "probe_id": 1012539,
@@ -27,7 +32,12 @@
       "avg": 56.0247597,
       "max": 56.141292
     },
-    "timestamp": 1767523009
+    "timestamp": 1767523009,
+    "location": {
+      "lat": 61.17,
+      "lon": -149.98,
+      "area": "Ted Stevens Anchorage Intl Airport vicinity"
+    }
   },
   {
     "probe_id": 61113,
@@ -42,7 +52,12 @@
       "avg": 56.1335863,
       "max": 65.921431
     },
-    "timestamp": 1767540988
+    "timestamp": 1767540988,
+    "location": {
+      "lat": 61.22,
+      "lon": -149.90,
+      "area": "Anchorage, Alaska"
+    }
   },
   {
     "probe_id": 60259,
@@ -57,6 +72,11 @@
       "avg": 40.8124899,
       "max": 44.727168
     },
-    "timestamp": 1767541604
+    "timestamp": 1767541604,
+    "location": {
+      "lat": 61.60,
+      "lon": -149.10,
+      "area": "Palmer / Mat-Su Valley, Alaska"
+    }
   }
 ]

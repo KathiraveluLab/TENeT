@@ -1,97 +1,85 @@
-import { MapContainer, TileLayer, CircleMarker, Popup } from "react-leaflet";
-import type { LatLngExpression } from "leaflet";
+import { MapContainer, TileLayer, GeoJSON } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { getColor } from "../utils/colour";
+import type { FeatureCollection, Geometry } from "geojson";
 
 type Mode = "physical" | "telehealth";
 
-export interface Region {
-  h3: string;
-  center: {
-    lat: number;
-    lon: number;
+type DesertProps = {
+  community: {
+    name: string;
+    geoid: string;
+    type: "place" | "native_village";
   };
   physical_desert: number;
   telehealth_desert: number;
   physical_count: number;
   telehealth_count: number;
-}
+};
 
 interface DesertMapProps {
-  data: Region[];
+  data: FeatureCollection<Geometry, DesertProps>;
   mode: Mode;
 }
 
-const center: LatLngExpression = [61.2, -149.9];
-
-// optional: small jitter to avoid perfect stacking
-const jitter = () => (Math.random() - 0.5) * 0.05;
-
 export default function DesertMap({ data, mode }: DesertMapProps) {
-  // 🔒 Guard: prevent rendering before data arrives
-  if (!Array.isArray(data) || data.length === 0) {
-    return <div style={{ padding: 20 }}>Loading map…</div>;
-  }
-
   return (
     <MapContainer
-      center={center}
+      center={[61.2, -149.9]}
       zoom={4}
-      style={{ height: "calc(100vh - 100px)", width: "100%" }}
+      style={{ height: "100%", width: "100%" }}
     >
       <TileLayer
         attribution="© OpenStreetMap contributors"
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      {data
-        // 🔒 Guard against bad coordinates
-        .filter(
-          (r) =>
-            typeof r.center?.lat === "number" &&
-            typeof r.center?.lon === "number"
-        )
-        .map((r) => {
-          const score =
-            mode === "physical"
-              ? r.physical_desert
-              : r.telehealth_desert;
+      <GeoJSON
+        data={data}
+        style={(feature) => {
+          if (!feature) return { fillOpacity: 0 };
 
-          const safeScore = Math.max(0, Math.min(1, score));
+          const p = feature.properties;
 
-          const radius =
-            mode === "physical"
-              ? Math.min(10, 3 + r.physical_count)
-              : Math.min(10, 3 + r.telehealth_count);
+          // Telehealth depends on broadband state
+          if (mode === "telehealth") {
+            return {
+              fillColor: p.broadband.color, 
+              weight: 1,
+              color: "#333",
+              fillOpacity: 0.7,
+            };
+          }
+          // Physical mode stays score-based
+          return {
+            fillColor: getColor(p.physical_desert),
+            weight: 1,
+            color: "#333",
+            fillOpacity: 0.7,
+          };
+        }}
+        onEachFeature={(feature, layer) => {
+          const p = feature.properties;
 
-          return (
-            <CircleMarker
-              key={r.h3}
-              center={[
-                r.center.lat + jitter(),
-                r.center.lon + jitter(),
-              ]}
-              radius={radius}
-              pathOptions={{
-                stroke: false,              
-                fillColor: getColor(safeScore),
-                fillOpacity: 0.6,           
-              }}
-            >
-              <Popup>
-                <div style={{ minWidth: 180 }}>
-                  <strong>{mode} desert score:</strong>{" "}
-                  {safeScore.toFixed(2)}
-                  <br />
-                  <strong>Providers nearby:</strong>{" "}
-                  {mode === "physical"
-                    ? r.physical_count
-                    : r.telehealth_count}
-                </div>
-              </Popup>
-            </CircleMarker>
-          );
-        })}
+          layer.bindPopup(`
+            <strong>${p.community.name}</strong><br/><br/>
+
+            <b>Broadband</b><br/>
+            Advertised: ${(p.broadband.advertised * 100).toFixed(0)}%<br/>
+            Actual: ${(p.broadband.actual * 100).toFixed(0)}%<br/>
+            Gap: ${(p.broadband.gap * 100).toFixed(0)}%<br/>
+            Status: <b>${p.broadband.state.replaceAll("_", " ")}</b><br/><br/>
+
+            <b>${mode === "physical" ? "Physical" : "Telehealth"} care</b><br/>
+            Desert score: ${
+              mode === "physical" ? p.physical_desert : p.telehealth_desert
+            }<br/>
+            Providers: ${
+              mode === "physical" ? p.physical_count : p.telehealth_count
+            }
+          `);
+        }}
+      />
     </MapContainer>
   );
 }
