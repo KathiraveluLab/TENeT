@@ -21,11 +21,17 @@ TECH_QUALITY_WEIGHT = {
     "copper": 0.45,
 }
 
+H3_RESOLUTION = 8
 DOWNLOAD_CAP_MBPS = 100.0
 UPLOAD_CAP_MBPS = 20.0
 
 DOWNLOAD_WEIGHT = 0.7
 UPLOAD_WEIGHT = 0.3
+
+MAX_USABLE_RTT_MS = 200
+MAX_USABLE_PACKET_LOSS_PCT = 10
+LATENCY_SCORE_WEIGHT = 0.7
+PACKET_LOSS_SCORE_WEIGHT = 0.3
 
 def speed_score(download, upload):
     d = min(download / DOWNLOAD_CAP_MBPS, 1.0)   # cap at 100 Mbps
@@ -58,9 +64,9 @@ def load_broadband_by_h3(csv_files):
     return h3_map
 
 def ripe_quality_score(rtt_ms, packet_loss):
-    latency_score = max(0.0, 1 - (rtt_ms / 200))   # 200 ms = unusable
-    loss_score = max(0.0, 1 - (packet_loss / 10)) # 10% = unusable
-    return round(0.7 * latency_score + 0.3 * loss_score, 3)
+    latency_score = max(0.0, 1 - (rtt_ms / MAX_USABLE_RTT_MS))   # 200 ms = unusable
+    loss_score = max(0.0, 1 - (packet_loss / MAX_USABLE_PACKET_LOSS_PCT)) # 10% = unusable
+    return round(LATENCY_SCORE_WEIGHT * latency_score + PACKET_LOSS_SCORE_WEIGHT * loss_score, 3)
 
 ripe_file = DATA_DIR / "ripe_atlas_ping.json"
 def load_ripe_by_h3():
@@ -77,7 +83,7 @@ def load_ripe_by_h3():
         lat = loc["lat"]
         lon = loc["lon"]
 
-        h3_id = h3.latlng_to_cell(lat, lon, 8)
+        h3_id = h3.latlng_to_cell(lat, lon, H3_RESOLUTION)
 
         rtt = p["rtt_ms"]["avg"]
         loss = p["packet_loss_pct"]

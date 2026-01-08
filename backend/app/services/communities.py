@@ -4,6 +4,7 @@ from pathlib import Path
 import h3
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
+H3_RESOLUTION = 8
 
 def load_communities():
     places = gpd.read_file(
@@ -33,11 +34,8 @@ def load_communities():
     gdf["lat"] = centroids.y
     gdf["lon"] = centroids.x
     gdf["h3"] = gdf.apply(
-    lambda r: h3.latlng_to_cell(r["lat"], r["lon"], 8),
+    lambda r: h3.latlng_to_cell(r["lat"], r["lon"], H3_RESOLUTION),
     axis=1
 )
 
     return gdf
-
-result=load_communities()
-print(result.length)

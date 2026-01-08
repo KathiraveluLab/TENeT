@@ -17,12 +17,10 @@ def desert_index():
     [(DATA_DIR / fname, tech) for fname, tech in BROADBAND_SOURCES]
 )
     h3_actual_map = load_actual_broadband_by_h3()
-    results = compute_community_desert_index(
+    return compute_community_desert_index(
         communities_gdf,
         specialists,
         healthsites,
         h3_broadband_map,
         h3_actual_map
     )
-    print("Successful")
-    return results

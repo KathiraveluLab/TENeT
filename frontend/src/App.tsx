@@ -8,7 +8,7 @@ type BroadbandInfo = {
   actual: number;
   gap: number;
   state: "adequately_served" | "true_desert" | "advertised_but_unreliable" | "partially_served";
-  color: "green" | "red" | "orange" | "yellow";
+  color: string;
 };
 
 

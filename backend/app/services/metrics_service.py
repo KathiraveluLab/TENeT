@@ -79,7 +79,6 @@ def compute_community_desert_index(
     h3_broadband_map,
     h3_actual_map
 ):
-    print("✅ COMMUNITY SCORING ACTIVE")
     spec_gdf = items_to_gdf(specialists)
     hs_gdf = items_to_gdf(healthsites)
 
@@ -109,8 +108,7 @@ def compute_community_desert_index(
 
     # Step 4: scoring
     features = []
-    print(communities_gdf.length)
-    print(communities_gdf.columns)
+
     for _, c in communities_gdf.iterrows():
         geoid = c["GEOID"]
 
@@ -141,51 +139,3 @@ def compute_community_desert_index(
     "type": "FeatureCollection",
     "features": features
     }
-
-
-
-# def region_broadband_metrics(region, h3_broadband_map):
-#     h3 = region.get("h3")
-
-#     if not h3 or h3 not in h3_broadband_map:
-#         return {
-#             "fiber": 0,
-#             "cable": 0,
-#             "licensed_fixed_wireless": 0,
-#             "copper": 0,
-#             "overall": 0.0
-#         }
-
-#     techs = h3_broadband_map[h3]
-
-#     overall = max(techs.values()) if techs else 0.0
-
-#     return {
-#         **techs,
-#         "overall": round(overall, 3)
-#     }
-
-# def haversine(lat1, lon1, lat2, lon2):
-#     R = 6371  # km
-#     phi1, phi2 = math.radians(lat1), math.radians(lat2)
-#     dphi = math.radians(lat2 - lat1)
-#     dlambda = math.radians(lon2 - lon1)
-
-#     a = (
-#         math.sin(dphi / 2) ** 2
-#         + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-#     )
-#     return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-# def assign_items_to_regions(regions, items, care_mode, radius_km=50):
-
-#     for region in regions:
-#         rlat = region["center"]["lat"]
-#         rlon = region["center"]["lon"]
-
-#         for item in items:
-#             ilat = item["location"]["lat"]
-#             ilon = item["location"]["lon"]
-
-#             if haversine(rlat, rlon, ilat, ilon) <= radius_km:
-#                 region[f"{care_mode}_items"].append(item)
-# import h3
