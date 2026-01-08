@@ -1,0 +1,78 @@
+/**
+ * Confidence Badge Styles
+ * Visual indicators for data quality levels
+ */
+
+.confidence-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.confidence-icon {
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+.confidence-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* High confidence - green */
+.confidence-high {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.confidence-high .confidence-icon {
+  color: #28a745;
+}
+
+/* Medium confidence - yellow */
+.confidence-medium {
+  background-color: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.confidence-medium .confidence-icon {
+  color: #ffc107;
+}
+
+/* Low confidence - orange */
+.confidence-low {
+  background-color: #ffe5d0;
+  color: #8b4513;
+  border: 1px solid #ffc9a0;
+}
+
+.confidence-low .confidence-icon {
+  color: #fd7e14;
+}
+
+/* Missing data - gray */
+.confidence-missing {
+  background-color: #e9ecef;
+  color: #495057;
+  border: 1px solid #dee2e6;
+}
+
+.confidence-missing .confidence-icon {
+  color: #6c757d;
+}
+
+/* Hover effect */
+.confidence-badge:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: help;
+}

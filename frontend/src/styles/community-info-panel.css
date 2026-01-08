@@ -150,6 +150,18 @@
   gap: 0.4rem;
 }
 
+/* Section header with confidence badge */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.section-header .section-title {
+  margin-bottom: 0;
+}
+
 .section-content {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -424,6 +436,43 @@
   .panel-title {
     font-size: 1.125rem;
   }
+}
+
+/* Loading state */
+.panel-content.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+
+.loading-spinner {
+  color: #2d3748;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* Specific row styles */
+.info-row.community-id {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+}
+
+.info-row.data-source {
+  font-size: 0.85rem;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.info-row.last-updated {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+.info-row.notes {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
   
   .info-section {
     padding: 1rem;
