@@ -259,15 +259,24 @@ def save_to_database(records: List[Dict], year: int = 2022):
 
 def main():
     parser = argparse.ArgumentParser(description="Fetch Census income data for Alaska ZCTAs")
-    parser.add_argument("--key", required=True, help="Your Census API Key")
+    parser.add_argument("--key", required=False, help="Census API Key (overrides CENSUS_API_KEY env var)")
     
     args = parser.parse_args()
+    
+    # Get API key from environment variable, with command-line override
+    api_key = args.key or os.environ.get('CENSUS_API_KEY')
+    
+    if not api_key:
+        print("❌ Error: Census API key required.")
+        print("   Set CENSUS_API_KEY environment variable or use --key argument")
+        print("   Get a key from: https://api.census.gov/data/key_signup.html")
+        sys.exit(1)
     
     print("=" * 60)
     print("CENSUS ACS INCOME DATA INGESTION")
     print("=" * 60)
     
-    records = fetch_all_alaska_income(args.key)
+    records = fetch_all_alaska_income(api_key)
     
     if not records:
         print("❌ No data retrieved. Check your API key.")
