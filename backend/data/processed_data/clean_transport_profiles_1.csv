@@ -1,11 +1,11 @@
 community,has_airport,has_road_access,has_water_access,primary_access_modes,latitude,longitude,coastal,cat_tier_level,access_score,tier_justification,harbordock,stateferry,cargobarge,data_collection_date
-adak,True,False,False,air,54.243154,-177.699385,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+adak,True,False,False,air,51.88,-176.6581,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 afognak,False,False,False,no_direct_access,58.01955,-152.767096,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 akhiok,True,False,False,air,56.9472,-154.173756,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 akiachak,True,False,False,air,61.144609,-161.500294,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 akiak,True,False,False,air,61.126516,-161.277843,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 akutan,True,False,True,"air,water",54.133139,-165.777239,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
-alakanuk,True,False,False,air,63.121061,-164.808109,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+alakanuk,True,False,False,air,62.6856,-164.6156,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 alatna,False,False,False,no_direct_access,66.618723,-152.686053,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 alcan border,False,True,False,road,63.246211,-140.781656,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 aleknagik,True,False,False,air,59.376776,-158.639156,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
@@ -13,27 +13,27 @@ aleneva,False,False,False,no_direct_access,58.015654,-152.87815,True,4,0,No dire
 alexander creek,False,False,False,no_direct_access,61.487344,-150.586321,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 allakaket,True,False,False,air,66.624664,-152.633573,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
 alpine,False,False,False,no_direct_access,70.408053,-150.839199,False,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,True,2025-12-20
-ambler,True,False,False,air,67.189882,-157.912359,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
-anaktuvuk pass,True,False,False,air,68.213804,-151.696576,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
+ambler,True,False,False,air,67.0861,-157.8514,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+anaktuvuk pass,True,False,False,air,68.1433,-151.735,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
 anchor point,True,True,False,"air,road",59.813211,-151.828455,True,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
-anchorage,True,True,False,"air,road",61.307351,-149.878303,True,1,75,"Full multimodal access (air,road) including road connectivity",True,False,True,2025-12-20
+anchorage,True,True,False,"air,road",61.2181,-149.9003,True,1,75,"Full multimodal access (air,road) including road connectivity",True,False,True,2025-12-20
 anderson,False,True,False,road,64.470356,-149.150771,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 andreafsky,False,False,False,no_direct_access,62.381639,-163.283623,True,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,True,2025-12-20
-angoon,True,False,True,"air,water",57.472682,-134.567585,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
-aniak,True,False,False,air,61.721039,-159.557153,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+angoon,True,False,True,"air,water",57.5033,-134.5839,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
+aniak,True,False,False,air,61.5767,-159.5225,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 anvik,True,False,False,air,62.826238,-160.242798,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 arctic,True,False,False,air,68.389435,-145.339337,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
-atka,True,False,False,air,54.074477,-174.975244,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+atka,True,False,False,air,52.1967,-174.2006,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 atmautluak,True,False,False,air,61.135694,-162.341511,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 atqasuk,True,False,False,air,70.549595,-157.521951,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
-attu,False,False,False,no_direct_access,57.65966,-189.887555,True,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,False,2025-12-20
+attu,False,False,False,no_direct_access,52.9233,172.9117,True,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,False,2025-12-20
 ayakulik,False,False,False,no_direct_access,57.200395,-154.535732,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 badger,False,True,False,road,64.997916,-147.340762,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 bear creek,True,True,False,"air,road",60.269721,-149.384374,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 beaver,True,False,False,air,66.551816,-147.299699,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 belkofski,False,False,False,no_direct_access,55.35876,-162.107011,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 beluga,True,False,False,air,61.233498,-151.033065,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
-bethel,True,False,False,air,61.039875,-161.827671,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+bethel,True,False,False,air,60.7922,-161.7558,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 bettles,True,False,False,air,66.999736,-151.475391,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
 big delta,False,True,False,road,64.416965,-145.740172,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 big lake,True,True,False,"air,road",61.647509,-149.801153,False,1,75,"Full multimodal access (air,road) including road connectivity",True,False,False,2025-12-20
@@ -41,8 +41,8 @@ big salt,False,False,False,no_direct_access,57.445916,-132.289297,True,4,0,No di
 birch creek,True,False,False,air,66.525952,-145.683051,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
 birchwood,True,True,False,"air,road",61.513339,-149.476643,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 boundary,True,True,False,"air,road",64.675353,-140.853206,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
-brevig mission,True,False,False,air,65.882372,-166.763163,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
-buckland,True,False,False,air,66.192479,-161.231048,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+brevig mission,True,False,False,air,65.3356,-166.4894,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+buckland,True,False,False,air,65.9806,-161.1194,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 buffalo soapstone,False,True,False,road,61.813811,-148.986176,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 butte,False,True,False,road,61.662541,-149.011296,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 candle,True,False,False,air,66.164802,-162.048054,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
@@ -59,7 +59,7 @@ chefornak,True,False,False,air,60.575634,-164.387969,True,3,40,Single mode acces
 chena hot springs,True,True,False,"air,road",65.308467,-145.954357,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 chena ridge,False,True,False,road,64.996635,-147.906638,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 chenega,True,False,True,"air,water",60.063642,-148.008059,True,2,65,"Dual mode access (air,water) without year-round road",True,True,False,2025-12-20
-chevak,True,False,False,air,62.042729,-165.748177,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+chevak,True,False,False,air,61.5278,-165.5864,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 chickaloon,True,True,False,"air,road",61.939141,-148.44831,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 chicken,True,True,False,"air,road",64.602347,-141.716123,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 chignik,True,False,True,"air,water",56.29602,-158.398863,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
@@ -79,24 +79,24 @@ clark's point,False,False,False,no_direct_access,58.927381,-158.565157,True,4,0,
 clear,True,True,False,"air,road",64.382186,-149.151273,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 coffman cove,True,False,True,"air,water",56.01682,-132.834654,True,2,65,"Dual mode access (air,water) without year-round road",True,False,True,2025-12-20
 cohoe,False,True,False,road,60.419334,-151.311841,True,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
-cold bay,True,False,True,"air,water",55.207342,-162.695916,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
+cold bay,True,False,True,"air,water",55.2064,-162.7181,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
 coldfoot,True,True,False,"air,road",67.358237,-150.132387,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 college,False,True,False,road,65.034219,-147.737101,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 cooper landing,True,True,False,"air,road",60.584492,-149.792776,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 copper center,True,True,False,"air,road",62.258241,-145.224755,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 copperville,False,True,False,road,62.36688,-145.335016,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
-cordova,True,False,True,"air,water",55.490666,-132.622313,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
+cordova,True,False,True,"air,water",60.5425,-145.7575,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
 council,True,False,False,air,65.249264,-163.824599,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
 covenant life,False,True,False,road,60.647727,-135.490288,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
-craig,True,False,False,air,57.317572,-132.377155,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+craig,True,False,False,air,55.4758,-133.1481,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 crooked creek,True,False,False,air,61.965202,-158.124289,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 crown point,False,True,False,road,60.522908,-149.351022,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 cube cove,False,False,False,no_direct_access,59.424076,-134.131129,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
-deering,True,False,False,air,66.369053,-162.875086,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
-delta junction,True,True,False,"air,road",64.32241,-145.641544,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,True,2025-12-20
+deering,True,False,False,air,66.0739,-162.7222,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+delta junction,True,True,False,"air,road",64.0378,-145.7322,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,True,2025-12-20
 deltana,False,True,False,road,64.194599,-145.067633,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
-dillingham,True,False,False,air,59.130219,-158.479572,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
-diomede,True,False,False,air,66.508855,-169.381283,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+dillingham,True,False,False,air,59.0397,-158.4575,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+diomede,True,False,False,air,65.7583,-168.9528,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 dot lake,False,True,False,road,64.035945,-143.925928,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 douglas,False,False,False,no_direct_access,59.800318,-133.766901,False,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,False,2025-12-20
 dry creek,False,True,False,road,64.018044,-144.484029,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
@@ -111,15 +111,15 @@ eklutna,False,True,False,road,61.570286,-149.340824,False,3,35,Single mode acces
 ekuk,True,False,False,air,58.909197,-158.578108,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 ekwok,True,False,False,air,59.412567,-157.488786,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 elfin cove,True,False,False,air,59.433877,-135.878124,True,3,40,Single mode access (air) - limited transport options,True,False,False,2025-12-20
-elim,True,False,False,air,64.890528,-162.368596,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
-emmonak,True,False,False,air,63.20046,-164.667306,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+elim,True,False,False,air,64.6175,-162.2611,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+emmonak,True,False,False,air,62.7778,-164.5231,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 ester,False,True,False,road,65.025921,-147.914026,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 ester dome,False,True,False,road,65.046827,-147.993549,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 eureka roadhouse,False,True,False,road,62.139462,-147.120673,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 evansville,False,False,False,no_direct_access,67.002529,-151.472761,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 excursion inlet,True,False,False,air,59.777896,-134.902726,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 eyak,False,False,False,no_direct_access,60.810199,-145.569697,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
-fairbanks,True,True,False,"air,road",65.020275,-147.654379,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,True,2025-12-20
+fairbanks,True,True,False,"air,road",64.8378,-147.7164,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,True,2025-12-20
 false pass,True,False,True,"air,water",54.862555,-163.411462,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
 ferry,False,True,False,road,64.145511,-149.077643,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 fishhook,False,True,False,road,61.807446,-149.225796,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
@@ -133,35 +133,35 @@ fox river,False,False,False,no_direct_access,59.909072,-150.906901,False,4,0,No 
 fritz creek,False,True,False,road,59.771764,-151.291211,True,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 funny river,False,True,False,road,60.565305,-150.751908,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 gakona,False,True,False,road,62.604911,-145.218172,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
-galena,True,False,False,air,64.822728,-156.899709,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
-gambell,True,False,False,air,64.867063,-172.284393,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+galena,True,False,False,air,64.7344,-156.9256,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+gambell,True,False,False,air,63.7797,-171.7381,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 game creek,False,False,False,no_direct_access,59.418912,-134.975461,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 gateway,False,True,False,road,61.688017,-149.217454,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 georgetown,False,False,False,no_direct_access,61.973862,-157.773112,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 girdwood,True,True,False,"air,road",61.082583,-149.106493,True,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 glacier view,True,True,False,"air,road",61.967978,-147.686944,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
-glennallen,True,True,False,"air,road",62.402277,-145.450583,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
+glennallen,True,True,False,"air,road",62.1089,-145.5467,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 gold sand acres,False,True,False,road,64.185003,-144.746073,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 goldstream,False,True,False,road,65.101621,-147.814149,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
-golovin,True,False,False,air,64.859889,-163.159282,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+golovin,True,False,False,air,64.5406,-163.0283,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 goodnews bay,False,False,False,no_direct_access,59.354688,-161.631933,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,True,2025-12-20
 grayling,True,False,False,air,63.075185,-160.10934,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 gulkana,True,True,False,"air,road",62.567392,-145.290005,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
-gustavus,True,False,True,"air,water",58.389516,-135.729905,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
-haines,False,False,True,water,59.281588,-135.461967,False,3,25,Single mode access (water) - limited transport options,False,False,False,2025-12-20
+gustavus,True,False,True,"air,water",58.4133,-135.735,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
+haines,False,False,True,water,59.2358,-135.4458,False,3,25,Single mode access (water) - limited transport options,False,False,False,2025-12-20
 halibut cove,False,False,False,no_direct_access,59.644749,-151.216078,True,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,False,2025-12-20
 hamilton,False,False,False,no_direct_access,63.274466,-164.014365,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 happy valley,False,True,False,road,59.974492,-151.732071,True,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 harding-birch lakes,False,False,False,no_direct_access,64.601945,-146.517964,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 haystack,False,True,False,road,65.30703,-147.556165,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
-healy,True,True,False,"air,road",64.001948,-148.967688,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
+healy,True,True,False,"air,road",63.8683,-148.9631,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 healy lake,False,False,False,no_direct_access,64.333368,-144.614068,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 hobart bay,False,False,False,no_direct_access,59.185165,-132.608625,True,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,False,2025-12-20
 hollis,True,False,False,air,57.41258,-131.821581,True,3,40,Single mode access (air) - limited transport options,True,False,False,2025-12-20
-holy cross,True,False,False,air,62.352877,-159.807095,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
-homer,True,True,True,"air,road,water",59.602689,-151.41041,True,1,100,"Full multimodal access (air,road,water) including road connectivity",True,True,True,2025-12-20
-hoonah,True,False,True,"air,water",58.116647,-135.457561,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
-hooper bay,True,False,False,air,62.087833,-166.272728,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+holy cross,True,False,False,air,62.2014,-159.7728,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+homer,True,True,True,"air,road,water",59.6425,-151.5483,True,1,100,"Full multimodal access (air,road,water) including road connectivity",True,True,True,2025-12-20
+hoonah,True,False,True,"air,water",58.1103,-135.4436,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
+hooper bay,True,False,False,air,61.5311,-166.0967,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 hope,True,True,False,"air,road",61.015776,-149.604538,True,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 houston,True,True,False,"air,road",61.72744,-149.783046,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 hughes,True,False,False,air,66.104253,-154.260822,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
@@ -174,12 +174,12 @@ iliamna,True,False,False,air,59.776624,-154.908125,False,3,40,Single mode access
 indian,False,False,False,no_direct_access,61.09073,-149.491447,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 ivanof bay,True,False,False,air,56.026049,-159.517669,True,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
 jakolof bay,True,False,False,air,59.505749,-151.531313,True,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
-juneau,True,False,True,"air,water",58.38173,-134.684055,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
+juneau,True,False,True,"air,water",58.3019,-134.4197,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
 kachemak,False,True,False,road,59.709831,-151.445881,True,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 kachemak selo,False,True,False,road,59.846247,-151.065698,True,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 kaguyak,False,False,False,no_direct_access,56.860389,-153.765407,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
-kake,True,False,True,"air,water",56.961237,-133.920962,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
-kaktovik,True,False,False,air,70.450708,-143.241439,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+kake,True,False,True,"air,water",56.9744,-133.945,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
+kaktovik,True,False,False,air,70.1319,-143.6233,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 kalifornsky,False,True,False,road,60.541295,-151.133998,True,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 kaltag,True,False,False,air,64.450884,-158.763731,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 kanatak,False,False,False,no_direct_access,57.58836,-156.042166,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
@@ -187,30 +187,30 @@ karluk,True,False,False,air,57.567055,-154.437838,True,3,40,Single mode access (
 kasaan,True,False,False,air,57.51167,-131.548349,True,3,40,Single mode access (air) - limited transport options,True,False,False,2025-12-20
 kasigluk,True,False,False,air,61.187897,-162.589403,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 kasilof,True,True,False,"air,road",60.376124,-151.248894,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
-kenai,True,True,False,"air,road",60.611943,-151.240599,True,1,75,"Full multimodal access (air,road) including road connectivity",False,False,True,2025-12-20
+kenai,True,True,False,"air,road",60.5544,-151.2583,True,1,75,"Full multimodal access (air,road) including road connectivity",False,False,True,2025-12-20
 kenny lake,False,True,False,road,62.06353,-144.860748,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
-ketchikan,True,False,True,"air,water",55.353847,-131.694443,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
-kiana,True,False,False,air,67.156774,-160.543011,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
-king cove,True,False,True,"air,water",55.055762,-162.323,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
+ketchikan,True,False,True,"air,water",55.3422,-131.6461,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
+kiana,True,False,False,air,66.9744,-160.4236,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+king cove,True,False,True,"air,water",55.06,-162.31,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
 king island,False,False,False,no_direct_access,65.646065,-168.397508,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
-king salmon,True,False,False,air,58.72034,-156.675064,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+king salmon,True,False,False,air,58.6883,-156.6614,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 kipnuk,True,False,False,air,60.336472,-164.138419,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
-kivalina,True,False,False,air,68.106371,-164.805115,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
-klawock,True,False,False,air,57.40214,-132.317199,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+kivalina,True,False,False,air,67.7256,-164.5333,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+klawock,True,False,False,air,55.5536,-133.0958,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 klawock lake,False,False,False,no_direct_access,57.395698,-132.202354,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 klehini valley,False,True,False,road,60.661629,-135.64395,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 klukwan,False,True,False,road,60.667108,-135.388668,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 knik,False,True,False,road,61.559756,-149.704153,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 knik river,False,True,False,road,61.621229,-148.916116,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 knik-fairview,False,True,False,road,61.617991,-149.6015,True,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
-kobuk,True,False,False,air,66.991837,-156.920839,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+kobuk,True,False,False,air,66.9072,-156.8806,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 kodiak,True,False,True,"air,water",57.78719,-152.402538,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
 kokhanok,True,False,False,air,59.458638,-154.750826,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
 koliganek,True,False,False,air,59.786036,-157.295585,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
 kongiganak,True,False,False,air,60.277489,-162.960968,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 kotlik,True,False,False,air,63.388477,-163.669281,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
-kotzebue,True,False,False,air,67.176076,-162.756164,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
-koyuk,True,False,False,air,65.149404,-161.249649,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+kotzebue,True,False,False,air,66.8983,-162.5967,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+koyuk,True,False,False,air,64.9306,-161.1544,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 koyukuk,True,False,False,air,64.97984,-157.734496,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 kupreanof,False,False,False,no_direct_access,58.627918,-132.196812,True,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,False,2025-12-20
 kwethluk,True,False,False,air,61.041265,-161.488152,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
@@ -229,12 +229,12 @@ loring,True,False,False,air,57.71311,-130.691438,True,3,40,Single mode access (a
 lowell point,False,True,False,road,60.171848,-149.42357,True,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 lower kalskag,False,False,False,no_direct_access,61.690122,-160.403122,False,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,True,2025-12-20
 lutak,False,True,False,road,60.630886,-135.010461,True,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
-manley hot springs,True,True,False,"air,road",65.086597,-150.608101,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,True,2025-12-20
+manley hot springs,True,True,False,"air,road",64.9967,-150.6392,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,True,2025-12-20
 manokotak,True,False,False,air,59.091975,-159.075797,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
-marshall,True,False,False,air,62.148672,-162.155896,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+marshall,True,False,False,air,61.8767,-162.0756,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 mary's igloo,False,False,False,no_direct_access,65.591232,-165.266739,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 mccarthy,True,False,False,air,61.905894,-142.78432,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
-mcgrath,True,False,False,air,63.001424,-155.595462,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+mcgrath,True,False,False,air,62.9533,-155.5936,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 mckinley park,True,True,False,"air,road",63.866431,-148.878795,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 meadow lakes,True,True,False,"air,road",61.726512,-149.583741,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 medfra,False,False,False,no_direct_access,63.150755,-154.702347,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
@@ -242,7 +242,7 @@ mekoryuk,True,False,False,air,60.962483,-166.363208,True,3,40,Single mode access
 mendeltna,False,True,False,road,62.282255,-146.48041,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 mentasta lake,False,True,False,road,63.328816,-143.667945,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 mertarvik,False,False,False,no_direct_access,61.250829,-164.624397,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,True,2025-12-20
-metlakatla,True,False,True,"air,water",55.266741,-131.560072,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
+metlakatla,True,False,True,"air,water",55.1311,-131.5753,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
 meyers chuck,True,False,False,air,57.728328,-131.385871,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 millers landing,False,True,False,road,59.708952,-151.436693,True,3,35,Single mode access (road) - limited transport options,True,False,False,2025-12-20
 minto,True,True,False,"air,road",65.276186,-149.302481,False,1,75,"Full multimodal access (air,road) including road connectivity",True,False,False,2025-12-20
@@ -253,7 +253,7 @@ mountain,True,False,False,air,62.459518,-163.832515,False,3,40,Single mode acces
 mountain point,False,False,False,no_direct_access,57.443046,-130.572473,True,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,False,2025-12-20
 mud bay,False,True,False,road,60.506893,-134.825616,True,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 nabesna,True,True,False,"air,road",62.832062,-142.864957,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
-naknek,True,False,False,air,58.775315,-157.02874,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+naknek,True,False,False,air,58.7283,-157.0139,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 nanwalek,True,False,False,air,59.386921,-151.914689,True,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
 napaimute,True,False,False,air,61.649189,-158.754955,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 napakiak,True,False,False,air,60.954581,-162.031557,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
@@ -261,7 +261,7 @@ napaskiak,True,False,False,air,60.955786,-161.80846,False,3,40,Single mode acces
 naukati bay,False,False,False,no_direct_access,57.683772,-132.438698,True,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,False,2025-12-20
 nelchina,False,True,False,road,62.210141,-146.725342,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 nelson lagoon,True,False,False,air,56.21586,-161.256587,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
-nenana,True,True,False,"air,road",64.693444,-149.047457,False,1,75,"Full multimodal access (air,road) including road connectivity",True,False,True,2025-12-20
+nenana,True,True,False,"air,road",64.5636,-149.0928,False,1,75,"Full multimodal access (air,road) including road connectivity",True,False,True,2025-12-20
 new allakaket,False,False,False,no_direct_access,66.604032,-152.635995,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 new stuyahok,True,False,False,air,59.510136,-157.321232,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 newhalen,False,False,False,no_direct_access,59.742569,-154.896795,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,True,2025-12-20
@@ -270,16 +270,16 @@ nightmute,True,False,False,air,60.931118,-164.851777,False,3,40,Single mode acce
 nikiski,True,True,False,"air,road",60.787747,-151.288722,True,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 nikolaevsk,False,True,False,road,59.852155,-151.606796,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 nikolai,True,False,False,air,63.057272,-154.376835,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
-nikolski,True,False,False,air,53.935502,-169.209178,True,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
+nikolski,True,False,False,air,52.94,-168.87,True,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
 ninilchik,True,True,False,"air,road",60.084368,-151.668905,True,1,75,"Full multimodal access (air,road) including road connectivity",True,False,False,2025-12-20
-noatak,True,False,False,air,67.865278,-163.185277,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
-nome,True,False,False,air,64.973079,-165.608914,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+noatak,True,False,False,air,67.5675,-163.0028,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
+nome,True,False,False,air,64.5011,-165.4064,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 nondalton,True,False,False,air,59.991049,-154.859508,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
-noorvik,True,False,False,air,67.041083,-161.164414,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+noorvik,True,False,False,air,66.8358,-161.0444,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 north lakes,False,True,False,road,61.730133,-149.288633,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 north pole,True,True,False,"air,road",64.950865,-147.279214,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 northway,True,True,False,"air,road",63.502776,-141.739006,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
-nuiqsut,True,False,False,air,70.281653,-150.917726,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+nuiqsut,True,False,False,air,70.2106,-150.9956,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 nulato,True,False,False,air,64.831118,-158.140348,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 nunam iqua,True,False,False,air,62.979819,-164.996398,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 nunapitchuk,True,False,False,air,61.186685,-162.526139,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
@@ -292,7 +292,7 @@ ophir,True,False,False,air,63.209595,-156.533834,False,3,40,Single mode access (
 oscarville,False,False,False,no_direct_access,60.971249,-161.826985,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,True,2025-12-20
 ouzinkie,True,False,True,"air,water",57.921253,-152.500166,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
 paimiut,False,False,False,no_direct_access,62.233294,-166.009702,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
-palmer,True,True,False,"air,road",61.717988,-149.094117,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
+palmer,True,True,False,"air,road",61.5994,-149.1125,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 pauloff,False,False,False,no_direct_access,54.779241,-162.795307,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 paxson,True,True,False,"air,road",63.322925,-145.408858,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 pedro bay,True,False,False,air,59.807336,-154.099764,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
@@ -300,7 +300,7 @@ pelican,True,False,True,"air,water",57.957666,-136.227399,True,2,65,"Dual mode a
 pennock island,False,False,False,no_direct_access,57.447757,-130.679724,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 perryville,True,False,False,air,56.018879,-159.17343,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 peters creek,False,True,False,road,61.518487,-149.426709,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
-petersburg,True,False,True,"air,water",56.807861,-132.975424,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
+petersburg,True,False,True,"air,water",56.8119,-132.9536,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
 petersville,False,True,False,road,62.572327,-150.753015,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 pile bay,False,False,False,no_direct_access,59.799234,-153.884228,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 pilot,True,False,False,air,62.252187,-162.967591,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
@@ -309,8 +309,8 @@ pitkas point,False,False,False,no_direct_access,62.372534,-163.381656,False,4,0,
 platinum,True,False,False,air,59.258753,-161.868118,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 pleasant valley,False,True,False,road,65.095606,-146.771557,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 point baker,True,False,False,air,58.073743,-132.905074,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
-point hope,True,False,False,air,68.86053,-167.144886,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
-point lay,True,False,False,air,70.005308,-163.290767,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+point hope,True,False,False,air,68.3478,-166.7992,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+point lay,True,False,False,air,69.7328,-163.0053,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 point mackenzie,True,True,False,"air,road",61.443657,-149.994702,True,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 point possession,False,True,False,road,61.111443,-150.365198,True,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 poorman,False,False,False,no_direct_access,64.157618,-155.556933,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
@@ -318,15 +318,15 @@ portage,False,True,False,road,60.951448,-148.962822,False,3,35,Single mode acces
 portage creek,True,False,False,air,58.971712,-157.731903,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 portlock,False,False,False,no_direct_access,59.247238,-151.735311,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 primrose,False,True,False,road,60.461498,-149.334038,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
-prudhoe bay,False,True,False,road,70.379148,-148.170684,True,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
+prudhoe bay,False,True,False,road,70.2553,-148.3372,True,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 quinhagak,True,False,False,air,60.007052,-161.955784,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 rabbit creek,False,True,False,road,61.177281,-149.807389,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 rampart,True,False,False,air,65.605984,-150.133285,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 razdolna,False,True,False,road,59.864227,-151.0744,True,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 red devil,True,False,False,air,61.856092,-157.347899,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 ridgeway,False,True,False,road,60.587574,-151.072185,True,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
-ruby,True,False,False,air,64.79972,-155.499869,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
-russian mission,True,False,False,air,62.009132,-161.377291,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+ruby,True,False,False,air,64.7389,-155.4867,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+russian mission,True,False,False,air,61.7856,-161.3194,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 saint george,False,False,False,no_direct_access,57.600175,-169.877701,True,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,True,2025-12-20
 saint lawrence island,False,False,False,no_direct_access,64.371792,-170.721282,True,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,True,2025-12-20
 saint mary's,False,False,False,no_direct_access,62.384866,-163.267312,False,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,True,2025-12-20
@@ -336,31 +336,31 @@ salamatof,False,True,False,road,60.669368,-151.325509,True,3,35,Single mode acce
 salcha,False,True,False,road,64.695032,-146.901711,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 sanak,False,False,False,no_direct_access,54.812475,-162.911512,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 sand point,True,False,True,"air,water",55.331854,-160.503959,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
-savoonga,True,False,False,air,64.645755,-170.946899,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+savoonga,True,False,False,air,63.6867,-170.4722,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 saxman,False,False,False,no_direct_access,57.451722,-130.643421,True,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,False,2025-12-20
-scammon bay,True,False,False,air,62.353741,-165.742298,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
-selawik,True,False,False,air,66.772463,-160.099178,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+scammon bay,True,False,False,air,61.8456,-165.5828,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+selawik,True,False,False,air,66.6039,-160.0069,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 seldovia,True,False,True,"air,water",59.440583,-151.720662,True,2,65,"Dual mode access (air,water) without year-round road",True,True,False,2025-12-20
-seward,True,True,False,"air,road",60.202699,-149.421635,True,1,75,"Full multimodal access (air,road) including road connectivity",True,False,True,2025-12-20
+seward,True,True,False,"air,road",60.1042,-149.4422,True,1,75,"Full multimodal access (air,road) including road connectivity",True,False,True,2025-12-20
 shageluk,True,False,False,air,62.801924,-159.565906,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 shakan bay,False,False,False,no_direct_access,57.895956,-132.728117,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
-shaktoolik,True,False,False,air,64.575169,-161.271336,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+shaktoolik,True,False,False,air,64.3344,-161.1439,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 shishmaref,True,False,False,air,66.757932,-166.352018,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
-shungnak,True,False,False,air,66.976789,-157.180298,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+shungnak,True,False,False,air,66.8881,-157.1364,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 shuyak island,False,False,False,no_direct_access,58.574949,-152.502673,True,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,False,2025-12-20
 silver springs,False,True,False,road,62.312594,-145.251708,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
-sitka,True,False,True,"air,water",57.129209,-135.381439,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
-skagway,True,True,True,"air,road,water",59.449193,-135.324786,True,1,100,"Full multimodal access (air,road,water) including road connectivity",True,True,True,2025-12-20
+sitka,True,False,True,"air,water",57.0531,-135.33,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
+skagway,True,True,True,"air,road,water",59.4583,-135.3139,True,1,100,"Full multimodal access (air,road,water) including road connectivity",True,True,True,2025-12-20
 skwentna,True,False,False,air,62.031051,-151.190466,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 slana,True,True,False,"air,road",63.095052,-143.848311,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 sleetmute,True,False,False,air,61.772198,-157.182532,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
-soldotna,True,True,False,"air,road",60.546776,-151.05694,True,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
+soldotna,True,True,False,"air,road",60.4878,-151.0583,True,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 solomon,True,False,False,air,64.966599,-164.607689,True,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
 south lakes,False,True,False,road,61.698999,-149.293601,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 south naknek,True,False,False,air,58.759971,-157.015703,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 south van horn,False,True,False,road,64.990121,-147.693396,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 squaw,True,False,False,air,55.419071,-160.601712,True,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
-stebbins,True,False,False,air,63.801494,-162.379955,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+stebbins,True,False,False,air,63.5192,-162.2786,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 steele creek,False,True,False,road,65.082502,-147.41645,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 sterling,True,True,False,"air,road",60.599784,-150.786847,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 stevens,True,False,False,air,66.137119,-149.024842,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
@@ -374,18 +374,18 @@ takotna,True,False,False,air,63.04542,-156.071572,False,3,40,Single mode access 
 talkeetna,True,True,False,"air,road",62.414316,-150.093355,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 tanacross,True,True,False,"air,road",63.804433,-143.205704,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 tanaina,False,True,False,road,61.719497,-149.363385,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
-tanana,True,False,False,air,65.238214,-152.061565,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+tanana,True,False,False,air,65.1722,-152.0756,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 tatitlek,True,False,True,"air,water",60.860036,-146.676449,True,2,65,"Dual mode access (air,water) without year-round road",True,True,False,2025-12-20
 tazlina,True,True,False,"air,road",62.344004,-145.333009,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 telida,True,False,False,air,63.431174,-153.27584,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
-teller,True,False,False,air,65.801878,-166.627839,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+teller,True,False,False,air,65.24,-166.3594,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 tenakee springs,True,False,True,"air,water",57.779205,-135.219491,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
 tetlin,True,True,False,"air,road",63.63052,-142.344163,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 thane,False,False,False,no_direct_access,59.794114,-133.683491,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 thoms place,False,False,False,no_direct_access,58.167756,-131.254149,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 thorne bay,True,False,False,air,57.628965,-131.682433,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
-togiak,False,False,False,no_direct_access,59.231908,-160.412418,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,True,2025-12-20
-tok,True,True,False,"air,road",63.791217,-142.825681,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
+togiak,False,False,False,no_direct_access,59.0614,-160.3767,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,True,2025-12-20
+tok,True,True,False,"air,road",63.3367,-142.9856,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 toksook bay,True,False,False,air,61.010837,-165.240861,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 tolsona,False,True,False,road,62.353053,-146.04723,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 tonsina,False,True,False,road,61.9727,-145.098736,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
@@ -400,23 +400,23 @@ uganik,False,False,False,no_direct_access,57.688639,-153.419607,False,4,0,No dir
 ugashik,True,False,False,air,57.562626,-157.411622,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 umiat,True,False,False,air,69.430601,-152.098168,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
 umkumiute,False,False,False,no_direct_access,60.986664,-165.330483,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
-unalakleet,True,False,False,air,64.078633,-160.855675,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
+unalakleet,True,False,False,air,63.8731,-160.7883,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 unga,False,False,False,no_direct_access,55.358096,-160.55674,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 upper kalskag,False,False,False,no_direct_access,61.713807,-160.354002,False,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,True,2025-12-20
-utqiagvik,False,False,False,no_direct_access,71.332025,-156.852334,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,True,2025-12-20
+utqiagvik,False,False,False,no_direct_access,71.2906,-156.7886,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,True,2025-12-20
 uyak,False,False,False,no_direct_access,57.641051,-154.001621,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
-valdez,True,True,True,"air,road,water",61.124023,-146.365688,True,1,100,"Full multimodal access (air,road,water) including road connectivity",True,True,True,2025-12-20
+valdez,True,True,True,"air,road,water",61.1308,-146.3483,True,1,100,"Full multimodal access (air,road,water) including road connectivity",True,True,True,2025-12-20
 venetie,True,False,False,air,67.246501,-146.285762,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
 voznesenka,False,True,False,road,59.845362,-151.088301,True,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
-wainwright,True,False,False,air,70.76663,-160.2247,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
-wales,True,False,False,air,66.285212,-168.459175,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
-wasilla,True,True,False,"air,road",61.689245,-149.423308,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
+wainwright,True,False,False,air,70.6369,-160.0386,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+wales,True,False,False,air,65.6094,-168.0875,True,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+wasilla,True,True,False,"air,road",61.5814,-149.4394,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 whale pass,False,False,False,no_direct_access,57.934815,-132.351901,True,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,False,2025-12-20
-white mountain,True,False,False,air,65.020428,-163.546275,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
+white mountain,True,False,False,air,64.6811,-163.4036,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 whitestone,False,False,False,no_direct_access,64.417868,-145.802374,False,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 whittier,True,True,True,"air,road,water",60.776416,-148.68359,True,1,100,"Full multimodal access (air,road,water) including road connectivity",True,True,True,2025-12-20
 williamsport,False,False,False,no_direct_access,59.701774,-153.629985,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,True,2025-12-20
 willow,True,True,False,"air,road",61.833734,-150.028472,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
 wiseman,True,True,False,"air,road",67.51345,-150.046838,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
-wrangell,True,False,True,"air,water",56.474404,-132.391261,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
+wrangell,True,False,True,"air,water",56.4708,-132.3767,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
 yakutat,True,False,True,"air,water",59.548573,-139.733376,True,2,65,"Dual mode access (air,water) without year-round road",True,True,True,2025-12-20
