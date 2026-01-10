@@ -553,7 +553,7 @@ def main():
         if len(not_found) > 30:
             print(f"    ... and {len(not_found) - 30} more")
     
-    print(f"\n✅ Done! Refresh browser to see updated map.")
+    print(f"\n[SUCCESS] Done! Refresh browser to see updated map.")
 
 
 if __name__ == "__main__":

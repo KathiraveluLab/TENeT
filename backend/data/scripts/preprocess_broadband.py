@@ -70,7 +70,7 @@ def drop_unnecessary_columns(df: pd.DataFrame) -> pd.DataFrame:
     """Remove columns that are redundant or not needed for analysis."""
     cols_to_drop = [col for col in COLS_TO_DROP if col in df.columns]
     df = df.drop(columns=cols_to_drop)
-    print(f"🗑️  Dropped {len(cols_to_drop)} unnecessary columns")
+    print(f"[INFO] Dropped {len(cols_to_drop)} unnecessary columns")
     return df
 
 
@@ -90,7 +90,7 @@ def filter_relevant_technologies(df: pd.DataFrame) -> pd.DataFrame:
     """Keep only the technology types relevant for telehealth analysis."""
     original_count = len(df)
     df = df[df['technology'].isin(TECHNOLOGIES_TO_KEEP)].copy()
-    print(f"📡 Filtered to relevant technologies: {original_count:,} → {len(df):,} rows")
+    print(f"[INFO] Filtered to relevant technologies: {original_count:,} -> {len(df):,} rows")
     print(f"   Technologies kept: {df['technology'].unique().tolist()}")
     return df
 
@@ -247,7 +247,7 @@ def generate_place_summary(df: pd.DataFrame) -> pd.DataFrame:
         })
     
     summary_df = pd.DataFrame(summary_rows)
-    print(f"📋 Generated place summary: {len(summary_df)} places")
+    print(f"[INFO] Generated place summary: {len(summary_df)} places")
     
     return summary_df
 
@@ -260,20 +260,20 @@ def print_data_gap_report(summary_df: pd.DataFrame):
     
     # Count places by telehealth viability
     viability = summary_df['telehealth_viable'].value_counts()
-    print(f"\n🏥 Telehealth Viability:")
+    print(f"\n[INFO] Telehealth Viability:")
     for status, count in viability.items():
         pct = count / len(summary_df) * 100
         print(f"   {status}: {count} places ({pct:.1f}%)")
     
     # Count places by primary access type
     access = summary_df['primary_access'].value_counts()
-    print(f"\n📡 Primary Internet Access:")
+    print(f"\n[INFO] Primary Internet Access:")
     for access_type, count in access.items():
         pct = count / len(summary_df) * 100
         print(f"   {access_type}: {count} places ({pct:.1f}%)")
     
     # Count specific data gaps
-    print(f"\n⚠️  Data Gap Flags:")
+    print(f"\n[WARNING] Data Gap Flags:")
     gap_flags = ['INTERNET_DESERT', 'SATELLITE_DEPENDENT', 'LOW_TERRESTRIAL', 
                  'LOW_CONFIDENCE', 'MISSING_OVERALL_DATA', 'MISSING_WIRED_DATA']
     
@@ -313,7 +313,7 @@ def save_outputs(df_cleaned: pd.DataFrame, df_summary: pd.DataFrame, output_dir:
 def main():
     """Main preprocessing pipeline."""
     print("\n" + "="*70)
-    print("🚀 BROADBAND DATA PREPROCESSING FOR TENeT")
+    print("[START] BROADBAND DATA PREPROCESSING FOR TENeT")
     print("="*70 + "\n")
     
     # Define paths
@@ -323,7 +323,7 @@ def main():
     
     # Check if input file exists
     if not raw_data_path.exists():
-        print(f"❌ Error: Input file not found at {raw_data_path}")
+        print(f"[ERROR] Input file not found at {raw_data_path}")
         return
     
     # Step 1: Load raw data
@@ -356,7 +356,7 @@ def main():
     # Step 10: Save outputs
     save_outputs(df, summary_df, str(output_dir))
     
-    print("\n✅ Preprocessing complete!\n")
+    print("\n[SUCCESS] Preprocessing complete!\n")
     
     # Return dataframes for testing/debugging
     return df, summary_df

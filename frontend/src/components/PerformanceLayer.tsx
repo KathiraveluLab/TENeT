@@ -311,7 +311,7 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
                             gapLabel = '⚠️ Speed Gap';
                             gapColor = '#ef4444';
                         } else if (hasAffordGap) {
-                            gapLabel = '💸 Affordability Gap';
+                            gapLabel = 'Affordability Gap';
                             gapColor = '#a855f7';
                         }
                     }
@@ -358,7 +358,7 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
                                 
                                 <div style="background: #f9fafb; padding: 8px; border-radius: 4px; border-left: 3px solid ${useStarlink ? '#3b82f6' : '#7c3aed'};">
                                     <div style="font-weight: 600; font-size: 11px; color: #374151; margin-bottom: 4px;">
-                                        💰 Affordability Analysis
+                                        Affordability Analysis
                                         <span style="font-weight: 400; color: #6b7280; display: block; font-size: 10px;">
                                             ${scenarioLabel}
                                         </span>
@@ -492,7 +492,7 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
         <div style={panelStyle}>
             {/* Header */}
             <div style={headerStyle} onClick={onToggle}>
-                <span>🎯 Gap Hunter</span>
+                <span>Gap Hunter</span>
                 <span style={{ fontSize: '10px', cursor: 'pointer' }}>✕</span>
             </div>
 
@@ -584,7 +584,7 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
                 borderLeft: `4px solid ${useStarlink ? '#f97316' : '#7c3aed'}`
             }}>
                 <div style={{ fontWeight: '600', marginBottom: '2px' }}>
-                    {useStarlink ? '🛰️ LEO Policy Scenario' : '💰 Regional Market Reality'}
+                    {useStarlink ? 'LEO Policy Scenario' : 'Regional Market Reality'}
                 </div>
                 <div style={{ color: '#4b5563' }}>
                     {useStarlink
@@ -684,7 +684,7 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
                     {/* Color Legend - Scenario Aware */}
                     <div style={{ padding: '10px 12px', fontSize: '11px', borderTop: '1px solid #e5e7eb' }}>
                         <div style={{ fontWeight: '600', color: '#374151', marginBottom: '8px' }}>
-                            🎨 Color Key
+                            Color Key
                         </div>
                         {useStarlink ? (
                             // LEO Scenario Legend

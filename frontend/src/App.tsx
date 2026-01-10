@@ -8,6 +8,7 @@ import Legend from './components/Legend';
 import SeasonSelector from './components/SeasonSelector';
 import DataCoveragePanel from './components/DataCoveragePanel';
 import PerformanceLayer from './components/PerformanceLayer';
+import AffordabilityLayer, { AffordabilityLegend } from './components/AffordabilityLayer';
 
 // Fix for default marker icons in React-Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -23,7 +24,7 @@ const ALASKA_ZOOM = 5;
 
 // Alaska boundary coordinates to restrict map view
 const ALASKA_BOUNDS: [[number, number], [number, number]] = [
-  [51.0, -180.0], // Southwest (includes Aleutian Islands)
+  [51.0, -190.0], // Southwest (includes Attu/Eareckson beyond dateline)
   [71.5, -129.0]  // Northeast
 ];
 
@@ -34,7 +35,29 @@ function App() {
   const [season, setSeason] = useState<Season>('year_round');
   const [dataPanelExpanded, setDataPanelExpanded] = useState(false);
   const [performanceLayerVisible, setPerformanceLayerVisible] = useState(false);
+  const [affordabilityLayerVisible, setAffordabilityLayerVisible] = useState(false);
   const [gapModeActive, setGapModeActive] = useState(false);  // When true, hide CAT markers
+
+  // Mutually exclusive layer toggles
+  const toggleAffordabilityLayer = () => {
+    if (!affordabilityLayerVisible) {
+      setGapModeActive(false); // Turn off Gap Hunter if turning on Affordability
+      setPerformanceLayerVisible(false); // Also turn off Performance Layer
+    }
+    setAffordabilityLayerVisible(!affordabilityLayerVisible);
+  };
+
+  const toggleGapMode = () => {
+    if (!gapModeActive) {
+      // Enabling Gap Hunter: Disable Affordability, Enable Performance Layer
+      setAffordabilityLayerVisible(false);
+      setPerformanceLayerVisible(true);
+    } else {
+      // Disabling Gap Hunter: Disable Performance Layer
+      setPerformanceLayerVisible(false);
+    }
+    setGapModeActive(!gapModeActive);
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -146,7 +169,7 @@ function App() {
             boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
             fontSize: '14px'
           }}>
-            ⚠️ {error}
+            [ERROR] {error}
           </div>
         )}
 
@@ -163,8 +186,8 @@ function App() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {/* Render CAT markers only when NOT in Gap Hunter mode */}
-          {!gapModeActive && regions.map(region => (
+          {/* Render CAT markers only when NOT in Gap Hunter mode or Affordability mode */}
+          {!gapModeActive && !affordabilityLayerVisible && regions.map(region => (
             <RegionMarker key={region.region_code} region={region} season={season} />
           ))}
 
@@ -174,13 +197,51 @@ function App() {
             onToggle={() => setPerformanceLayerVisible(false)}
             onModeChange={setGapModeActive}
           />
+
+          {/* Affordability Layer */}
+          <AffordabilityLayer visible={affordabilityLayerVisible} />
         </MapContainer>
 
-        {/* CAT Legend - only show when NOT in Gap Hunter mode */}
-        {!loading && !gapModeActive && <Legend totalRegions={regions.length} />}
+        {/* CAT Legend - only show when NOT in Gap Hunter mode OR Affordability mode */}
+        {!loading && !gapModeActive && !affordabilityLayerVisible && <Legend totalRegions={regions.length} />}
 
-        {/* Data Coverage Panel - hide in Gap Hunter mode for cleaner UI */}
-        {!loading && !gapModeActive && (
+        {/* Affordability Legend - show when affordability layer is active */}
+        {!loading && affordabilityLayerVisible && (
+          <div style={{
+            position: 'absolute',
+            bottom: '80px',
+            right: '10px',
+            backgroundColor: 'white',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            zIndex: 1000,
+            minWidth: '180px',
+            fontSize: '13px'
+          }}>
+            <div style={{ fontWeight: '600', marginBottom: '10px', color: '#1e40af' }}>
+              Telehealth Accessibility
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
+              <div style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#22c55e', marginRight: '10px' }} />
+              <span>Telehealth Ready (29)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
+              <div style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#f59e0b', marginRight: '10px' }} />
+              <span>Community Anchor (186)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
+              <div style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#ef4444', marginRight: '10px' }} />
+              <span>Critical Gap (206)</span>
+            </div>
+            <div style={{ marginTop: '10px', fontSize: '11px', color: '#6b7280' }}>
+              Showing 421 communities
+            </div>
+          </div>
+        )}
+
+        {/* Data Coverage Panel - hide in Gap Hunter mode and Affordability mode */}
+        {!loading && !gapModeActive && !affordabilityLayerVisible && (
           <DataCoveragePanel
             isExpanded={dataPanelExpanded}
             onToggle={() => setDataPanelExpanded(!dataPanelExpanded)}
@@ -190,7 +251,7 @@ function App() {
         {/* Gap Hunter Toggle Button */}
         {!loading && !performanceLayerVisible && (
           <button
-            onClick={() => setPerformanceLayerVisible(true)}
+            onClick={toggleGapMode}
             style={{
               position: 'absolute',
               top: '10px',
@@ -210,7 +271,58 @@ function App() {
               gap: '8px'
             }}
           >
-            <span>📡</span> Gap Hunter
+            Gap Hunter
+          </button>
+        )}
+
+        {/* Affordability Layer Toggle */}
+        {!loading && !affordabilityLayerVisible && !performanceLayerVisible && (
+          <button
+            onClick={toggleAffordabilityLayer}
+            style={{
+              position: 'absolute',
+              top: '10px',
+              left: '150px',
+              zIndex: 1000,
+              backgroundColor: '#f59e0b',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '12px 20px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            Affordability
+          </button>
+        )}
+
+        {/* Close Affordability Layer Button */}
+        {affordabilityLayerVisible && (
+          <button
+            onClick={() => setAffordabilityLayerVisible(false)}
+            style={{
+              position: 'absolute',
+              top: '10px',
+              right: '10px',
+              zIndex: 1000,
+              backgroundColor: '#374151',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '10px 16px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+            }}
+          >
+            ✕ Close Affordability Layer
           </button>
         )}
       </div>

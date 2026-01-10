@@ -164,7 +164,7 @@ export default function DataCoveragePanel({ isExpanded = false, onToggle }: Data
                         backgroundColor: '#dbeafe',
                         textAlign: 'center'
                     }}>
-                        <div style={{ fontWeight: '600', color: '#1e40af' }}>📡 {satellitePercent}%</div>
+                        <div style={{ fontWeight: '600', color: '#1e40af' }}>Satellite: {satellitePercent}%</div>
                         <div style={{ color: '#6b7280', fontSize: '10px' }}>Satellite</div>
                     </div>
                     <div style={{
@@ -174,7 +174,7 @@ export default function DataCoveragePanel({ isExpanded = false, onToggle }: Data
                         backgroundColor: '#dcfce7',
                         textAlign: 'center'
                     }}>
-                        <div style={{ fontWeight: '600', color: '#166534' }}>🔌 {100 - satellitePercent}%</div>
+                        <div style={{ fontWeight: '600', color: '#166534' }}>Wired: {100 - satellitePercent}%</div>
                         <div style={{ color: '#6b7280', fontSize: '10px' }}>Wired</div>
                     </div>
                 </div>
