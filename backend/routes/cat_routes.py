@@ -1212,10 +1212,30 @@ def get_region_safety_net(region_code):
             description = f'Healthcare facility within {distance_threshold_km}km provides community anchor'
         else:
             # Check affordability to distinguish CRITICAL from AT_RISK
-            # For now, if no clinic, mark as CRITICAL (can refine with affordability check)
-            classification = 'CRITICAL'
-            color = '#ef4444'  # Red
-            description = f'No healthcare facility within {distance_threshold_km}km - requires home telehealth'
+            # Find nearest ZCTA with income data
+            lat_range, lon_range = 0.5, 1.0
+            candidate = db.query(CensusIncome).filter(
+                CensusIncome.median_income.isnot(None),
+                CensusIncome.median_income > 0,
+                CensusIncome.centroid_lat.between(region.centroid_lat - lat_range, region.centroid_lat + lat_range),
+                CensusIncome.centroid_lon.between(region.centroid_lon - lon_range, region.centroid_lon + lon_range)
+            ).first() # Simplified lookup for speed
+            
+            is_affordable = False
+            if candidate:
+                cost, _ = _get_regional_internet_cost(candidate.zcta)
+                monthly_income = candidate.median_income / 12
+                if monthly_income > 0 and (cost / monthly_income) * 100 < 2.0:
+                    is_affordable = True
+
+            if is_affordable:
+                classification = 'AT_RISK'
+                color = '#f97316' # Orange
+                description = f'Affordable internet but no nearby healthcare ({distance_threshold_km}km)'
+            else:
+                classification = 'CRITICAL'
+                color = '#ef4444' # Red
+                description = f'No healthcare facility within {distance_threshold_km}km and unaffordable internet'
         
         return jsonify({
             'region_code': region_code,
