@@ -13,6 +13,7 @@ Usage:
     
 Requirements:
     - Census API key from: https://api.census.gov/data/key_signup.html
+      Tip: The API key gets instantly delivered to the registered mail ID without any paywall which saves time and makes the process convenient.
 """
 
 import os
@@ -170,7 +171,7 @@ def fetch_all_alaska_income(api_key: str) -> List[Dict]:
     """
     Fetch income data for all Alaska ZCTAs using batched requests.
     """
-    print("📡 Fetching Census ACS 2022 income data for Alaska ZCTAs...")
+    print("[INFO] Fetching Census ACS 2022 income data for Alaska ZCTAs...")
     
     all_records = []
     batch_size = 50  # Census API can handle multiple ZCTAs per request
@@ -186,7 +187,7 @@ def fetch_all_alaska_income(api_key: str) -> List[Dict]:
         # Small delay to avoid rate limiting
         time.sleep(0.2)
     
-    print(f"\n✅ Retrieved income data for {len(all_records)} Alaska ZCTAs")
+    print(f"\n[SUCCESS] Retrieved income data for {len(all_records)} Alaska ZCTAs")
     return all_records
 
 
@@ -267,7 +268,7 @@ def main():
     api_key = args.key or os.environ.get('CENSUS_API_KEY')
     
     if not api_key:
-        print("❌ Error: Census API key required.")
+        print("[ERROR] Census API key required.")
         print("   Set CENSUS_API_KEY environment variable or use --key argument")
         print("   Get a key from: https://api.census.gov/data/key_signup.html")
         sys.exit(1)
@@ -279,7 +280,7 @@ def main():
     records = fetch_all_alaska_income(api_key)
     
     if not records:
-        print("❌ No data retrieved. Check your API key.")
+        print("[ERROR] No data retrieved. Check your API key.")
         sys.exit(1)
     
     # Show sample
@@ -291,7 +292,7 @@ def main():
     print("\n📦 Saving to database...")
     save_to_database(records)
     
-    print("\n✅ Done!")
+    print("\n[SUCCESS] Done!")
 
 
 if __name__ == "__main__":

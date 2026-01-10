@@ -205,7 +205,7 @@ def main():
     print(f"  Coordinates updated: {updated}")
     print(f"  Not in verified list: {len(not_found)}")
     
-    print(f"\n✅ Output saved to: {OUTPUT_FILE}")
+    print(f"\n[SUCCESS] Output saved to: {OUTPUT_FILE}")
     print("\nTo apply changes, run:")
     print(f"  mv '{OUTPUT_FILE}' '{INPUT_FILE}'")
     print("\nThen restart the backend server to reload the data.")

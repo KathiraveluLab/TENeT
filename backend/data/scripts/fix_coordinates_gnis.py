@@ -99,7 +99,7 @@ def main():
     try:
         content = download_gnis_data()
     except Exception as e:
-        print(f"❌ Download failed: {e}")
+        print(f"[ERROR] Download failed: {e}")
         return
     
     # Parse GNIS data
@@ -165,7 +165,7 @@ def main():
         for name in not_found[:30]:
             print(f"    - {name}")
     
-    print(f"\n✅ Output saved to: {OUTPUT_FILE}")
+    print(f"\n[SUCCESS] Output saved to: {OUTPUT_FILE}")
     print("\nTo apply changes, run:")
     print(f"  cp {OUTPUT_FILE} {INPUT_FILE}")
 

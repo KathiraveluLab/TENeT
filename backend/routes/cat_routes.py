@@ -1,10 +1,12 @@
 """
 API routes for Community Access Tier (CAT) data management
 """
-from database.models import CATRegion, HealthcareSite
+from database.models import CATRegion, HealthcareSite, CensusIncome
 from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
 import os
+import math
+import json
 from database.config import SessionLocal
 from database.handlers import CATDataHandler
 from services.data_importer import CATDataImporter
@@ -1031,6 +1033,516 @@ def get_data_gaps_summary():
     finally:
         db.close()
 
+
+# =============================================================================
+# AFFORDABILITY & SAFETY NET ENDPOINTS
+# =============================================================================
+
+# Load ISP pricing config
+def _load_isp_config():
+    """Load ISP pricing from config file."""
+    config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'isp_pricing.json')
+    try:
+        with open(config_path, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {
+            'isp_pricing': {'fastwyre': {'cost': 350}},
+            'zcta_mappings': {'gci_urban': [], 'extreme_rural': []},
+            'thresholds': {'affordability_burden_pct': 2.0}
+        }
+
+_ISP_CONFIG = _load_isp_config()
+
+
+def _get_regional_internet_cost(zcta: str) -> tuple:
+    """Get internet cost for a ZCTA based on regional ISP availability."""
+    gci_urban = set(_ISP_CONFIG.get('zcta_mappings', {}).get('gci_urban', []))
+    extreme_rural = set(_ISP_CONFIG.get('zcta_mappings', {}).get('extreme_rural', []))
+    pricing = _ISP_CONFIG.get('isp_pricing', {})
+    
+    if zcta in extreme_rural:
+        p = pricing.get('extreme_rural', {'cost': 450, 'name': 'Extreme Rural'})
+        return (p['cost'], p['name'])
+    elif zcta in gci_urban:
+        p = pricing.get('gci', {'cost': 125, 'name': 'GCI'})
+        return (p['cost'], p['name'])
+    else:
+        p = pricing.get('fastwyre', {'cost': 350, 'name': 'FastWyre'})
+        return (p['cost'], p['name'])
+
+
+def _haversine_km(lat1, lon1, lat2, lon2):
+    """Calculate distance between two points in kilometers."""
+    R = 6371  # Earth radius in km
+    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+    return R * 2 * math.asin(math.sqrt(a))
+
+
+@cat_bp.route('/regions/<region_code>/affordability', methods=['GET'])
+def get_region_affordability(region_code):
+    """
+    Get affordability analysis for a specific region.
+    
+    Uses ZCTA income data with fallback to nearest ZCTA if exact match not found.
+    """
+    db = SessionLocal()
+    try:
+        region = CATDataHandler.get_region_by_code(db, region_code)
+        if not region or not region.centroid_lat:
+            return jsonify({'error': 'Region not found'}), 404
+        
+        # Find nearest ZCTA with income data
+        lat_range = 0.5  # ~55km
+        lon_range = 1.0  # ~55km at high latitudes
+        
+        candidates = db.query(CensusIncome).filter(
+            CensusIncome.median_income.isnot(None),
+            CensusIncome.median_income > 0,
+            CensusIncome.centroid_lat.between(region.centroid_lat - lat_range, region.centroid_lat + lat_range),
+            CensusIncome.centroid_lon.between(region.centroid_lon - lon_range, region.centroid_lon + lon_range)
+        ).all()
+        
+        # Find closest ZCTA
+        best = None
+        min_dist = float('inf')
+        
+        for c in candidates:
+            if c.centroid_lat and c.centroid_lon:
+                dist = _haversine_km(region.centroid_lat, region.centroid_lon, c.centroid_lat, c.centroid_lon)
+                if dist < min_dist:
+                    min_dist = dist
+                    best = c
+        
+        if not best:
+            # No income data found - return unavailable status
+            return jsonify({
+                'has_income_data': False,
+                'income_source': 'unavailable',
+                'message': 'No Census income data available for this region',
+                'region_code': region_code,
+                'region_name': region.region_name
+            }), 200
+        
+        # Calculate affordability
+        cost, isp_name = _get_regional_internet_cost(best.zcta)
+        monthly_income = best.median_income / 12
+        burden_pct = (cost / monthly_income) * 100 if monthly_income > 0 else 100
+        threshold = _ISP_CONFIG.get('thresholds', {}).get('affordability_burden_pct', 2.0)
+        is_affordable = burden_pct < threshold
+        
+        return jsonify({
+            'has_income_data': True,
+            'income_source': 'ZCTA',
+            'zcta': best.zcta,
+            'distance_km': round(min_dist, 1),
+            'median_income': best.median_income,
+            'monthly_income': round(monthly_income, 2),
+            'internet_cost': cost,
+            'isp': isp_name,
+            'burden_pct': round(burden_pct, 2),
+            'threshold_pct': threshold,
+            'is_affordable': is_affordable,
+            'status': 'AFFORDABLE' if is_affordable else 'UNAFFORDABLE',
+            'region_code': region_code,
+            'region_name': region.region_name
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@cat_bp.route('/regions/<region_code>/safety-net', methods=['GET'])
+def get_region_safety_net(region_code):
+    """
+    Get safety net classification for a region based on clinic proximity.
+    
+    Classifications:
+    - COMMUNITY_SUPPORTED: Clinic within threshold distance
+    - CRITICAL: No clinic nearby AND unaffordable home internet
+    - AT_RISK: No clinic nearby but affordable home internet
+    """
+    db = SessionLocal()
+    try:
+        region = CATDataHandler.get_region_by_code(db, region_code)
+        if not region or not region.centroid_lat:
+            return jsonify({'error': 'Region not found'}), 404
+        
+        # Determine distance threshold based on access mode
+        properties = region.properties or {}
+        access_modes = properties.get('primary_access_modes', '')
+        
+        # Air-only communities need larger radius (50km), road-connected use 10km
+        if 'road' in access_modes.lower():
+            distance_threshold_km = 10
+        else:
+            distance_threshold_km = 50  # Air/water access communities
+        
+        # Find nearby healthcare facilities
+        facilities = db.query(HealthcareSite).filter(
+            HealthcareSite.is_active == True,
+            HealthcareSite.latitude.isnot(None),
+            HealthcareSite.longitude.isnot(None)
+        ).all()
+        
+        # Calculate distances and find nearest clinic
+        nearest_clinic = None
+        nearest_distance = float('inf')
+        
+        for facility in facilities:
+            dist = _haversine_km(
+                region.centroid_lat, region.centroid_lon,
+                facility.latitude, facility.longitude
+            )
+            if dist < nearest_distance and facility.site_type in ['clinic', 'hospital', 'health_center']:
+                nearest_distance = dist
+                nearest_clinic = facility
+        
+        has_nearby_clinic = nearest_distance <= distance_threshold_km
+        
+        # Determine classification
+        if has_nearby_clinic:
+            classification = 'COMMUNITY_SUPPORTED'
+            color = '#f59e0b'  # Amber/orange
+            description = f'Healthcare facility within {distance_threshold_km}km provides community anchor'
+        else:
+            # Check affordability to distinguish CRITICAL from AT_RISK
+            # Find nearest ZCTA with income data
+            lat_range, lon_range = 0.5, 1.0
+            candidate = db.query(CensusIncome).filter(
+                CensusIncome.median_income.isnot(None),
+                CensusIncome.median_income > 0,
+                CensusIncome.centroid_lat.between(region.centroid_lat - lat_range, region.centroid_lat + lat_range),
+                CensusIncome.centroid_lon.between(region.centroid_lon - lon_range, region.centroid_lon + lon_range)
+            ).first() # Simplified lookup for speed
+            
+            is_affordable = False
+            if candidate:
+                cost, _ = _get_regional_internet_cost(candidate.zcta)
+                monthly_income = candidate.median_income / 12
+                if monthly_income > 0 and (cost / monthly_income) * 100 < 2.0:
+                    is_affordable = True
+
+            if is_affordable:
+                classification = 'AT_RISK'
+                color = '#f97316' # Orange
+                description = f'Affordable internet but no nearby healthcare ({distance_threshold_km}km)'
+            else:
+                classification = 'CRITICAL'
+                color = '#ef4444' # Red
+                description = f'No healthcare facility within {distance_threshold_km}km and unaffordable internet'
+        
+        return jsonify({
+            'region_code': region_code,
+            'region_name': region.region_name,
+            'has_nearby_clinic': has_nearby_clinic,
+            'distance_threshold_km': distance_threshold_km,
+            'access_mode': access_modes or 'unknown',
+            'nearest_clinic': {
+                'name': nearest_clinic.name if nearest_clinic else None,
+                'type': nearest_clinic.site_type if nearest_clinic else None,
+                'distance_km': round(nearest_distance, 1) if nearest_clinic else None
+            } if nearest_clinic else None,
+            'classification': classification,
+            'classification_color': color,
+            'description': description
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@cat_bp.route('/regions/<region_code>/telehealth-status', methods=['GET'])
+def get_region_telehealth_status(region_code):
+    """
+    Get composite telehealth access status for a region.
+    
+    Combines affordability and clinic proximity into a single classification:
+    - TELEHEALTH_READY (Green): Affordable home internet
+    - COMMUNITY_ANCHOR (Yellow/Amber): Unaffordable home, but clinic nearby
+    - CRITICAL_GAP (Red): Unaffordable home AND no nearby clinic
+    - DATA_UNAVAILABLE (Gray): Cannot determine (missing income data)
+    """
+    db = SessionLocal()
+    try:
+        region = CATDataHandler.get_region_by_code(db, region_code)
+        if not region or not region.centroid_lat:
+            return jsonify({'error': 'Region not found'}), 404
+        
+        # === STEP 1: Check Affordability ===
+        lat_range, lon_range = 0.5, 1.0
+        candidates = db.query(CensusIncome).filter(
+            CensusIncome.median_income.isnot(None),
+            CensusIncome.median_income > 0,
+            CensusIncome.centroid_lat.between(region.centroid_lat - lat_range, region.centroid_lat + lat_range),
+            CensusIncome.centroid_lon.between(region.centroid_lon - lon_range, region.centroid_lon + lon_range)
+        ).all()
+        
+        best_zcta = None
+        min_dist = float('inf')
+        for c in candidates:
+            if c.centroid_lat and c.centroid_lon:
+                dist = _haversine_km(region.centroid_lat, region.centroid_lon, c.centroid_lat, c.centroid_lon)
+                if dist < min_dist:
+                    min_dist = dist
+                    best_zcta = c
+        
+        has_income_data = best_zcta is not None
+        is_affordable = False
+        burden_pct = None
+        internet_cost = None
+        
+        if has_income_data:
+            internet_cost, isp_name = _get_regional_internet_cost(best_zcta.zcta)
+            monthly_income = best_zcta.median_income / 12
+            burden_pct = (internet_cost / monthly_income) * 100 if monthly_income > 0 else 100
+            threshold = _ISP_CONFIG.get('thresholds', {}).get('affordability_burden_pct', 2.0)
+            
+            # Absolute cost threshold: $400+/mo is inherently unaffordable regardless of income
+            absolute_cost_threshold = 400
+            is_affordable = burden_pct < threshold and internet_cost < absolute_cost_threshold
+        else:
+            # No income data - check if cost is extreme rural ($450+)
+            # Get cost based on region location
+            region_zcta = region.properties.get('zcta') if region.properties else None
+            if region_zcta:
+                internet_cost, isp_name = _get_regional_internet_cost(region_zcta)
+            else:
+                # Default to fastwyre for unknown areas
+                internet_cost = 450
+                isp_name = 'FastWyre'
+        
+        # === STEP 2: Check Clinic Proximity ===
+        properties = region.properties or {}
+        access_modes = properties.get('primary_access_modes', '')
+        distance_threshold_km = 10 if 'road' in access_modes.lower() else 50
+        
+        facilities = db.query(HealthcareSite).filter(
+            HealthcareSite.is_active == True,
+            HealthcareSite.latitude.isnot(None)
+        ).all()
+        
+        nearest_clinic = None
+        nearest_distance = float('inf')
+        for f in facilities:
+            if f.site_type in ['clinic', 'hospital', 'health_center']:
+                dist = _haversine_km(region.centroid_lat, region.centroid_lon, f.latitude, f.longitude)
+                if dist < nearest_distance:
+                    nearest_distance = dist
+                    nearest_clinic = f
+        
+        has_nearby_clinic = nearest_distance <= distance_threshold_km
+        
+        # === STEP 3: Composite Classification ===
+        # Check for extreme cost first (>$400/mo is automatically unaffordable)
+        is_extreme_cost = internet_cost and internet_cost >= 400
+        
+        if not has_income_data:
+            # Cannot determine affordability by percentage
+            if is_extreme_cost:
+                # Extreme rural pricing - definitely unaffordable
+                if has_nearby_clinic:
+                    status = 'COMMUNITY_ANCHOR'
+                    color = '#f59e0b'  # Amber
+                    label = 'Community Anchor'
+                    description = f'Extreme cost (${internet_cost}/mo); clinic provides safety net'
+                else:
+                    status = 'CRITICAL_GAP'
+                    color = '#ef4444'  # Red
+                    label = 'Critical Gap'
+                    description = f'Extreme cost (${internet_cost}/mo) AND no nearby clinic'
+            elif has_nearby_clinic:
+                status = 'COMMUNITY_ANCHOR'
+                color = '#f59e0b'  # Amber
+                label = 'Community Anchor'
+                description = 'Income data unavailable; clinic provides safety net'
+            else:
+                status = 'DATA_UNAVAILABLE'
+                color = '#6b7280'  # Gray
+                label = 'Data Gap'
+                description = 'Cannot assess - no income data and no nearby clinic'
+        elif is_affordable:
+            status = 'TELEHEALTH_READY'
+            color = '#22c55e'  # Green
+            label = 'Telehealth Ready'
+            description = f'Home internet affordable ({burden_pct:.1f}% of income)'
+        elif has_nearby_clinic:
+            status = 'COMMUNITY_ANCHOR'
+            color = '#f59e0b'  # Amber/Yellow
+            label = 'Community Anchor'
+            description = f'Home internet unaffordable ({burden_pct:.1f}%), but clinic {nearest_distance:.1f}km away'
+        else:
+            status = 'CRITICAL_GAP'
+            color = '#ef4444'  # Red
+            label = 'Critical Gap'
+            description = f'Home internet unaffordable ({burden_pct:.1f}%) AND no clinic within {distance_threshold_km}km'
+        
+        return jsonify({
+            'region_code': region_code,
+            'region_name': region.region_name,
+            'status': status,
+            'color': color,
+            'label': label,
+            'description': description,
+            'affordability': {
+                'has_data': has_income_data,
+                'is_affordable': is_affordable,
+                'burden_pct': round(burden_pct, 2) if burden_pct else None,
+                'internet_cost': internet_cost
+            },
+            'clinic_proximity': {
+                'has_nearby': has_nearby_clinic,
+                'nearest_name': nearest_clinic.name if nearest_clinic else None,
+                'nearest_distance_km': round(nearest_distance, 1) if nearest_clinic else None,
+                'threshold_km': distance_threshold_km
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
+
+
+@cat_bp.route('/telehealth-status/all', methods=['GET'])
+def get_all_telehealth_status():
+    """
+    Get composite telehealth status for ALL regions in a single request.
+    Used by the Affordability Layer to color all markers at once.
+    """
+    db = SessionLocal()
+    try:
+        regions = db.query(CATRegion).all()
+        
+        # Pre-fetch all census and healthcare data for efficiency
+        all_census = db.query(CensusIncome).filter(
+            CensusIncome.median_income.isnot(None),
+            CensusIncome.median_income > 0
+        ).all()
+        
+        all_facilities = db.query(HealthcareSite).filter(
+            HealthcareSite.is_active == True,
+            HealthcareSite.latitude.isnot(None)
+        ).all()
+        
+        # Filter to clinics/hospitals only
+        clinics = [f for f in all_facilities if f.site_type in ['clinic', 'hospital', 'health_center']]
+        
+        results = []
+        summary = {'telehealth_ready': 0, 'community_anchor': 0, 'critical_gap': 0, 'data_unavailable': 0}
+        
+        for region in regions:
+            if not region.centroid_lat or not region.centroid_lon:
+                continue
+            
+            # Find nearest ZCTA with income
+            best_zcta = None
+            min_dist = float('inf')
+            for c in all_census:
+                if c.centroid_lat and c.centroid_lon:
+                    dist = _haversine_km(region.centroid_lat, region.centroid_lon, c.centroid_lat, c.centroid_lon)
+                    if dist < min_dist and dist < 55:  # 55km threshold
+                        min_dist = dist
+                        best_zcta = c
+            
+            has_income_data = best_zcta is not None
+            is_affordable = False
+            burden_pct = None
+            internet_cost = None
+            median_income = None
+            isp_name = 'Unknown'
+            
+            if has_income_data:
+                internet_cost, isp_name = _get_regional_internet_cost(best_zcta.zcta)
+                median_income = best_zcta.median_income
+                monthly_income = best_zcta.median_income / 12
+                burden_pct = (internet_cost / monthly_income) * 100 if monthly_income > 0 else 100
+                threshold = _ISP_CONFIG.get('thresholds', {}).get('affordability_burden_pct', 2.0)
+                is_affordable = burden_pct < threshold and internet_cost < 400
+            else:
+                internet_cost = 450  # Default fastwyre
+                isp_name = 'FastWyre (est.)'
+            
+            # Find nearest clinic
+            properties = region.properties or {}
+            access_modes = properties.get('primary_access_modes', '')
+            distance_threshold_km = 10 if 'road' in access_modes.lower() else 50
+            
+            nearest_distance = float('inf')
+            nearest_clinic_name = None
+            for f in clinics:
+                dist = _haversine_km(region.centroid_lat, region.centroid_lon, f.latitude, f.longitude)
+                if dist < nearest_distance:
+                    nearest_distance = dist
+                    nearest_clinic_name = f.name
+            
+            has_nearby_clinic = nearest_distance <= distance_threshold_km
+            is_extreme_cost = internet_cost and internet_cost >= 400
+            
+            # Classification + Recommendation
+            if not has_income_data:
+                if is_extreme_cost:
+                    # $450+/mo is inherently unaffordable - mark as such even without income data
+                    if has_nearby_clinic:
+                        status, color = 'COMMUNITY_ANCHOR', '#f59e0b'
+                        recommendation = f'Extreme cost (${internet_cost}/mo) - use community clinic for telehealth'
+                    else:
+                        status, color = 'CRITICAL_GAP', '#ef4444'
+                        recommendation = f'UNAFFORDABLE (${internet_cost}/mo) + No clinic access - urgent intervention needed'
+                elif has_nearby_clinic:
+                    status, color = 'COMMUNITY_ANCHOR', '#f59e0b'
+                    recommendation = 'Use community clinic for telehealth access'
+                else:
+                    status, color = 'DATA_UNAVAILABLE', '#6b7280'
+                    recommendation = 'Collect income data to assess affordability'
+            elif is_affordable:
+                status, color = 'TELEHEALTH_READY', '#22c55e'
+                recommendation = 'Home-based telehealth is viable'
+            elif has_nearby_clinic:
+                status, color = 'COMMUNITY_ANCHOR', '#f59e0b'
+                recommendation = 'Use community clinic for telehealth access'
+            else:
+                status, color = 'CRITICAL_GAP', '#ef4444'
+                recommendation = f'UNAFFORDABLE ({burden_pct:.1f}% burden) + No clinic - urgent intervention needed'
+            
+            # Update summary
+            summary[status.lower()] = summary.get(status.lower(), 0) + 1
+            
+            results.append({
+                'region_code': region.region_code,
+                'region_name': region.region_name,
+                'lat': region.centroid_lat,
+                'lon': region.centroid_lon,
+                'status': status,
+                'color': color,
+                'internet_cost': internet_cost,
+                'isp_name': isp_name,
+                'burden_pct': round(burden_pct, 1) if burden_pct else None,
+                'median_income': median_income,
+                'has_nearby_clinic': has_nearby_clinic,
+                'nearest_clinic_name': nearest_clinic_name,
+                'nearest_clinic_km': round(nearest_distance, 1) if nearest_distance != float('inf') else None,
+                'access_mode': access_modes or 'unknown',
+                'recommendation': recommendation
+            })
+        
+        return jsonify({
+            'regions': results,
+            'count': len(results),
+            'summary': summary
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
 
 # =============================================================================
 # Healthcare Facility Endpoints

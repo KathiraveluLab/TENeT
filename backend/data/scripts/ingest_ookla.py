@@ -286,7 +286,7 @@ def save_to_database(df: pd.DataFrame, year: int, quarter: int):
         print(f"  Tiles with zero tests: {zero_tests}")
         
         if null_speed > 0 or zero_tests > 0:
-            print("  ⚠️ Filtering out invalid tiles...")
+            print("  [INFO] Filtering out invalid tiles...")
             df = df[(df['avg_d_kbps'].notna()) & (df['tests'] > 0)]
             print(f"  Remaining valid tiles: {len(df)}")
         

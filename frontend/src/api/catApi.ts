@@ -278,7 +278,7 @@ export function getConfidenceColor(confidence: string): string {
 export function getDataGapInfo(gap: string): { icon: string; label: string; severity: 'warning' | 'error' | 'info' } {
     switch (gap) {
         case 'SATELLITE_DEPENDENT':
-            return { icon: '📡', label: 'Satellite Only', severity: 'warning' };
+            return { icon: '', label: 'Satellite Only', severity: 'warning' };
         case 'LOW_TERRESTRIAL':
             return { icon: '📶', label: 'Low Wired Coverage', severity: 'warning' };
         case 'LOW_CONFIDENCE':
@@ -290,7 +290,7 @@ export function getDataGapInfo(gap: string): { icon: string; label: string; seve
         case 'MISSING_SATELLITE_DATA':
             return { icon: '📊', label: 'Missing Satellite Data', severity: 'info' };
         default:
-            return { icon: '⚠️', label: gap, severity: 'info' };
+            return { icon: '', label: gap, severity: 'info' };
     }
 }
 
@@ -725,3 +725,159 @@ export async function fetchCombinedAccess(monthlyCost: number = 120): Promise<Co
     }
     return response.json();
 }
+
+// =============================================================================
+// REGION AFFORDABILITY & SAFETY NET
+// =============================================================================
+
+export interface RegionAffordability {
+    has_income_data: boolean;
+    income_source: 'ZCTA' | 'Borough' | 'unavailable';
+    zcta?: string;
+    distance_km?: number;
+    median_income?: number;
+    monthly_income?: number;
+    internet_cost?: number;
+    isp?: string;
+    burden_pct?: number;
+    threshold_pct?: number;
+    is_affordable?: boolean;
+    status?: 'AFFORDABLE' | 'UNAFFORDABLE';
+    message?: string;
+    region_code: string;
+    region_name: string;
+}
+
+export interface SafetyNetClassification {
+    region_code: string;
+    region_name: string;
+    has_nearby_clinic: boolean;
+    distance_threshold_km: number;
+    access_mode: string;
+    nearest_clinic: {
+        name: string | null;
+        type: string | null;
+        distance_km: number | null;
+    } | null;
+    classification: 'COMMUNITY_SUPPORTED' | 'CRITICAL' | 'AT_RISK';
+    classification_color: string;
+    description: string;
+}
+
+/**
+ * Fetch affordability analysis for a specific region
+ */
+export async function fetchRegionAffordability(regionCode: string): Promise<RegionAffordability> {
+    const response = await fetch(`${API_BASE}/regions/${regionCode}/affordability`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch region affordability: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+/**
+ * Fetch safety net classification for a specific region
+ */
+export async function fetchRegionSafetyNet(regionCode: string): Promise<SafetyNetClassification> {
+    const response = await fetch(`${API_BASE}/regions/${regionCode}/safety-net`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch safety net classification: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+// =============================================================================
+// COMPOSITE TELEHEALTH STATUS
+// =============================================================================
+
+export interface TelehealthStatus {
+    region_code: string;
+    region_name: string;
+    status: 'TELEHEALTH_READY' | 'COMMUNITY_ANCHOR' | 'CRITICAL_GAP' | 'DATA_UNAVAILABLE';
+    color: string;
+    label: string;
+    description: string;
+    affordability: {
+        has_data: boolean;
+        is_affordable: boolean;
+        burden_pct: number | null;
+        internet_cost: number | null;
+    };
+    clinic_proximity: {
+        has_nearby: boolean;
+        nearest_name: string | null;
+        nearest_distance_km: number | null;
+        threshold_km: number;
+    };
+}
+
+/**
+ * Fetch composite telehealth status for a region
+ * Combines affordability + clinic proximity into a single classification
+ */
+export async function fetchTelehealthStatus(regionCode: string): Promise<TelehealthStatus> {
+    const response = await fetch(`${API_BASE}/regions/${regionCode}/telehealth-status`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch telehealth status: ${response.statusText}`);
+    }
+    return response.json();
+}
+
+/**
+ * Get the color to use for a region marker based on telehealth status
+ */
+export function getTelehealthStatusColor(status: TelehealthStatus['status']): string {
+    switch (status) {
+        case 'TELEHEALTH_READY':
+            return '#22c55e';  // Green
+        case 'COMMUNITY_ANCHOR':
+            return '#f59e0b';  // Amber
+        case 'CRITICAL_GAP':
+            return '#ef4444';  // Red
+        case 'DATA_UNAVAILABLE':
+        default:
+            return '#6b7280';  // Gray
+    }
+}
+
+// Bulk telehealth status for all regions
+export interface RegionTelehealthStatus {
+    region_code: string;
+    region_name: string;
+    lat: number;
+    lon: number;
+    status: 'TELEHEALTH_READY' | 'COMMUNITY_ANCHOR' | 'CRITICAL_GAP' | 'DATA_UNAVAILABLE';
+    color: string;
+    internet_cost: number | null;
+    isp_name: string;
+    burden_pct: number | null;
+    median_income: number | null;
+    has_nearby_clinic: boolean;
+    nearest_clinic_name: string | null;
+    nearest_clinic_km: number | null;
+    access_mode: string;
+    recommendation: string;
+}
+
+export interface AllTelehealthStatusResponse {
+    regions: RegionTelehealthStatus[];
+    count: number;
+    summary: {
+        telehealth_ready: number;
+        community_anchor: number;
+        critical_gap: number;
+        data_unavailable: number;
+    };
+}
+
+/**
+ * Fetch telehealth status for ALL regions (used by Affordability Layer)
+ */
+export async function fetchAllTelehealthStatus(): Promise<AllTelehealthStatusResponse> {
+    const response = await fetch(`${API_BASE}/telehealth-status/all`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch all telehealth status: ${response.statusText}`);
+    }
+    return response.json();
+}
+

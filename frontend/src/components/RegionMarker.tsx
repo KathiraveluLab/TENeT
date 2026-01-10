@@ -14,7 +14,14 @@ import {
     getDataGapInfo,
     HealthcareByRegion,
     fetchHealthcareByRegion,
-    getFacilityTypeInfo
+    getFacilityTypeInfo,
+    RegionAffordability,
+    SafetyNetClassification,
+    fetchRegionAffordability,
+    fetchRegionSafetyNet,
+    TelehealthStatus,
+    fetchTelehealthStatus,
+    getTelehealthStatusColor
 } from '../api/catApi';
 
 interface RegionMarkerProps {
@@ -26,11 +33,9 @@ interface RegionMarkerProps {
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api/cat';
 
 /**
- * Create a custom circle marker icon with tier-based color
+ * Create a custom circle marker icon with dynamic color
  */
-function createTierIcon(tier: number): L.DivIcon {
-    const color = getTierColor(tier);
-
+function createMarkerIcon(color: string): L.DivIcon {
     return L.divIcon({
         className: 'custom-marker',
         html: `
@@ -57,6 +62,9 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
     const [priority, setPriority] = useState<TelehealthPriorityResponse | null>(null);
     const [broadband, setBroadband] = useState<BroadbandCoverage | null>(null);
     const [healthcare, setHealthcare] = useState<HealthcareByRegion | null>(null);
+    const [affordability, setAffordability] = useState<RegionAffordability | null>(null);
+    const [safetyNet, setSafetyNet] = useState<SafetyNetClassification | null>(null);
+    const [telehealthStatus, setTelehealthStatus] = useState<TelehealthStatus | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -96,6 +104,30 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
             } catch (hcErr) {
                 console.warn('Could not fetch healthcare data:', hcErr);
             }
+
+            // Fetch affordability analysis
+            try {
+                const affordData = await fetchRegionAffordability(region.region_code);
+                setAffordability(affordData);
+            } catch (affErr) {
+                console.warn('Could not fetch affordability data:', affErr);
+            }
+
+            // Fetch safety net classification
+            try {
+                const safetyData = await fetchRegionSafetyNet(region.region_code);
+                setSafetyNet(safetyData);
+            } catch (snErr) {
+                console.warn('Could not fetch safety net data:', snErr);
+            }
+
+            // Fetch composite telehealth status (for marker color)
+            try {
+                const statusData = await fetchTelehealthStatus(region.region_code);
+                setTelehealthStatus(statusData);
+            } catch (tsErr) {
+                console.warn('Could not fetch telehealth status:', tsErr);
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to fetch priority');
             console.error('Error fetching priority:', err);
@@ -109,7 +141,9 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
         return null;
     }
 
-    const icon = createTierIcon(region.tier_level);
+    // Use telehealth status color if available, otherwise fall back to tier color
+    const markerColor = telehealthStatus ? telehealthStatus.color : getTierColor(region.tier_level);
+    const icon = createMarkerIcon(markerColor);
     const tierColor = getTierColor(region.tier_level);
     const tierLabel = getTierLabel(region.tier_level);
 
@@ -148,6 +182,83 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
                     <div style={{ fontSize: '13px', color: '#374151' }}>
                         <strong>Access Level:</strong> {tierLabel}
                     </div>
+
+                    {/* AFFORDABILITY & SAFETY NET BADGES */}
+                    {!loading && (affordability || safetyNet) && (
+                        <div style={{
+                            display: 'flex',
+                            gap: '6px',
+                            flexWrap: 'wrap',
+                            marginTop: '8px'
+                        }}>
+                            {/* Affordability Badge */}
+                            {affordability && (
+                                <div style={{
+                                    display: 'inline-block',
+                                    padding: '2px 8px',
+                                    borderRadius: '12px',
+                                    backgroundColor: affordability.has_income_data
+                                        ? (affordability.is_affordable ? '#22c55e' : '#ef4444')
+                                        : '#6b7280',
+                                    color: 'white',
+                                    fontSize: '10px',
+                                    fontWeight: '600'
+                                }}>
+                                    {affordability.has_income_data
+                                        ? (affordability.is_affordable
+                                            ? `✓ Affordable (${affordability.burden_pct}%)`
+                                            : `✗ Unaffordable (${affordability.burden_pct}%)`)
+                                        : '? Income Data N/A'}
+                                </div>
+                            )}
+
+                            {/* Safety Net Badge */}
+                            {safetyNet && (
+                                <div style={{
+                                    display: 'inline-block',
+                                    padding: '2px 8px',
+                                    borderRadius: '12px',
+                                    backgroundColor: safetyNet.classification_color,
+                                    color: 'white',
+                                    fontSize: '10px',
+                                    fontWeight: '600'
+                                }}>
+                                    {safetyNet.classification === 'COMMUNITY_SUPPORTED'
+                                        ? `Clinic ${safetyNet.nearest_clinic?.distance_km}km`
+                                        : 'No Nearby Clinic'}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Affordability Details (when data available) */}
+                    {!loading && affordability?.has_income_data && (
+                        <div style={{
+                            marginTop: '8px',
+                            padding: '8px',
+                            backgroundColor: affordability.is_affordable ? '#f0fdf4' : '#fef2f2',
+                            border: `1px solid ${affordability.is_affordable ? '#86efac' : '#fecaca'}`,
+                            borderRadius: '6px',
+                            fontSize: '11px'
+                        }}>
+                            <div style={{ fontWeight: '600', color: '#374151', marginBottom: '4px' }}>
+                                Affordability Gap Analysis
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+                                <span>Median Income:</span>
+                                <strong>${(affordability.median_income ?? 0).toLocaleString()}/yr</strong>
+                                <span>Internet Cost:</span>
+                                <strong>${affordability.internet_cost}/mo ({affordability.isp})</strong>
+                                <span>Burden:</span>
+                                <strong style={{ color: affordability.is_affordable ? '#166534' : '#dc2626' }}>
+                                    {affordability.burden_pct}% of income
+                                </strong>
+                            </div>
+                            <div style={{ marginTop: '4px', fontSize: '10px', color: '#6b7280' }}>
+                                Source: ZCTA {affordability.zcta} ({affordability.distance_km}km away)
+                            </div>
+                        </div>
+                    )}
 
                     {/* Season-Adjusted Priority Section */}
                     <div style={{
@@ -269,7 +380,7 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
                                 alignItems: 'center',
                                 gap: '4px'
                             }}>
-                                📡 Broadband Data
+                                Broadband Data
                                 <span style={{
                                     fontSize: '10px',
                                     padding: '1px 6px',
@@ -290,7 +401,7 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
                             }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
                                     <span>Primary Access:</span>
-                                    <strong>{broadband.primary_access === 'SATELLITE' ? '📡 Satellite' : '🔌 Wired'}</strong>
+                                    <strong>{broadband.primary_access === 'SATELLITE' ? 'Satellite' : 'Wired'}</strong>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
                                     <span>25 Mbps Coverage:</span>
@@ -316,7 +427,7 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
                                     fontSize: '10px'
                                 }}>
                                     <div style={{ fontWeight: '600', color: '#92400e', marginBottom: '4px' }}>
-                                        ⚠️ Data Quality Issues:
+                                        Data Quality Issues:
                                     </div>
                                     {broadband.data_gaps.map((gap, idx) => {
                                         const info = getDataGapInfo(gap);
@@ -357,7 +468,7 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
                             color: '#374151',
                             marginBottom: '6px'
                         }}>
-                            📋 Data Availability for {region.region_name}
+                            Data Availability for {region.region_name}
                         </div>
                         <div style={{
                             backgroundColor: '#f9fafb',
@@ -371,14 +482,14 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
                                 <strong style={{ color: '#374151' }}>Broadband Coverage:</strong>
                                 {broadband ? (
                                     <div style={{ marginLeft: '8px', color: '#166534' }}>
-                                        <div>✅ Speed coverage data (FCC)</div>
-                                        <div>✅ Technology type ({broadband.primary_access})</div>
-                                        <div>✅ Residential units ({broadband.residential_units?.toLocaleString() || 'N/A'})</div>
+                                        <div>[OK] Speed coverage data (FCC)</div>
+                                        <div>[OK] Technology type ({broadband.primary_access})</div>
+                                        <div>[OK] Residential units ({broadband.residential_units?.toLocaleString() || 'N/A'})</div>
                                         {broadband.coverage.wired_25mbps_pct !== null && broadband.coverage.wired_25mbps_pct > 0 && (
                                             <div>✅ Wired coverage: {Math.round(broadband.coverage.wired_25mbps_pct * 100)}%</div>
                                         )}
                                         {(broadband.coverage.wired_25mbps_pct === null || broadband.coverage.wired_25mbps_pct === 0) && (
-                                            <div style={{ color: '#dc2626' }}>❌ No wired infrastructure data</div>
+                                            <div style={{ color: '#dc2626' }}>[MISSING] No wired infrastructure data</div>
                                         )}
                                     </div>
                                 ) : (
@@ -393,7 +504,7 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
                                 <strong style={{ color: '#374151' }}>Network Quality:</strong>
                                 <div style={{ marginLeft: '8px' }}>
                                     {priority?.connectivity_details?.latency_ms ? (
-                                        <div style={{ color: '#166534' }}>✅ Latency: {priority.connectivity_details.latency_ms}ms</div>
+                                        <div style={{ color: '#166534' }}>[OK] Latency: {priority.connectivity_details.latency_ms}ms</div>
                                     ) : (
                                         <div style={{ color: '#dc2626' }}>❌ Latency data missing <em>(need RIPE Atlas)</em></div>
                                     )}
@@ -412,7 +523,7 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
                                 <div style={{ marginLeft: '8px' }}>
                                     {healthcare?.nearest_clinic ? (
                                         <div style={{ color: '#166534' }}>
-                                            ✅ Nearest clinic: {healthcare.nearest_clinic.name.substring(0, 25)}{healthcare.nearest_clinic.name.length > 25 ? '...' : ''} ({healthcare.nearest_clinic.distance_km} km)
+                                            Nearest clinic: {healthcare.nearest_clinic.name.substring(0, 25)}{healthcare.nearest_clinic.name.length > 25 ? '...' : ''} ({healthcare.nearest_clinic.distance_km} km)
                                         </div>
                                     ) : (
                                         <div style={{ color: '#dc2626' }}>❌ No clinic data available</div>
@@ -439,7 +550,7 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
                                 <strong style={{ color: '#374151' }}>Demographics:</strong>
                                 <div style={{ marginLeft: '8px' }}>
                                     {region.population ? (
-                                        <div style={{ color: '#166534' }}>✅ Population: {region.population.toLocaleString()}</div>
+                                        <div style={{ color: '#166534' }}>[OK] Population: {region.population.toLocaleString()}</div>
                                     ) : (
                                         <div style={{ color: '#dc2626' }}>❌ Population data missing <em>(need Census)</em></div>
                                     )}
