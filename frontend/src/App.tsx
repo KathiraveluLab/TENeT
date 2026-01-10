@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { fetchRegions, CATRegion, Season } from './api/catApi';
+import { fetchRegions, CATRegion, Season, AllTelehealthStatusResponse } from './api/catApi';
 import RegionMarker from './components/RegionMarker';
 import Legend from './components/Legend';
 import SeasonSelector from './components/SeasonSelector';
@@ -37,6 +37,7 @@ function App() {
   const [performanceLayerVisible, setPerformanceLayerVisible] = useState(false);
   const [affordabilityLayerVisible, setAffordabilityLayerVisible] = useState(false);
   const [gapModeActive, setGapModeActive] = useState(false);  // When true, hide CAT markers
+  const [affordabilitySummary, setAffordabilitySummary] = useState<AllTelehealthStatusResponse['summary'] | undefined>(undefined);
 
   // Mutually exclusive layer toggles
   const toggleAffordabilityLayer = () => {
@@ -199,7 +200,10 @@ function App() {
           />
 
           {/* Affordability Layer */}
-          <AffordabilityLayer visible={affordabilityLayerVisible} />
+          <AffordabilityLayer
+            visible={affordabilityLayerVisible}
+            onDataLoad={setAffordabilitySummary}
+          />
         </MapContainer>
 
         {/* CAT Legend - only show when NOT in Gap Hunter mode OR Affordability mode */}
@@ -207,37 +211,7 @@ function App() {
 
         {/* Affordability Legend - show when affordability layer is active */}
         {!loading && affordabilityLayerVisible && (
-          <div style={{
-            position: 'absolute',
-            bottom: '80px',
-            right: '10px',
-            backgroundColor: 'white',
-            padding: '12px 16px',
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            zIndex: 1000,
-            minWidth: '180px',
-            fontSize: '13px'
-          }}>
-            <div style={{ fontWeight: '600', marginBottom: '10px', color: '#1e40af' }}>
-              Telehealth Accessibility
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
-              <div style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#22c55e', marginRight: '10px' }} />
-              <span>Telehealth Ready (29)</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
-              <div style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#f59e0b', marginRight: '10px' }} />
-              <span>Community Anchor (186)</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '6px' }}>
-              <div style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#ef4444', marginRight: '10px' }} />
-              <span>Critical Gap (206)</span>
-            </div>
-            <div style={{ marginTop: '10px', fontSize: '11px', color: '#6b7280' }}>
-              Showing 421 communities
-            </div>
-          </div>
+          <AffordabilityLegend summary={affordabilitySummary} />
         )}
 
         {/* Data Coverage Panel - hide in Gap Hunter mode and Affordability mode */}

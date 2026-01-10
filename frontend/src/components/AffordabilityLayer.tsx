@@ -8,6 +8,7 @@ import {
 
 interface AffordabilityLayerProps {
     visible: boolean;
+    onDataLoad?: (summary: AllTelehealthStatusResponse['summary']) => void;
 }
 
 /**
@@ -17,7 +18,7 @@ interface AffordabilityLayerProps {
  * Red = Critical Gap (unaffordable AND no nearby clinic)
  * Gray = Data Unavailable
  */
-export default function AffordabilityLayer({ visible }: AffordabilityLayerProps) {
+export default function AffordabilityLayer({ visible, onDataLoad }: AffordabilityLayerProps) {
     const [data, setData] = useState<AllTelehealthStatusResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -27,11 +28,16 @@ export default function AffordabilityLayer({ visible }: AffordabilityLayerProps)
         if (visible && !data) {
             setLoading(true);
             fetchAllTelehealthStatus()
-                .then(setData)
+                .then(response => {
+                    setData(response);
+                    if (onDataLoad) {
+                        onDataLoad(response.summary);
+                    }
+                })
                 .catch(err => setError(err.message))
                 .finally(() => setLoading(false));
         }
-    }, [visible, data]);
+    }, [visible, data, onDataLoad]);
 
     if (!visible) return null;
     if (loading) return null;  // Could add a loading spinner
