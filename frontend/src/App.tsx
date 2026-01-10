@@ -7,6 +7,7 @@ import RegionMarker from './components/RegionMarker';
 import Legend from './components/Legend';
 import SeasonSelector from './components/SeasonSelector';
 import DataCoveragePanel from './components/DataCoveragePanel';
+import PerformanceLayer from './components/PerformanceLayer';
 
 // Fix for default marker icons in React-Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -32,6 +33,8 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [season, setSeason] = useState<Season>('year_round');
   const [dataPanelExpanded, setDataPanelExpanded] = useState(false);
+  const [performanceLayerVisible, setPerformanceLayerVisible] = useState(false);
+  const [gapModeActive, setGapModeActive] = useState(false);  // When true, hide CAT markers
 
   useEffect(() => {
     async function loadData() {
@@ -160,21 +163,55 @@ function App() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {/* Render markers for all regions with season prop */}
-          {regions.map(region => (
+          {/* Render CAT markers only when NOT in Gap Hunter mode */}
+          {!gapModeActive && regions.map(region => (
             <RegionMarker key={region.region_code} region={region} season={season} />
           ))}
+
+          {/* Gap Hunter - Performance + Affordability Analysis */}
+          <PerformanceLayer
+            visible={performanceLayerVisible}
+            onToggle={() => setPerformanceLayerVisible(false)}
+            onModeChange={setGapModeActive}
+          />
         </MapContainer>
 
-        {/* Legend */}
-        {!loading && <Legend totalRegions={regions.length} />}
+        {/* CAT Legend - only show when NOT in Gap Hunter mode */}
+        {!loading && !gapModeActive && <Legend totalRegions={regions.length} />}
 
-        {/* Data Coverage Panel */}
-        {!loading && (
+        {/* Data Coverage Panel - hide in Gap Hunter mode for cleaner UI */}
+        {!loading && !gapModeActive && (
           <DataCoveragePanel
             isExpanded={dataPanelExpanded}
             onToggle={() => setDataPanelExpanded(!dataPanelExpanded)}
           />
+        )}
+
+        {/* Gap Hunter Toggle Button */}
+        {!loading && !performanceLayerVisible && (
+          <button
+            onClick={() => setPerformanceLayerVisible(true)}
+            style={{
+              position: 'absolute',
+              top: '10px',
+              left: '10px',
+              zIndex: 1000,
+              backgroundColor: '#dc2626',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '12px 20px',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <span>📡</span> Gap Hunter
+          </button>
         )}
       </div>
 
