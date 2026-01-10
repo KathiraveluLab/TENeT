@@ -94,12 +94,12 @@ export default function AffordabilityLayer({ visible, onDataLoad }: Affordabilit
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', color: '#374151' }}>
                                     <span>Internet:</span>
-                                    <strong>${region.internet_cost}/mo ({(region as any).isp_name || 'N/A'})</strong>
+                                    <strong>${region.internet_cost}/mo ({region.isp_name || 'N/A'})</strong>
 
-                                    {(region as any).median_income && (
+                                    {region.median_income && (
                                         <>
                                             <span>Median Income:</span>
-                                            <strong>${((region as any).median_income).toLocaleString()}/yr</strong>
+                                            <strong>${(region.median_income).toLocaleString()}/yr</strong>
                                         </>
                                     )}
 
@@ -124,17 +124,17 @@ export default function AffordabilityLayer({ visible, onDataLoad }: Affordabilit
                                     Healthcare Safety Net
                                 </div>
                                 <div style={{ color: '#374151' }}>
-                                    {(region as any).nearest_clinic_name ? (
+                                    {region.nearest_clinic_name ? (
                                         <div>
-                                            <strong>Nearest:</strong> {(region as any).nearest_clinic_name.substring(0, 30)}
-                                            {(region as any).nearest_clinic_name.length > 30 ? '...' : ''}
-                                            ({(region as any).nearest_clinic_km}km)
+                                            <strong>Nearest:</strong> {region.nearest_clinic_name.substring(0, 30)}
+                                            {region.nearest_clinic_name.length > 30 ? '...' : ''}
+                                            ({region.nearest_clinic_km}km)
                                         </div>
                                     ) : (
                                         <div style={{ color: '#dc2626' }}>No clinic data available</div>
                                     )}
                                     <div style={{ marginTop: '4px' }}>
-                                        <strong>Access:</strong> {(region as any).access_mode || 'Unknown'}
+                                        <strong>Access:</strong> {region.access_mode || 'Unknown'}
                                     </div>
                                 </div>
                             </div>
@@ -153,7 +153,7 @@ export default function AffordabilityLayer({ visible, onDataLoad }: Affordabilit
                                     Recommendation
                                 </div>
                                 <div style={{ color: '#374151' }}>
-                                    {(region as any).recommendation || 'No recommendation available'}
+                                    {region.recommendation || 'No recommendation available'}
                                 </div>
                             </div>
                         </div>

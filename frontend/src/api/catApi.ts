@@ -849,8 +849,14 @@ export interface RegionTelehealthStatus {
     status: 'TELEHEALTH_READY' | 'COMMUNITY_ANCHOR' | 'CRITICAL_GAP' | 'DATA_UNAVAILABLE';
     color: string;
     internet_cost: number | null;
+    isp_name: string;
     burden_pct: number | null;
+    median_income: number | null;
     has_nearby_clinic: boolean;
+    nearest_clinic_name: string | null;
+    nearest_clinic_km: number | null;
+    access_mode: string;
+    recommendation: string;
 }
 
 export interface AllTelehealthStatusResponse {
