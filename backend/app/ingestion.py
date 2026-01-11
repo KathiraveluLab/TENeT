@@ -2,6 +2,8 @@
 Data ingestion utilities for TENeT.
 
 This module provides sample data ingestion for Alaska communities.
+Enhanced to support database persistence and larger datasets.
+
 In a production system, this would connect to real data sources like:
 - OpenStreetMap Overpass API for healthcare facilities
 - FCC broadband data
@@ -16,6 +18,29 @@ from app.models import (
     CommunityRecord, Location, HealthcareData, ConnectivityData, 
     AccessData, ConfidenceLevel
 )
+from app.data_store import CommunityDataStore
+from app.database import SessionLocal
+from app.data_loader import load_enhanced_communities
+
+
+def load_sample_data(store: CommunityDataStore) -> int:
+    """
+    Load sample data into both database and in-memory store.
+    
+    Returns:
+        Number of communities loaded into in-memory store
+    """
+    # Load enhanced data into database first
+    db = SessionLocal()
+    try:
+        db_communities = load_enhanced_communities(db)
+        print(f"✓ Loaded {len(db_communities)} communities into database")
+    except Exception as e:
+        print(f"⚠️  Database load failed: {e}")
+    finally:
+        db.close()
+    
+    # Continue with original in-memory data load for backward compatibility
 
 
 def calculate_data_completeness(community: CommunityRecord) -> float:

@@ -1,13 +1,14 @@
 /**
  * Dashboard Layout Component
  * 
- * Orchestrates the main UI: map view and community info panel.
- * Manages state for community selection and panel visibility.
+ * Orchestrates the main UI: map view, season selector, and community info panel.
+ * Manages state for community selection, panel visibility, and season filtering.
  */
 
 import React, { useState, useRef, useEffect } from 'react'
 import MapViewUpdated from '../components/MapViewUpdated'
 import CommunityInfoPanel from '../components/CommunityInfoPanel'
+import SeasonSelector from '../components/SeasonSelector'
 import { fetchCommunity } from '../services/api'
 import '../styles/dashboard-layout.css'
 
@@ -17,6 +18,7 @@ const DashboardLayout = () => {
   const [selectedCommunity, setSelectedCommunity] = useState(null)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
   const [isLoadingCommunity, setIsLoadingCommunity] = useState(false)
+  const [selectedSeason, setSelectedSeason] = useState('year_round')
   const closeTimeoutRef = useRef(null)
 
   const handleCommunitySelect = async (communityId) => {
@@ -59,9 +61,14 @@ const DashboardLayout = () => {
   return (
     <div className="dashboard-layout">
       <div className="map-container">
+        <SeasonSelector 
+          selectedSeason={selectedSeason}
+          onSeasonChange={setSelectedSeason}
+        />
         <MapViewUpdated 
           onCommunitySelect={handleCommunitySelect}
           selectedCommunityId={selectedCommunity?.community_id}
+          season={selectedSeason}
         />
       </div>
       
@@ -70,6 +77,7 @@ const DashboardLayout = () => {
         isOpen={isPanelOpen}
         onClose={handleClosePanel}
         isLoading={isLoadingCommunity}
+        season={selectedSeason}
       />
     </div>
   )

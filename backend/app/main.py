@@ -8,12 +8,15 @@ Design principles:
 - Raw data exposure (no derived scores)
 - Explicit confidence tracking
 - Transparent handling of missing data
+- Season-aware analysis
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 
 from app.routes.communities import router as communities_router
+from app.database import init_db, get_db
 from app.data_store import data_store
 from app.ingestion import load_sample_data
 
@@ -46,9 +49,14 @@ async def startup_event():
     """
     Initialize data on startup.
     
-    In production, this would connect to databases or external APIs.
-    For prototype, we load sample data.
+    Creates database tables and loads sample data.
+    In production, data would be loaded from external APIs.
     """
+    # Initialize database
+    init_db()
+    print("✓ Database initialized")
+    
+    # Load sample data into in-memory store (backward compatibility)
     count = load_sample_data(data_store)
     print(f"✓ Loaded {count} communities into data store")
 
