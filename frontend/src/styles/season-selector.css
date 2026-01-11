@@ -5,10 +5,10 @@
   top: 1rem;
   left: 1rem;
   z-index: 1000;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #2e7d32 0%, #1b5e20 100%);
   padding: 1rem 1.25rem;
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.35);
+  box-shadow: 0 8px 24px rgba(46, 125, 50, 0.35);
   color: white;
   max-width: 400px;
 }
