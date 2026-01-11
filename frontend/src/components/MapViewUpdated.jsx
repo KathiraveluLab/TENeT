@@ -30,11 +30,20 @@ const ALASKA_BOUNDS = [
   [71.5, -129.0]
 ]
 
-// Custom marker icon based on data completeness
-const createCommunityIcon = (dataCompleteness, isSelected) => {
-  let color = '#6c757d' // Gray for low completeness
+// Custom marker icon based on access tier
+const createCommunityIcon = (accessTier, dataCompleteness, isSelected) => {
+  let color = '#6c757d' // Gray default
   
-  if (dataCompleteness >= 0.75) {
+  // Use access tier for color if available, otherwise fall back to data completeness
+  if (accessTier !== null && accessTier !== undefined) {
+    if (accessTier === 1) {
+      color = '#28a745' // Green - Good access
+    } else if (accessTier === 2) {
+      color = '#ffc107' // Yellow - Fair access
+    } else if (accessTier === 3) {
+      color = '#dc3545' // Red - Limited access
+    }
+  } else if (dataCompleteness >= 0.75) {
     color = '#28a745' // Green for high
   } else if (dataCompleteness >= 0.50) {
     color = '#ffc107' // Yellow for medium
@@ -79,11 +88,14 @@ const ZoomTracker = ({ onZoomChange }) => {
 }
 
 // Main MapView component
-const MapViewUpdated = ({ onCommunitySelect, selectedCommunityId }) => {
+const MapViewUpdated = ({ onCommunitySelect, selectedCommunityId, searchResults = null }) => {
   const [communities, setCommunities] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [currentZoom, setCurrentZoom] = useState(ALASKA_ZOOM)
+  
+  // Filter communities based on search results
+  const displayedCommunities = (searchResults && Array.isArray(searchResults)) ? searchResults : communities
 
   // Fetch communities from backend
   useEffect(() => {
@@ -151,11 +163,12 @@ const MapViewUpdated = ({ onCommunitySelect, selectedCommunityId }) => {
         
         <ZoomTracker onZoomChange={handleZoomChange} />
         
-        {communities.map((community) => (
+        {displayedCommunities.map((community) => (
           <Marker
             key={community.community_id}
             position={[community.location.lat, community.location.lon]}
             icon={createCommunityIcon(
+              community.access_tier,
               community.data_completeness,
               selectedCommunityId === community.community_id
             )}
@@ -184,23 +197,24 @@ const MapViewUpdated = ({ onCommunitySelect, selectedCommunityId }) => {
       </MapContainer>
       
       <div className="map-legend">
-        <h4>Data Completeness</h4>
+        <h4>Access Tiers</h4>
         <div className="legend-item">
           <span className="legend-marker" style={{backgroundColor: '#28a745'}}></span>
-          <span>High (75%+)</span>
+          <span>Tier 1 - Good</span>
         </div>
         <div className="legend-item">
           <span className="legend-marker" style={{backgroundColor: '#ffc107'}}></span>
-          <span>Medium (50-75%)</span>
+          <span>Tier 2 - Fair</span>
         </div>
         <div className="legend-item">
-          <span className="legend-marker" style={{backgroundColor: '#fd7e14'}}></span>
-          <span>Low (25-50%)</span>
+          <span className="legend-marker" style={{backgroundColor: '#dc3545'}}></span>
+          <span>Tier 3 - Limited</span>
         </div>
-        <div className="legend-item">
-          <span className="legend-marker" style={{backgroundColor: '#6c757d'}}></span>
-          <span>Limited (&lt;25%)</span>
-        </div>
+        {searchResults && (
+          <div className="legend-search-info">
+            <span>🔍 Showing {searchResults.length} results</span>
+          </div>
+        )}
       </div>
     </div>
   )

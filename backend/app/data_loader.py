@@ -91,6 +91,12 @@ def load_enhanced_communities(db: Session) -> List[Community]:
     
     In production, this would load from actual data files.
     """
+    # Check if data already exists
+    existing_count = db.query(Community).count()
+    if existing_count > 0:
+        print(f"✓ Database already has {existing_count} communities, skipping data load")
+        return db.query(Community).all()
+    
     communities_data = [
         # Major hubs - Tier 1
         {

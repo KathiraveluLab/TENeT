@@ -666,6 +666,15 @@
   border: 1px solid rgba(0, 0, 0, 0.2);
 }
 
+.legend-search-info {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  font-size: 0.8125rem;
+  color: #667eea;
+  font-weight: 600;
+}
+
 /* Community markers */
 .community-div-icon {
   background: transparent !important;

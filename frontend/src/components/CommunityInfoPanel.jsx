@@ -19,8 +19,27 @@ import ConfidenceBadge from './ConfidenceBadge'
 import CompletenessIndicator from './CompletenessIndicator'
 import '../styles/community-info-panel.css'
 
-const CommunityInfoPanel = ({ community, isOpen, onClose, isLoading = false }) => {
+const CommunityInfoPanel = ({ community, isOpen, onClose, isLoading = false, season = 'year_round' }) => {
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false)
+  const [necessityData, setNecessityData] = useState(null)
+  const [loadingNecessity, setLoadingNecessity] = useState(false)
+
+  // Fetch necessity score when community or season changes
+  React.useEffect(() => {
+    if (community?.community_id && season) {
+      setLoadingNecessity(true)
+      fetch(`http://localhost:8000/api/communities/${community.community_id}/necessity?season=${season}`)
+        .then(res => res.json())
+        .then(data => {
+          setNecessityData(data)
+          setLoadingNecessity(false)
+        })
+        .catch(err => {
+          console.error('Failed to fetch necessity score:', err)
+          setLoadingNecessity(false)
+        })
+    }
+  }, [community?.community_id, season])
 
   if (!community && !isLoading) return null
 
@@ -45,6 +64,16 @@ const CommunityInfoPanel = ({ community, isOpen, onClose, isLoading = false }) =
     } catch {
       return 'Invalid date'
     }
+  }
+
+  const getAccessTierLabel = (tier) => {
+    const labels = { 1: 'Good', 2: 'Fair', 3: 'Limited' }
+    return labels[tier] || 'Unknown'
+  }
+
+  const getAccessTierColor = (tier) => {
+    const colors = { 1: '#28a745', 2: '#ffc107', 3: '#dc3545' }
+    return colors[tier] || '#6c757d'
   }
 
   return (
@@ -72,6 +101,40 @@ const CommunityInfoPanel = ({ community, isOpen, onClose, isLoading = false }) =
           <section className="info-section">
             <CompletenessIndicator score={community.data_completeness} />
           </section>
+
+          {/* Necessity Score & Access Tier */}
+          {necessityData && (
+            <section className="info-section necessity-section">
+              <h3 className="section-title">🎯 Telehealth Priority</h3>
+              <div className="section-content">
+                <div className="necessity-score-card" style={{ borderLeftColor: necessityData.priority_color }}>
+                  <div className="necessity-score-value">{necessityData.necessity_score.toFixed(1)}</div>
+                  <div className="necessity-score-label">Necessity Score</div>
+                  <div className="necessity-priority" style={{ color: necessityData.priority_color }}>
+                    {necessityData.priority_level}
+                  </div>
+                </div>
+                <InfoRow 
+                  label="Access Tier" 
+                  value={
+                    <span style={{ color: getAccessTierColor(necessityData.access_tier), fontWeight: 'bold' }}>
+                      Tier {necessityData.access_tier} - {getAccessTierLabel(necessityData.access_tier)}
+                    </span>
+                  }
+                  className="full-width"
+                />
+                <InfoRow 
+                  label="Season" 
+                  value={season.replace('_', ' ').toUpperCase()}
+                />
+                <InfoRow 
+                  label="Recommendation" 
+                  value={necessityData.recommendation}
+                  className="full-width notes"
+                />
+              </div>
+            </section>
+          )}
 
           {/* Basic Community Details */}
           <section className="info-section">

@@ -8,6 +8,9 @@
 import React, { useState, useRef, useEffect } from 'react'
 import MapViewUpdated from '../components/MapViewUpdated'
 import CommunityInfoPanel from '../components/CommunityInfoPanel'
+import SeasonSelector from '../components/SeasonSelector'
+import SearchBar from '../components/SearchBar'
+import StatsPanel from '../components/StatsPanel'
 import { fetchCommunity } from '../services/api'
 import '../styles/dashboard-layout.css'
 
@@ -17,6 +20,8 @@ const DashboardLayout = () => {
   const [selectedCommunity, setSelectedCommunity] = useState(null)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
   const [isLoadingCommunity, setIsLoadingCommunity] = useState(false)
+  const [selectedSeason, setSelectedSeason] = useState('year_round')
+  const [searchResults, setSearchResults] = useState(null)
   const closeTimeoutRef = useRef(null)
 
   const handleCommunitySelect = async (communityId) => {
@@ -48,6 +53,15 @@ const DashboardLayout = () => {
     }, PANEL_ANIMATION_DURATION)
   }
 
+  const handleSearch = (results, query) => {
+    setSearchResults(results)
+    console.log(`Search for "${query}" found ${results.length} communities`)
+  }
+
+  const handleClearSearch = () => {
+    setSearchResults(null)
+  }
+
   useEffect(() => {
     return () => {
       if (closeTimeoutRef.current) {
@@ -59,9 +73,21 @@ const DashboardLayout = () => {
   return (
     <div className="dashboard-layout">
       <div className="map-container">
+        <SeasonSelector 
+          selectedSeason={selectedSeason}
+          onSeasonChange={setSelectedSeason}
+        />
+        <SearchBar 
+          onSearch={handleSearch}
+          onClear={handleClearSearch}
+          onCommunitySelect={handleCommunitySelect}
+        />
+        <StatsPanel />
         <MapViewUpdated 
           onCommunitySelect={handleCommunitySelect}
           selectedCommunityId={selectedCommunity?.community_id}
+          season={selectedSeason}
+          searchResults={searchResults}
         />
       </div>
       
@@ -70,6 +96,7 @@ const DashboardLayout = () => {
         isOpen={isPanelOpen}
         onClose={handleClosePanel}
         isLoading={isLoadingCommunity}
+        season={selectedSeason}
       />
     </div>
   )
