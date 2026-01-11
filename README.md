@@ -162,12 +162,12 @@ Auto-generated interactive docs at `/api/docs`:
        │
        ▼
 ┌─────────────┐
-│  In-Memory  │  8 Alaska Communities
-│    Store    │  (Resets on restart)
+│   SQLite    │  20 Alaska Communities
+│  Database   │  (tenet.db - persistent)
 └─────────────┘
 ```
 
-📐 **Full architecture:** See [ARCHITECTURE.md](ARCHITECTURE.md)
+📐 **Full documentation:** See [DATA_SOURCES.md](DATA_SOURCES.md)
 
 ---
 
@@ -198,11 +198,20 @@ Data includes:
 ## 🔍 API Endpoints
 
 ```bash
-# List all communities
+# List all communities (lightweight view)
 GET /api/communities
+
+# Search communities by name or filter by tier
+GET /api/communities/search?q={query}&tier={1-3}
+
+# Get community statistics
+GET /api/communities/stats
 
 # Get community details
 GET /api/communities/{id}
+
+# Get healthcare necessity score (season-aware)
+GET /api/communities/{id}/necessity?season={summer|winter|year_round}
 
 # Healthcare data only
 GET /api/communities/{id}/healthcare
@@ -214,9 +223,19 @@ GET /api/communities/{id}/connectivity
 GET /api/health
 ```
 
-**Example:**
+**Examples:**
 ```bash
-curl http://localhost:8000/api/communities/AK-02185-0001 | jq
+# Get all communities
+curl http://localhost:8000/api/communities | jq
+
+# Search for Anchorage
+curl http://localhost:8000/api/communities/search?q=anc | jq
+
+# Get winter necessity score for Bethel
+curl "http://localhost:8000/api/communities/bethel/necessity?season=winter" | jq
+
+# Get statistics
+curl http://localhost:8000/api/communities/stats | jq
 ```
 
 📚 **Interactive docs:** http://localhost:8000/api/docs
@@ -226,16 +245,20 @@ curl http://localhost:8000/api/communities/AK-02185-0001 | jq
 ## 🎨 Technology Stack
 
 ### Backend
-- **FastAPI** - Modern Python web framework
+- **FastAPI 0.115.6** - Modern Python web framework
+- **SQLAlchemy 2.0.23** - ORM for database management
+- **SQLite** - Lightweight database (tenet.db)
+- **Pandas 2.1.4** - Data processing
 - **Pydantic** - Data validation
 - **Uvicorn** - ASGI server
 - **Python 3.8+**
 
 ### Frontend
 - **React 18** - UI framework
-- **Vite** - Build tool
+- **Vite 5.4.21** - Build tool & dev server
 - **Leaflet** - Interactive maps
 - **react-leaflet** - React bindings
+- **Custom CSS** - Green-themed UI
 
 ---
 
@@ -243,12 +266,10 @@ curl http://localhost:8000/api/communities/AK-02185-0001 | jq
 
 | Document | Description |
 |----------|-------------|
-| [SETUP.md](SETUP.md) | Complete setup guide with troubleshooting |
-| [PR_SUMMARY.md](PR_SUMMARY.md) | Overview of this integration PR |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | System design and data flows |
-| [TESTING_CHECKLIST.md](TESTING_CHECKLIST.md) | Comprehensive testing guide |
-| [FILE_MANIFEST.md](FILE_MANIFEST.md) | All files created/modified |
-| [QUICK_REFERENCE.md](QUICK_REFERENCE.md) | Quick reference card |
+| [DATA_SOURCES.md](DATA_SOURCES.md) | Complete data methodology and sources |
+| [PR.md](PR.md) | Full pull request documentation |
+| [backend/README.md](backend/README.md) | Backend setup guide |
+| [frontend/README.md](frontend/README.md) | Frontend setup guide |
 
 ---
 
@@ -259,15 +280,25 @@ curl http://localhost:8000/api/communities/AK-02185-0001 | jq
 ```bash
 # Backend health
 curl http://localhost:8000/api/health
-# Expected: {"status":"healthy","communities_loaded":8}
+# Expected: {"status":"healthy","communities_loaded":20}
+
+# Test search
+curl "http://localhost:8000/api/communities/search?q=anc" | jq
+
+# Test stats
+curl http://localhost:8000/api/communities/stats | jq
 
 # Frontend
 open http://localhost:5173
-# Click any marker → Panel should show data
+# 1. Click search → Should show all 20 communities
+# 2. Type "anc" → Should filter to Anchorage
+# 3. Click marker → Panel shows community details
+# 4. Change season → Necessity score updates
+# 5. Check stats panel → Shows tier distribution
 ```
 
 ### Full Testing
-See [TESTING_CHECKLIST.md](TESTING_CHECKLIST.md) for comprehensive test suite.
+See [PR.md](PR.md) for comprehensive testing checklist.
 
 ---
 
@@ -277,47 +308,58 @@ See [TESTING_CHECKLIST.md](TESTING_CHECKLIST.md) for comprehensive test suite.
 
 - **Exploratory** - For research and discovery
 - **Transparent** - Data quality explicitly tracked
-- **Extensible** - Easy to add features
+- **Analytical** - Healthcare necessity scoring based on multiple factors
+- **Extensible** - Easy to add features and communities
 - **Honest** - Missing data clearly marked
 - **Educational** - Demonstrates integration patterns
+- **Season-aware** - Accounts for Alaska's unique seasonal challenges
 
 ### ❌ What This Project IS NOT
 
-- ~~A scoring system~~ - No feasibility calculations
-- ~~A decision tool~~ - No policy recommendations  
-- ~~Production-ready~~ - Prototype only
-- ~~Complete~~ - Intentionally a foundation
-- ~~Optimized~~ - Clarity over performance
+- ~~A prescriptive tool~~ - Scores inform, don't dictate policy
+- ~~A decision engine~~ - Analysis only, no automated recommendations
+- ~~Production-hardened~~ - Research/prototype quality
+- ~~Comprehensive~~ - Intentionally a foundation for expansion
+- ~~Real-time~~ - Static database, not live API integration
 
 ---
 
 ## 🚧 Current Limitations
 
-- **In-memory storage** - Data resets on server restart
-- **No authentication** - Open API
-- **Limited data** - Only 8 communities
-- **No caching** - Fresh queries each time
-- **Basic error handling** - Could be more robust
-- **No tests** - Manual testing only
+- **No authentication** - Open API (appropriate for public data)
+- **Limited dataset** - 20 communities (expandable to 100+)
+- **No caching** - Fresh database queries each time
+- **Basic spatial queries** - Bounding box filtering (could add PostGIS)
+- **Manual testing** - No automated test suite yet
+- **Single database file** - SQLite (sufficient for current scale)
 
-These are intentional for prototype phase.
+These are intentional for prototype/research phase.
 
 ---
 
 ## 🔮 Future Enhancements
 
+### Completed ✅
+- [x] Database layer (SQLite with SQLAlchemy)
+- [x] Expanded to 20 Alaska communities
+- [x] Search and filter functionality
+- [x] Season-aware analysis
+- [x] Healthcare necessity scoring
+- [x] Statistics dashboard
+
 ### Near-term
 - [ ] Add more Alaska communities (target: 50+)
-- [ ] Integrate real OSM API for healthcare data
-- [ ] Connect to FCC broadband database
-- [ ] Add database layer (PostgreSQL + PostGIS)
+- [ ] Integrate real-time OSM API for healthcare data
+- [ ] Connect to FCC broadband database API
+- [ ] Upgrade to PostgreSQL + PostGIS for better spatial queries
 
 ### Medium-term
-- [ ] Search and filter functionality
-- [ ] Community comparison views
-- [ ] Export to CSV/JSON
+- [ ] Community comparison views (side-by-side)
+- [ ] Export to CSV/PDF reports
 - [ ] Historical data tracking
-- [ ] User authentication
+- [ ] User authentication for admin features
+- [ ] Automated testing suite (unit + integration)
+- [ ] Mobile-responsive optimizations
 
 ### Long-term
 - [ ] Mobile app

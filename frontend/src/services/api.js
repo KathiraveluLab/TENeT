@@ -104,3 +104,60 @@ export async function checkHealth() {
     return { data: null, error: error.message }
   }
 }
+
+/**
+ * Search communities by query
+ */
+export async function searchCommunities(query) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/communities/search?q=${encodeURIComponent(query)}`)
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    return { data: data.results || [], error: null }
+  } catch (error) {
+    console.error('Error searching communities:', error)
+    return { data: [], error: error.message }
+  }
+}
+
+/**
+ * Fetch community statistics
+ */
+export async function fetchCommunityStats() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/communities/stats`)
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    return { data, error: null }
+  } catch (error) {
+    console.error('Error fetching community stats:', error)
+    return { data: null, error: error.message }
+  }
+}
+
+/**
+ * Fetch healthcare necessity score for a community
+ */
+export async function fetchNecessityScore(communityId, season) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/communities/${communityId}/necessity?season=${season}`)
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    return { data, error: null }
+  } catch (error) {
+    console.error(`Error fetching necessity score for ${communityId}:`, error)
+    return { data: null, error: error.message }
+  }
+}

@@ -12,12 +12,36 @@ supporting both prototype and production environments.
 
 import json
 import math
+import re
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.models import CommunityRecord, HealthcareData, ConnectivityData, AccessData, ConfidenceLevel, Location
 from app.database import Community, HealthcareFacility, BroadbandCoverage
+
+
+def generate_community_id(name: str) -> str:
+    """
+    Generate a unique, URL-friendly community ID from the community name.
+    
+    Examples:
+        "Anchorage" -> "anchorage"
+        "Barrow (Utqiaġvik)" -> "barrow-utqiagvik"
+        "Point Hope" -> "point-hope"
+    
+    Args:
+        name: Community name
+        
+    Returns:
+        Lowercase slug suitable as database ID
+    """
+    # Remove parentheses and their contents, convert to lowercase
+    slug = re.sub(r'\([^)]*\)', '', name).strip()
+    # Replace spaces and special chars with hyphens
+    slug = re.sub(r'[^\w\s-]', '', slug.lower())
+    slug = re.sub(r'[-\s]+', '-', slug)
+    return slug.strip('-')
 from app.season_utils import Season, calculate_seasonal_access_score
 
 
@@ -248,7 +272,7 @@ def load_enhanced_communities(db: Session) -> List[Community]:
             "source": "OSM",
             "confidence": "high" if data["facilities"] > 1 else "medium",
             "notes": f"Primary care available" if data["facilities"] > 0 else "Limited services",
-            "last_updated": datetime.now().isoformat()
+            "last_updated": datetime.utcnow().isoformat()
         }
         
         # Create connectivity data JSON
@@ -259,7 +283,7 @@ def load_enhanced_communities(db: Session) -> List[Community]:
             "source": "FCC",
             "confidence": "high" if data["download"] > 50 else "medium",
             "notes": "Satellite backup available" if data["tier"] == 3 else "Multiple providers",
-            "last_updated": datetime.now().isoformat()
+            "last_updated": datetime.utcnow().isoformat()
         }
         
         # Create access data JSON
@@ -283,7 +307,7 @@ def load_enhanced_communities(db: Session) -> List[Community]:
         completeness = 1.0 if data["tier"] <= 2 else 0.7
         
         community = Community(
-            community_id=f"AK-{data['name'][:3].upper()}-{data['population']:05d}",
+            community_id=generate_community_id(data["name"]),
             name=data["name"],
             region="Alaska",
             latitude=data["lat"],

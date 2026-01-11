@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react'
+import { fetchCommunities, searchCommunities } from '../services/api'
 import '../styles/search-bar.css'
 
 const SearchBar = ({ onSearch, onClear, onCommunitySelect }) => {
@@ -14,17 +15,17 @@ const SearchBar = ({ onSearch, onClear, onCommunitySelect }) => {
   const [allCommunities, setAllCommunities] = useState([])
   const [showResults, setShowResults] = useState(false)
   const searchRef = useRef(null)
+  const debounceTimerRef = useRef(null)
 
   // Fetch all communities on mount
   useEffect(() => {
     const fetchAllCommunities = async () => {
-      try {
-        const response = await fetch('http://localhost:8000/api/communities')
-        const data = await response.json()
-        setAllCommunities(Array.isArray(data) ? data : [])
-      } catch (error) {
+      const { data, error } = await fetchCommunities()
+      if (error) {
         console.error('Failed to fetch communities:', error)
         setAllCommunities([])
+      } else {
+        setAllCommunities(Array.isArray(data) ? data : [])
       }
     }
     fetchAllCommunities()
@@ -47,49 +48,70 @@ const SearchBar = ({ onSearch, onClear, onCommunitySelect }) => {
     if (query.trim().length < 2) return
 
     setIsSearching(true)
-    try {
-      const response = await fetch(`http://localhost:8000/api/communities/search?q=${encodeURIComponent(query)}`)
-      const results = await response.json()
-      setSearchResults(Array.isArray(results) ? results : [])
-      setShowResults(true)
-      onSearch(Array.isArray(results) ? results : [], query)
-    } catch (error) {
+    const { data, error } = await searchCommunities(query)
+    if (error) {
       console.error('Search failed:', error)
       setSearchResults([])
       onSearch([], query)
-    } finally {
-      setIsSearching(false)
+    } else {
+      setSearchResults(Array.isArray(data) ? data : [])
+      setShowResults(true)
+      onSearch(Array.isArray(data) ? data : [], query)
     }
+    setIsSearching(false)
   }
 
-  const handleInputChange = async (e) => {
+  const handleInputChange = (e) => {
     const value = e.target.value
     setQuery(value)
 
-    // Auto-search as user types (debounced)
-    if (value.trim().length >= 2) {
-      setIsSearching(true)
-      try {
-        const response = await fetch(`http://localhost:8000/api/communities/search?q=${encodeURIComponent(value)}`)
-        const results = await response.json()
-        const resultsArray = Array.isArray(results) ? results : []
-        setSearchResults(resultsArray)
-        setShowResults(true)
-        onSearch(resultsArray, value)
-      } catch (error) {
-        console.error('Search failed:', error)
-        setSearchResults([])
-      } finally {
-        setIsSearching(false)
-      }
-    } else {
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+
+    // Handle empty input immediately
+    if (value.trim().length === 0) {
       setSearchResults([])
       setShowResults(false)
-      if (value.trim().length === 0) {
-        onClear()
+      onClear()
+      return
+    }
+
+    // Show loading state immediately
+    if (value.trim().length >= 2) {
+      setIsSearching(true)
+    }
+
+    // Debounce API call (300ms delay)
+    debounceTimerRef.current = setTimeout(async () => {
+      if (value.trim().length >= 2) {
+        const { data, error } = await searchCommunities(value)
+        if (error) {
+          console.error('Search failed:', error)
+          setSearchResults([])
+        } else {
+          setSearchResults(data)
+          setShowResults(true)
+          onSearch(data, value)
+        }
+        setIsSearching(false)
+      } else {
+        setSearchResults([])
+        setShowResults(false)
+        setIsSearching(false)
+      }
+    }, 300)
+  }
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
       }
     }
-  }
+  }, [])
 
   const handleClear = () => {
     setQuery('')

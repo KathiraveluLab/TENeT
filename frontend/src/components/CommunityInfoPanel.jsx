@@ -17,6 +17,7 @@ import React, { useState } from 'react'
 import InfoRow from './InfoRow'
 import ConfidenceBadge from './ConfidenceBadge'
 import CompletenessIndicator from './CompletenessIndicator'
+import { fetchNecessityScore } from '../services/api'
 import '../styles/community-info-panel.css'
 
 const CommunityInfoPanel = ({ community, isOpen, onClose, isLoading = false, season = 'year_round' }) => {
@@ -28,14 +29,13 @@ const CommunityInfoPanel = ({ community, isOpen, onClose, isLoading = false, sea
   React.useEffect(() => {
     if (community?.community_id && season) {
       setLoadingNecessity(true)
-      fetch(`http://localhost:8000/api/communities/${community.community_id}/necessity?season=${season}`)
-        .then(res => res.json())
-        .then(data => {
-          setNecessityData(data)
-          setLoadingNecessity(false)
-        })
-        .catch(err => {
-          console.error('Failed to fetch necessity score:', err)
+      fetchNecessityScore(community.community_id, season)
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Failed to fetch necessity score:', error)
+          } else {
+            setNecessityData(data)
+          }
           setLoadingNecessity(false)
         })
     }

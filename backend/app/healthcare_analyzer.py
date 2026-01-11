@@ -18,6 +18,31 @@ from app.database import Community, HealthcareFacility
 from app.season_utils import Season, get_isolation_factor
 
 
+def calculate_bounding_box(lat: float, lon: float, radius_km: float = 500) -> Tuple[float, float, float, float]:
+    """
+    Calculate bounding box coordinates for a given point and radius.
+    
+    Args:
+        lat: Center latitude
+        lon: Center longitude
+        radius_km: Search radius in kilometers
+        
+    Returns:
+        Tuple of (min_lat, max_lat, min_lon, max_lon)
+    """
+    # Rough conversion: 1 degree latitude ≈ 111 km
+    # Longitude varies by latitude, but we use a conservative estimate
+    lat_delta = radius_km / 111.0
+    lon_delta = radius_km / (111.0 * math.cos(math.radians(lat)))
+    
+    return (
+        lat - lat_delta,  # min_lat
+        lat + lat_delta,  # max_lat
+        lon - lon_delta,  # min_lon
+        lon + lon_delta   # max_lon
+    )
+
+
 def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """
     Calculate great-circle distance between two points (in kilometers).
@@ -186,11 +211,21 @@ def analyze_community_healthcare(
     if not community:
         return {"error": "Community not found"}
     
-    # Get all facilities
-    all_facilities = db.query(HealthcareFacility).all()
+    # Get facilities within bounding box (500km radius for Alaska distances)
+    # This optimizes the query by limiting to geographically relevant facilities
+    min_lat, max_lat, min_lon, max_lon = calculate_bounding_box(
+        community.latitude, community.longitude, radius_km=500
+    )
+    
+    nearby_facilities = db.query(HealthcareFacility).filter(
+        HealthcareFacility.latitude >= min_lat,
+        HealthcareFacility.latitude <= max_lat,
+        HealthcareFacility.longitude >= min_lon,
+        HealthcareFacility.longitude <= max_lon
+    ).all()
     
     # Find nearest facilities
-    nearest = find_nearest_facilities(community, all_facilities, limit=3)
+    nearest = find_nearest_facilities(community, nearby_facilities, limit=3)
     
     # Count local facilities (within 50km)
     local_count = sum(1 for _, dist in nearest if dist <= 50)

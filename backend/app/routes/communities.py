@@ -41,7 +41,7 @@ async def get_communities(db: Session = Depends(get_db)):
 
 @router.get("/communities/search")
 async def search_communities(
-    q: str = Query(..., description="Search query"),
+    q: Optional[str] = Query(None, description="Search query"),
     tier: Optional[int] = Query(None, description="Filter by access tier (1-3)"),
     db: Session = Depends(get_db)
 ):

@@ -5,6 +5,7 @@
  */
 
 import React, { useEffect, useState } from 'react'
+import { fetchCommunityStats } from '../services/api'
 import '../styles/stats-panel.css'
 
 const StatsPanel = () => {
@@ -13,14 +14,13 @@ const StatsPanel = () => {
   const [isExpanded, setIsExpanded] = useState(false)
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/communities/stats')
-      .then(res => res.json())
-      .then(data => {
-        setStats(data)
-        setLoading(false)
-      })
-      .catch(err => {
-        console.error('Failed to fetch stats:', err)
+    fetchCommunityStats()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Failed to fetch stats:', error)
+        } else {
+          setStats(data)
+        }
         setLoading(false)
       })
   }, [])
