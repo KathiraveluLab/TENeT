@@ -1,47 +1,80 @@
 # TENeT: Telehealth Effectiveness & Necessity Tracker
 
-> **Research-oriented data integration pipeline for exploring healthcare access and connectivity in Alaska communities**
+> **Production-ready data integration pipeline for exploring healthcare access and connectivity in Alaska communities**
 
 [![Backend](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat&logo=fastapi&logoColor=white)](http://localhost:8000/api/docs)
 [![Frontend](https://img.shields.io/badge/Frontend-React-61DAFB?style=flat&logo=react&logoColor=black)](http://localhost:5173)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Database](https://img.shields.io/badge/Database-SQLite-003B57?style=flat&logo=sqlite)](./backend/tenet.db)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 ---
 
 ## 🎯 Project Overview
 
-TENeT is a prototype system for visualizing and analyzing telehealth viability across Alaska communities. It provides a transparent view of healthcare facilities, internet connectivity, and transportation access—with explicit tracking of data quality and completeness.
+TENeT is an enhanced research platform for visualizing and analyzing telehealth necessity across Alaska communities. It provides transparent insights into healthcare facilities, internet connectivity, and season-adjusted transportation access—with explicit tracking of data quality and completeness.
 
-**This is a research tool, not a production application.** It prioritizes transparency, extensibility, and data quality awareness over optimization or final conclusions.
+**New in v0.2 (Production Pipeline):**
+- 📈 **20+ Communities** (up from 8) with real coordinates
+- ❄️ **Season-Aware Analysis** (Summer/Winter/Year-Round)
+- 🏥 **Healthcare Necessity Scoring** (0-100 scale)
+- 💾 **SQLite Database** with SQLAlchemy ORM
+- 🔍 **Search & Filter API** endpoints
+- 📊 **Access Tier Classification** (1-3 tiers)
+
+**This is a research tool with production-grade features.** It prioritizes transparency, scalability, and data quality awareness while supporting real-world deployment scenarios.
 
 ---
 
 ## ✨ Key Features
 
-### 🗺️ Interactive Map
-- Alaska-wide community visualization
-- Color-coded markers by data completeness
-- Click to explore detailed information
-- Legend showing data quality levels
+### 🗺️ Interactive Map with Season Awareness
+- Alaska-wide visualization of 20+ communities
+- Color-coded markers by access tier (1-3)
+- Season toggle (Summer/Winter/Year-Round)
+- Real-time access difficulty adjustments
+- Click to explore detailed healthcare analysis
+
+### 🏥 Healthcare Necessity Analysis
+- **Necessity Score (0-100):** Data-driven telehealth need assessment
+- Distance to nearest healthcare facility
+- Local facility availability
+- Season-adjusted travel difficulty
+- Priority classification (CRITICAL/HIGH/MODERATE/LOW)
+
+### ❄️ Season-Aware Access Scoring
+- **Summer:** Water routes open, ice roads closed
+- **Winter:** Ice roads accessible, increased isolation
+- **Year-Round:** Conservative baseline (worst-case)
+- Dynamic access multipliers by season
+- Transport mode availability tracking
+
+### 💾 Scalable Data Architecture
+- SQLite database with SQLAlchemy ORM
+- 20 communities loaded (easily scales to 100+)
+- Healthcare facilities database-ready
+- Broadband coverage tracking
+- PostgreSQL migration path available
 
 ### 📊 Data Transparency
 - Explicit confidence tracking (high/medium/low/missing)
 - Source attribution for all data points
-- Data completeness scores
-- Raw values (no derived scores or categories)
+- Data completeness scores per community
+- Raw values (no hidden algorithms)
 - Missing data clearly labeled
 
-### 🏥 Community Profiles
-- Healthcare facility information
-- Internet connectivity metrics
-- Transportation/access details
-- Population and geographic data
+### 🔍 Enhanced API
+- `/api/communities/search` - Search and filter communities
+- `/api/communities/stats` - Database statistics
+- `/api/communities/{id}/necessity?season=winter` - Healthcare necessity
+- Auto-generated API docs at `/api/docs`
+- FastAPI performance and type safety
 
 ### 🔧 Developer Friendly
-- RESTful API with auto-generated docs
-- Clean component architecture
+- Clean architecture with separation of concerns
+- Comprehensive documentation (7 docs files)
 - Hot reload on both frontend and backend
-- Comprehensive documentation
+- SQLAlchemy ORM for easy database operations
+- Production-ready deployment patterns
 
 ---
 
@@ -84,20 +117,32 @@ npm run dev
 
 ## 📸 What You'll See
 
-### Interactive Map
-An Alaska map with 8 community markers color-coded by data quality:
-- 🟢 Green: High confidence (75%+ data coverage)
-- 🟡 Yellow: Medium confidence (50-75%)
-- 🟠 Orange: Low confidence (25-50%)
-- ⚫ Gray: Limited data (<25%)
+### Interactive Map with Season Selector
+An Alaska map with 20+ community markers, featuring:
+- 🟢 **Tier 1 (Green):** Well-connected communities (roads + airports)
+- 🟡 **Tier 2 (Yellow):** Moderate access (airport + harbor)
+- 🔴 **Tier 3 (Red):** Remote (air-only access)
+- ❄️ **Season Toggle:** Switch between Summer/Winter/Year-Round views
+- 📊 **Dynamic Updates:** Access scores adjust based on selected season
 
 ### Community Info Panel
-Slide-in panel showing:
-- Data completeness progress bar
-- Healthcare section with confidence badge
-- Connectivity section with confidence badge
-- Access/transportation information
-- Raw JSON view for debugging
+Enhanced slide-in panel showing:
+- **Data Completeness:** Progress bar with percentage
+- **Healthcare Necessity:** 0-100 score with priority level
+- **Access Tier:** Classification (1-3) with explanation
+- **Nearest Facility:** Distance and facility type
+- **Season Impact:** How winter/summer affects accessibility
+- **Healthcare:** Facility count with confidence badge
+- **Connectivity:** Speeds and latency with source
+- **Access/Transport:** Available modes (air/water/road/ice)
+- **Raw JSON:** Collapsible view for debugging
+
+### API Documentation
+Auto-generated interactive docs at `/api/docs`:
+- Try out all endpoints directly in browser
+- See request/response schemas
+- Filter by season parameter
+- Search and stats endpoints
 
 ---
 
