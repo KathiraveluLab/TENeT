@@ -86,4 +86,5 @@ class CommunityListItem(BaseModel):
     name: str
     location: Location
     region: Optional[str] = None
+    population: Optional[int] = None
     data_completeness: float

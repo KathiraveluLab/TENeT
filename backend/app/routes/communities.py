@@ -10,9 +10,8 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from app.models import (
-    CommunityRecord, CommunityListItem, HealthcareData, ConnectivityData
+    CommunityRecord, CommunityListItem, HealthcareData, ConnectivityData, Location
 )
-from app.data_store import data_store
 from app.database import get_db, Community
 from app.data_loader import sync_to_pydantic
 from app.healthcare_analyzer import analyze_community_healthcare
@@ -23,74 +22,21 @@ router = APIRouter(prefix="/api", tags=["communities"])
 
 
 @router.get("/communities", response_model=List[CommunityListItem])
-async def get_communities():
+async def get_communities(db: Session = Depends(get_db)):
     """
     Get list of all communities (lightweight view).
     
     Returns basic information for map markers and overview displays.
     """
-    return data_store.get_communities_list()
-
-
-@router.get("/communities/{community_id}", response_model=CommunityRecord)
-async def get_community(community_id: str):
-    """
-    Get complete data for a specific community.
-    
-    Returns all healthcare, connectivity, and access data with confidence indicators.
-    """
-    community = data_store.get_community(community_id)
-    
-    if not community:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Community with ID '{community_id}' not found"
-        )
-    
-    return community
-
-
-@router.get("/communities/{community_id}/healthcare", response_model=HealthcareData)
-async def get_community_healthcare(community_id: str):
-    """
-    Get healthcare data for a specific community.
-    """
-    community = data_store.get_community(community_id)
-    
-    if not community:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Community with ID '{community_id}' not found"
-        )
-    
-    return community.healthcare
-
-
-@router.get("/communities/{community_id}/connectivity", response_model=ConnectivityData)
-async def get_community_connectivity(community_id: str):
-    """
-    Get connectivity data for a specific community.
-    """
-    community = data_store.get_community(community_id)
-    
-    if not community:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Community with ID '{community_id}' not found"
-        )
-    
-    return community.connectivity
-
-
-@router.get("/health")
-async def health_check():
-    """
-    Health check endpoint.
-    """
-    return {
-        "status": "healthy",
-        "communities_loaded": data_store.count()
-    }
+    communities = db.query(Community).all()
+    return [CommunityListItem(
+        community_id=c.community_id,
+        name=c.name,
+        location=Location(lat=c.latitude, lon=c.longitude),
+        region=c.region,
+        population=c.population,
+        data_completeness=c.data_completeness
+    ) for c in communities]
 
 
 @router.get("/communities/search")
@@ -144,6 +90,68 @@ async def get_statistics(db: Session = Depends(get_db)):
         "by_tier": tier_counts,
         "average_data_completeness": round(avg, 3),
         "data_sources": ["OSM", "FCC", "Alaska DOT"]
+    }
+
+
+@router.get("/communities/{community_id}", response_model=CommunityRecord)
+async def get_community(community_id: str, db: Session = Depends(get_db)):
+    """
+    Get complete data for a specific community.
+    
+    Returns all healthcare, connectivity, and access data with confidence indicators.
+    """
+    community = db.query(Community).filter(Community.community_id == community_id).first()
+    
+    if not community:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Community with ID '{community_id}' not found"
+        )
+    
+    return sync_to_pydantic(community)
+
+
+@router.get("/communities/{community_id}/healthcare", response_model=HealthcareData)
+async def get_community_healthcare(community_id: str, db: Session = Depends(get_db)):
+    """
+    Get healthcare data for a specific community.
+    """
+    community = db.query(Community).filter(Community.community_id == community_id).first()
+    
+    if not community:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Community with ID '{community_id}' not found"
+        )
+    
+    return sync_to_pydantic(community).healthcare
+
+
+@router.get("/communities/{community_id}/connectivity", response_model=ConnectivityData)
+async def get_community_connectivity(community_id: str, db: Session = Depends(get_db)):
+    """
+    Get connectivity data for a specific community.
+    """
+    community = db.query(Community).filter(Community.community_id == community_id).first()
+    
+    if not community:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Community with ID '{community_id}' not found"
+        )
+    
+    return sync_to_pydantic(community).connectivity
+
+
+@router.get("/health")
+async def health_check(db: Session = Depends(get_db)):
+    """
+    Health check endpoint.
+    """
+    total = db.query(Community).count()
+    return {
+        "status": "healthy",
+        "communities_loaded": total
     }
 
 

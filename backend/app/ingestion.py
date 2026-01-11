@@ -40,7 +40,14 @@ def load_sample_data(store: CommunityDataStore) -> int:
     finally:
         db.close()
     
-    # Continue with original in-memory data load for backward compatibility
+    # Load legacy in-memory data for backward compatibility with old endpoints
+    communities = ingest_sample_communities()
+    
+    for community in communities:
+        store.add_community(community)
+    
+    print(f"✓ Loaded {len(communities)} communities into data store")
+    return len(communities)
 
 
 def calculate_data_completeness(community: CommunityRecord) -> float:
@@ -340,18 +347,3 @@ def ingest_sample_communities() -> List[CommunityRecord]:
         community.data_completeness = calculate_data_completeness(community)
     
     return communities
-
-
-def load_sample_data(data_store) -> int:
-    """
-    Load sample community data into the data store.
-    
-    Returns:
-        Number of communities loaded
-    """
-    communities = ingest_sample_communities()
-    
-    for community in communities:
-        data_store.add_community(community)
-    
-    return len(communities)
