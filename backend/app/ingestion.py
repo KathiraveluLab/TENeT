@@ -130,7 +130,7 @@ def ingest_sample_communities() -> List[CommunityRecord]:
         
         CommunityRecord(
             community_id="AK-02070-0001",
-            name="Barrow (Utqiaġvik)",
+            name="Utqiaġvik (Barrow)",
             location=Location(lat=71.2906, lon=-156.7886),
             region="North Slope Borough",
             population=4927,

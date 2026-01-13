@@ -180,7 +180,7 @@ The system includes 8 representative Alaska communities:
 | Anchorage | 291,247 | Major City | ⭐⭐⭐⭐⭐ |
 | Juneau | 32,255 | State Capital | ⭐⭐⭐⭐⭐ |
 | Bethel | 6,325 | Regional Hub | ⭐⭐⭐⭐ |
-| Barrow | 4,927 | Remote Hub | ⭐⭐⭐⭐ |
+| Utqiaġvik (Barrow) | 4,927 | Remote Hub | ⭐⭐⭐⭐ |
 | Nome | 3,699 | Coastal Hub | ⭐⭐⭐⭐ |
 | Kotzebue | 3,102 | Northwest Hub | ⭐⭐⭐⭐ |
 | Haines | 2,508 | Southeast Town | ⭐⭐⭐⭐⭐ |

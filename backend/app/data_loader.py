@@ -27,7 +27,7 @@ def generate_community_id(name: str) -> str:
     
     Examples:
         "Anchorage" -> "anchorage"
-        "Barrow (Utqiaġvik)" -> "barrow-utqiagvik"
+        "Utqiaġvik (Barrow)" -> "utqiagvik"
         "Point Hope" -> "point-hope"
     
     Args:
@@ -182,7 +182,7 @@ def load_enhanced_communities(db: Session) -> List[Community]:
         
         # Remote villages - Tier 3
         {
-            "name": "Barrow (Utqiaġvik)", "lat": 71.2906, "lon": -156.7886,
+            "name": "Utqiaġvik (Barrow)", "lat": 71.2906, "lon": -156.7886,
             "population": 4927, "tier": 3,
             "road": False, "airport": True, "harbor": False,
             "facilities": 2, "download": 50, "upload": 10

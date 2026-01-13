@@ -52,7 +52,7 @@ See `app/models.py` for full schema.
 
 8 Alaska communities with diverse characteristics:
 - Major cities (Anchorage, Juneau)
-- Regional hubs (Bethel, Nome, Kotzebue, Barrow)
+- Regional hubs (Bethel, Nome, Kotzebue, Utqiaġvik)
 - Smaller towns (Haines, Napakiak)
 
 Data source: `app/ingestion.py`
