@@ -1,57 +1,55 @@
 import { useEffect, useState } from "react";
 import DesertMap from "./components/DesertMap";
-import type { Region } from "./components/DesertMap"
 type Mode = "physical" | "telehealth";
+import type { FeatureCollection, Geometry } from "geojson";
 
+type BroadbandInfo = {
+  advertised: number;
+  actual: number;
+  gap: number;
+  state: "adequately_served" | "true_desert" | "advertised_but_unreliable" | "partially_served";
+  color: string;
+};
+
+
+type DesertProps = {
+  community: {
+    name: string;
+    geoid: string;
+    type: "place" | "native_village";
+  };
+  physical_desert: number;
+  telehealth_desert: number;
+  physical_count: number;
+  telehealth_count: number;
+  broadband: BroadbandInfo;
+};
+
+type DesertGeoJSON = FeatureCollection<Geometry, DesertProps>;
 function App() {
-  const [data, setData] = useState<Region[]>([]);
-
+  const [data, setData] = useState<DesertGeoJSON | null>(null);
   const [mode, setMode] = useState<Mode>("physical");
 
   useEffect(() => {
-  fetch("http://localhost:8000/metrics/desert-index")
-    .then((res) => {
-      return res.json();
-    })
-    .then((json) => {
-      console.log("data received:", json);
-      setData(json);
-    })
-    .catch((err) => {
-      console.error("Failed to load metrics", err);
-    });
-}, []);
+    fetch("http://localhost:8000/metrics/desert-index")
+      .then(res => res.json())
+      .then(json => setData(json))
+      .catch(console.error);
+  }, []);
 
   return (
     <div style={{ height: "100vh", width: "100vw" }}>
-      {/* Header */}
       <div style={{ padding: 10, background: "#111", color: "#fff" }}>
         <button onClick={() => setMode("physical")}>Physical</button>
         <button onClick={() => setMode("telehealth")}>Telehealth</button>
       </div>
 
-      {/* Map ALWAYS renders */}
       <div style={{ height: "calc(100vh - 50px)" }}>
-        <DesertMap data={data} mode={mode} />
+        {data ? <DesertMap data={data} mode={mode} /> : "Loading…"}
       </div>
-
-      {/* Optional overlay */}
-      {!data && (
-        <div
-          style={{
-            position: "absolute",
-            top: 70,
-            left: 20,
-            background: "#000",
-            color: "#fff",
-            padding: 8,
-          }}
-        >
-          Loading data…
-        </div>
-      )}
     </div>
   );
 }
+
 
 export default App;
