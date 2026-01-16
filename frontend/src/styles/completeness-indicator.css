@@ -1,0 +1,74 @@
+/**
+ * Data Completeness Indicator Styles
+ * Progress bar showing overall data quality
+ */
+
+.completeness-indicator {
+  padding: 0.75rem;
+  background: #f8f9fa;
+  border-radius: 0.5rem;
+  border: 1px solid #e9ecef;
+}
+
+.completeness-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.completeness-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #495057;
+}
+
+.completeness-percentage {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.completeness-percentage.high {
+  color: #28a745;
+}
+
+.completeness-percentage.medium {
+  color: #ffc107;
+}
+
+.completeness-percentage.low {
+  color: #fd7e14;
+}
+
+.completeness-bar-container {
+  width: 100%;
+  height: 1rem;
+  background-color: #e9ecef;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  margin-bottom: 0.4rem;
+}
+
+.completeness-bar {
+  height: 100%;
+  transition: width 0.5s ease, background-color 0.3s ease;
+  border-radius: 0.5rem;
+}
+
+.completeness-bar.high {
+  background: linear-gradient(90deg, #28a745, #20c997);
+}
+
+.completeness-bar.medium {
+  background: linear-gradient(90deg, #ffc107, #fd7e14);
+}
+
+.completeness-bar.low {
+  background: linear-gradient(90deg, #fd7e14, #dc3545);
+}
+
+.completeness-quality-label {
+  font-size: 0.75rem;
+  color: #6c757d;
+  font-style: italic;
+}

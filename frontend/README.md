@@ -1,20 +1,32 @@
 # TENeT Frontend
 
-## Overview
-
-The TENeT frontend is a React application built with Vite that provides an interactive map interface for visualizing telehealth accessibility and internet infrastructure in Alaska.
+React frontend for the Telehealth Effectiveness & Necessity Tracker.
 
 ## Features
 
-- **Interactive Alaska Map**: Leaflet-based mapping with Alaska boundary visualization
-- **Responsive Design**: Mobile-friendly interface with proper accessibility
-- **Modern React**: Built with React 18 and modern JavaScript features
-- **Environment Configuration**: Configurable API endpoints and map settings
-- **Clean Architecture**: Modular component structure ready for expansion
+- Interactive Alaska map with Leaflet
+- Community markers color-coded by data completeness
+- Detailed community information panel
+- Data confidence indicators
+- Explicit handling of missing data
+- Loading states and error handling
 
-## Getting Started
+## Quick Start
 
-### Prerequisites
+```bash
+# Install dependencies
+npm install
+
+# Copy environment template (optional)
+cp .env.example .env
+
+# Start development server
+npm run dev
+```
+
+Open http://localhost:5173
+
+## Prerequisites
 
 - Node.js (version 16 or higher)
 - npm or yarn

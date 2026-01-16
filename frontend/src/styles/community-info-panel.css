@@ -139,6 +139,50 @@
   margin-bottom: 0.5rem;
 }
 
+/* Necessity Score Section */
+.necessity-section {
+  background: linear-gradient(135deg, rgba(46, 125, 50, 0.12) 0%, rgba(27, 94, 32, 0.08) 100%);
+  border: 2px solid rgba(46, 125, 50, 0.3);
+}
+
+.necessity-score-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  text-align: center;
+  border-left: 4px solid #2e7d32;
+  box-shadow: 0 4px 12px rgba(46, 125, 50, 0.15);
+}
+
+.necessity-score-value {
+  font-size: 3rem;
+  font-weight: 800;
+  color: #2e7d32;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
+.necessity-score-label {
+  font-size: 0.875rem;
+  color: #6c757d;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.5rem;
+}
+
+.necessity-priority {
+  font-size: 1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  background: rgba(46, 125, 50, 0.1);
+  display: inline-block;
+}
+
 .section-title {
   margin: 0 0 0.75rem 0;
   font-size: 1rem;
@@ -148,6 +192,18 @@
   display: flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+/* Section header with confidence badge */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.section-header .section-title {
+  margin-bottom: 0;
 }
 
 .section-content {
@@ -424,6 +480,43 @@
   .panel-title {
     font-size: 1.125rem;
   }
+}
+
+/* Loading state */
+.panel-content.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+}
+
+.loading-spinner {
+  color: #2d3748;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* Specific row styles */
+.info-row.community-id {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+}
+
+.info-row.data-source {
+  font-size: 0.85rem;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.info-row.last-updated {
+  font-size: 0.8rem;
+  color: #6c757d;
+}
+
+.info-row.notes {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
   
   .info-section {
     padding: 1rem;
