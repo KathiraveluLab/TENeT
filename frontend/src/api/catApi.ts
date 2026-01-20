@@ -7,6 +7,9 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api
 // Season type for user-selected seasonal scenario
 export type Season = 'summer' | 'winter' | 'year_round';
 
+// Filter modes for Gap Hunter layer
+export type PerformanceFilterType = 'combined' | 'affordability' | 'latency';
+
 export interface CATRegion {
     region_code: string;
     region_name: string;

@@ -426,6 +426,77 @@ def get_statistics():
 
 
 # =============================================================================
+# GeoJSON Boundaries API (Choropleth Layer)
+# =============================================================================
+
+# Path to Alaska boundaries GeoJSON
+BOUNDARIES_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), 
+    'data', 'raw', 'Alaska_Borough_and_Census_Area_Boundaries.geojson'
+)
+
+@cat_bp.route('/boundaries', methods=['GET'])
+def get_boundaries():
+    """
+    Serve Alaska Borough and Census Area boundary polygons.
+    
+    Returns GeoJSON FeatureCollection with properties:
+    - CommunityName: Borough/Census Area name
+    - EconomicRegion: Economic region grouping
+    - FIPS: Census FIPS code
+    - Census_Area: 'Y' if census area, null if borough
+    """
+    try:
+        if not os.path.exists(BOUNDARIES_FILE):
+            return jsonify({
+                'error': 'Boundaries file not found',
+                'path': BOUNDARIES_FILE
+            }), 404
+        
+        with open(BOUNDARIES_FILE, 'r') as f:
+            geojson = json.load(f)
+        
+        # Optionally simplify geometry for performance (client can request full detail)
+        simplify = request.args.get('simplify', 'false').lower() == 'true'
+        
+        return jsonify(geojson), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@cat_bp.route('/boundaries/summary', methods=['GET'])
+def get_boundaries_summary():
+    """
+    Get a summary of all regions without full geometry (for dropdowns, lists).
+    """
+    try:
+        if not os.path.exists(BOUNDARIES_FILE):
+            return jsonify({'error': 'Boundaries file not found'}), 404
+        
+        with open(BOUNDARIES_FILE, 'r') as f:
+            geojson = json.load(f)
+        
+        regions = []
+        for feature in geojson.get('features', []):
+            props = feature.get('properties', {})
+            regions.append({
+                'name': props.get('CommunityName'),
+                'fips': props.get('FIPS'),
+                'economic_region': props.get('EconomicRegion'),
+                'is_census_area': props.get('Census_Area') == 'Y'
+            })
+        
+        return jsonify({
+            'regions': regions,
+            'count': len(regions)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# =============================================================================
 # Feasibility Evaluation API (PR-3)
 # =============================================================================
 

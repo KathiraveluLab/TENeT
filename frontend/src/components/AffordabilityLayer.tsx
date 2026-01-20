@@ -168,39 +168,63 @@ export default function AffordabilityLayer({ visible, onDataLoad }: Affordabilit
  * Legend component for the affordability layer
  */
 export function AffordabilityLegend({ summary }: { summary?: AllTelehealthStatusResponse['summary'] }) {
+    const items = [
+        { color: '#22c55e', label: 'Telehealth Ready', sub: 'Affordable + Fast', count: summary?.telehealth_ready },
+        { color: '#f59e0b', label: 'Community Anchor', sub: 'Has nearby clinic', count: summary?.community_anchor },
+        { color: '#ef4444', label: 'Critical Gap', sub: 'No affordable access', count: summary?.critical_gap },
+        { color: '#6b7280', label: 'Data Unavailable', sub: 'Missing data', count: summary?.data_unavailable },
+    ];
+
     return (
         <div style={{
             position: 'absolute',
             bottom: '20px',
             left: '20px',
             backgroundColor: 'white',
-            padding: '12px',
-            borderRadius: '8px',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+            padding: '14px 16px',
+            borderRadius: '10px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             zIndex: 1000,
+            minWidth: '200px',
             fontSize: '12px'
         }}>
-            <div style={{ fontWeight: '600', marginBottom: '8px' }}>Telehealth Accessibility</div>
-
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
-                <div style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#22c55e', marginRight: '8px' }} />
-                <span>Telehealth Ready {summary && `(${summary.telehealth_ready})`}</span>
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '10px',
+                paddingBottom: '8px',
+                borderBottom: '1px solid #e5e7eb'
+            }}>
+                <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '13px' }}>
+                    Telehealth Accessibility
+                </div>
+                <span style={{ fontSize: '10px', color: '#64748b' }}>Safety Net</span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
-                <div style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#f59e0b', marginRight: '8px' }} />
-                <span>Community Anchor {summary && `(${summary.community_anchor})`}</span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '4px' }}>
-                <div style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#ef4444', marginRight: '8px' }} />
-                <span>Critical Gap {summary && `(${summary.critical_gap})`}</span>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-                <div style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#6b7280', marginRight: '8px' }} />
-                <span>Data Unavailable {summary && `(${summary.data_unavailable})`}</span>
-            </div>
+            {items.map(item => (
+                <div key={item.label} style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '8px', gap: '10px' }}>
+                    <div style={{
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '50%',
+                        backgroundColor: item.color,
+                        flexShrink: 0,
+                        marginTop: '3px',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
+                    }} />
+                    <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: '#1e293b', fontWeight: '500' }}>{item.label}</span>
+                            {item.count !== undefined && (
+                                <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '600' }}>{item.count}</span>
+                            )}
+                        </div>
+                        <div style={{ color: '#64748b', fontSize: '10px' }}>{item.sub}</div>
+                    </div>
+                </div>
+            ))}
         </div>
     );
 }
+
