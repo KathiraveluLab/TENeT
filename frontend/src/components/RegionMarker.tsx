@@ -482,14 +482,14 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
                                 <strong style={{ color: '#374151' }}>Broadband Coverage:</strong>
                                 {broadband ? (
                                     <div style={{ marginLeft: '8px', color: '#166534' }}>
-                                        <div>[OK] Speed coverage data (FCC)</div>
-                                        <div>[OK] Technology type ({broadband.primary_access})</div>
-                                        <div>[OK] Residential units ({broadband.residential_units?.toLocaleString() || 'N/A'})</div>
+                                        <div>✅ Speed coverage data (FCC)</div>
+                                        <div>✅ Technology type ({broadband.primary_access})</div>
+                                        <div>✅ Residential units ({broadband.residential_units?.toLocaleString() || 'N/A'})</div>
                                         {broadband.coverage.wired_25mbps_pct !== null && broadband.coverage.wired_25mbps_pct > 0 && (
                                             <div>✅ Wired coverage: {Math.round(broadband.coverage.wired_25mbps_pct * 100)}%</div>
                                         )}
                                         {(broadband.coverage.wired_25mbps_pct === null || broadband.coverage.wired_25mbps_pct === 0) && (
-                                            <div style={{ color: '#dc2626' }}>[MISSING] No wired infrastructure data</div>
+                                            <div style={{ color: '#dc2626' }}>❌ No wired infrastructure data</div>
                                         )}
                                     </div>
                                 ) : (
@@ -504,7 +504,7 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
                                 <strong style={{ color: '#374151' }}>Network Quality:</strong>
                                 <div style={{ marginLeft: '8px' }}>
                                     {priority?.connectivity_details?.latency_ms ? (
-                                        <div style={{ color: '#166534' }}>[OK] Latency: {priority.connectivity_details.latency_ms}ms</div>
+                                        <div style={{ color: '#166534' }}>✅ Latency: {priority.connectivity_details.latency_ms}ms</div>
                                     ) : (
                                         <div style={{ color: '#dc2626' }}>❌ Latency data missing <em>(need RIPE Atlas)</em></div>
                                     )}
@@ -550,7 +550,7 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
                                 <strong style={{ color: '#374151' }}>Demographics:</strong>
                                 <div style={{ marginLeft: '8px' }}>
                                     {region.population ? (
-                                        <div style={{ color: '#166534' }}>[OK] Population: {region.population.toLocaleString()}</div>
+                                        <div style={{ color: '#166534' }}>✅ Population: {region.population.toLocaleString()}</div>
                                     ) : (
                                         <div style={{ color: '#dc2626' }}>❌ Population data missing <em>(need Census)</em></div>
                                     )}

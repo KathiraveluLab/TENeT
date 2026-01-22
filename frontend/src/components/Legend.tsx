@@ -5,6 +5,17 @@ interface LegendProps {
     totalRegions?: number;
 }
 
+// Helper for tier description
+const getTierCapability = (tier: number): string => {
+    switch (tier) {
+        case 1: return 'HD Video Ready';
+        case 2: return 'Video Capable';
+        case 3: return 'Audio Only';
+        case 4: return 'Async/Text Only';
+        default: return '';
+    }
+};
+
 /**
  * Map legend showing CAT tier color coding
  */
@@ -17,43 +28,59 @@ export default function Legend({ totalRegions }: LegendProps) {
             bottom: '80px',
             right: '10px',
             backgroundColor: 'white',
-            padding: '12px 16px',
-            borderRadius: '8px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            padding: '14px 16px',
+            borderRadius: '10px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             zIndex: 1000,
-            minWidth: '180px',
-            fontSize: '13px',
+            minWidth: '200px',
+            fontSize: '12px',
         }}>
-            <h4 style={{
-                margin: '0 0 10px 0',
-                color: '#1f2937',
-                fontSize: '14px',
-                fontWeight: '600'
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '10px',
+                paddingBottom: '8px',
+                borderBottom: '1px solid #e5e7eb'
             }}>
-                Community Access Tiers
-            </h4>
+                <h4 style={{
+                    margin: 0,
+                    color: '#0f172a',
+                    fontSize: '13px',
+                    fontWeight: '700'
+                }}>
+                    Community Access Tiers
+                </h4>
+                <span style={{ fontSize: '10px', color: '#64748b' }}>CAT-4</span>
+            </div>
 
             {tiers.map(tier => (
                 <div
                     key={tier}
                     style={{
                         display: 'flex',
-                        alignItems: 'center',
-                        marginBottom: '6px',
-                        gap: '8px'
+                        alignItems: 'flex-start',
+                        marginBottom: '8px',
+                        gap: '10px'
                     }}
                 >
                     <div style={{
-                        width: '14px',
-                        height: '14px',
+                        width: '12px',
+                        height: '12px',
                         borderRadius: '50%',
                         backgroundColor: getTierColor(tier),
-                        border: '2px solid white',
-                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                        flexShrink: 0,
+                        marginTop: '3px',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
                     }} />
-                    <span style={{ color: '#374151', fontSize: '12px' }}>
-                        <strong>Tier {tier}:</strong> {getTierLabel(tier)}
-                    </span>
+                    <div>
+                        <div style={{ color: '#1e293b', fontWeight: '500' }}>
+                            Tier {tier}: {getTierLabel(tier)}
+                        </div>
+                        <div style={{ color: '#64748b', fontSize: '10px' }}>
+                            {getTierCapability(tier)}
+                        </div>
+                    </div>
                 </div>
             ))}
 
@@ -62,12 +89,16 @@ export default function Legend({ totalRegions }: LegendProps) {
                     marginTop: '10px',
                     paddingTop: '8px',
                     borderTop: '1px solid #e5e7eb',
-                    fontSize: '11px',
-                    color: '#6b7280'
+                    fontSize: '10px',
+                    color: '#64748b',
+                    display: 'flex',
+                    justifyContent: 'space-between'
                 }}>
-                    Showing {totalRegions} communities
+                    <span>Communities</span>
+                    <strong style={{ color: '#334155' }}>{totalRegions}</strong>
                 </div>
             )}
         </div>
     );
 }
+
