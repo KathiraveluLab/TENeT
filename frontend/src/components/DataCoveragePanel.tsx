@@ -231,27 +231,33 @@ export default function DataCoveragePanel({ isExpanded = false, onToggle }: Data
     );
 }
 
-// Styles
+// Styles - Clean Glass (Flaw 3 fix)
 const panelStyle: React.CSSProperties = {
     position: 'absolute',
     bottom: '80px',
-    left: '10px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+    left: '20px',
     zIndex: 1000,
-    minWidth: '220px',
+    minWidth: '240px',
     maxWidth: '280px',
+    // Glassmorphism - consistent with other panels
+    background: 'rgba(255, 255, 255, 0.92)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    borderRadius: '12px',
+    border: '1px solid rgba(255, 255, 255, 0.3)',
+    boxShadow: '0 8px 32px rgba(31, 38, 135, 0.12)',
     fontSize: '13px',
     overflow: 'hidden'
 };
 
+// Clean header - no colored bar (Flaw 3 fix)
 const headerStyle: React.CSSProperties = {
-    padding: '10px 12px',
-    backgroundColor: '#1e40af',
-    color: 'white',
-    fontSize: '13px',
-    fontWeight: '600',
+    padding: '14px 16px',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+    fontSize: '14px',
+    fontWeight: '700',
+    letterSpacing: '-0.02em',
+    color: '#0f172a',  // Dark gray text, no background
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between'

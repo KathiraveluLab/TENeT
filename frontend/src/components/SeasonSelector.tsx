@@ -8,68 +8,45 @@ interface SeasonSelectorProps {
 }
 
 /**
- * Season selector toggle for TENeT.
- * User-selected season controls transport difficulty assumptions in API queries.
+ * Season selector dropdown for TENeT.
+ * Clean dropdown design for the top-right info panel.
  */
 export default function SeasonSelector({ season, onChange }: SeasonSelectorProps) {
-    const seasons: { id: Season; label: string }[] = [
-        { id: 'summer', label: 'Summer' },
-        { id: 'winter', label: 'Winter' },
-        { id: 'year_round', label: 'Year-Round' },
-    ];
+    const getLabel = (s: Season): string => {
+        switch (s) {
+            case 'summer': return 'Summer';
+            case 'winter': return 'Winter';
+            case 'year_round': return 'Year-Round Average';
+        }
+    };
 
     return (
-        <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 16px',
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            borderRadius: '8px',
-        }}>
-            <span style={{
-                fontSize: '13px',
+        <select
+            value={season}
+            onChange={(e) => onChange(e.target.value as Season)}
+            style={{
+                padding: '8px 12px',
+                fontSize: '12px',
                 fontWeight: '500',
-                color: 'rgba(255, 255, 255, 0.8)',
-                marginRight: '4px',
-            }}>
-                Season Scenario:
-            </span>
-
-            {seasons.map(({ id, label }) => (
-                <button
-                    key={id}
-                    onClick={() => onChange(id)}
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        padding: '6px 14px',
-                        fontSize: '13px',
-                        fontWeight: season === id ? '600' : '400',
-                        color: season === id ? '#1e40af' : 'white',
-                        backgroundColor: season === id ? 'white' : 'transparent',
-                        border: season === id ? 'none' : '1px solid rgba(255, 255, 255, 0.3)',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                    }}
-                    onMouseOver={(e) => {
-                        if (season !== id) {
-                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
-                        }
-                    }}
-                    onMouseOut={(e) => {
-                        if (season !== id) {
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                        }
-                    }}
-                    aria-pressed={season === id}
-                    title={`Set season scenario to ${label}`}
-                >
-                    {label}
-                </button>
-            ))}
-        </div>
+                color: '#475569',
+                backgroundColor: 'white',
+                border: '1px solid rgba(0, 0, 0, 0.1)',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                outline: 'none',
+                appearance: 'none',
+                WebkitAppearance: 'none',
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23475569' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 10px center',
+                paddingRight: '32px',
+                minWidth: '140px'
+            }}
+            title="Select season scenario"
+        >
+            <option value="summer">Summer</option>
+            <option value="winter">Winter</option>
+            <option value="year_round">Year-Round Average</option>
+        </select>
     );
 }

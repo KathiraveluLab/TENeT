@@ -33,24 +33,25 @@ interface RegionMarkerProps {
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api/cat';
 
 /**
- * Create a custom circle marker icon with dynamic color
+ * Create a custom circle marker icon with dynamic color - "Gemstone" style
  */
 function createMarkerIcon(color: string): L.DivIcon {
     return L.divIcon({
         className: 'custom-marker',
         html: `
             <div style="
-                width: 12px;
-                height: 12px;
+                width: 10px;
+                height: 10px;
                 background-color: ${color};
-                border: 2px solid white;
+                opacity: 0.8;
+                border: 1.5px solid rgba(255, 255, 255, 0.9);
                 border-radius: 50%;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                box-shadow: 0 1px 3px rgba(0,0,0,0.2);
             "></div>
         `,
-        iconSize: [12, 12],
-        iconAnchor: [6, 6],
-        popupAnchor: [0, -6],
+        iconSize: [10, 10],
+        iconAnchor: [5, 5],
+        popupAnchor: [0, -5],
     });
 }
 

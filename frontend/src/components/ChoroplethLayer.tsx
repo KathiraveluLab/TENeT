@@ -97,13 +97,13 @@ const getTrafficLightStatus = (
     return 'GRAY';
 };
 
-// Status colors
+// Status colors - Vibrant palette (Flaw 4 fix)
 const STATUS_COLORS: Record<string, string> = {
-    GREEN: '#22c55e',
-    YELLOW: '#facc15',
-    ORANGE: '#f97316',
-    RED: '#ef4444',
-    GRAY: '#9ca3af'
+    GREEN: '#10b981',   // Emerald - crisp and sharp
+    YELLOW: '#f59e0b',  // Amber - pops against gray
+    ORANGE: '#f97316',  // Orange
+    RED: '#f43f5e',     // Rose - distinct from amber
+    GRAY: '#94a3b8'     // Slate gray
 };
 
 // Status labels and icons
@@ -220,7 +220,7 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
         return stats;
     }, [boundaries, tiles, affordabilityData, useStarlink]);
 
-    // Style function for GeoJSON
+    // Style function for GeoJSON - "Ghost" regions (Flaw 2 fix)
     const styleFeature = (feature: any) => {
         const name = feature.properties?.CommunityName;
         const stats = regionStats.get(name);
@@ -228,9 +228,9 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
 
         return {
             fillColor: color,
-            fillOpacity: 0.35,
-            color: '#374151',
-            weight: 1,
+            fillOpacity: 0.2,           // Ghost: whisper of color, not wall
+            color: 'rgba(255,255,255,0.6)', // Very thin white border
+            weight: 0.5,                // Almost invisible border
             opacity: 0.8
         };
     };
@@ -273,16 +273,18 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
             mouseover: (e) => {
                 const layer = e.target;
                 layer.setStyle({
-                    fillOpacity: 0.6,
-                    weight: 2
+                    fillOpacity: 0.35,  // Slightly more visible on hover
+                    weight: 1,
+                    color: '#ffffff'
                 });
                 layer.bringToFront();
             },
             mouseout: (e) => {
                 const layer = e.target;
                 layer.setStyle({
-                    fillOpacity: 0.35,
-                    weight: 1
+                    fillOpacity: 0.2,   // Back to ghost
+                    weight: 0.5,
+                    color: 'rgba(255,255,255,0.6)'
                 });
             }
         });
