@@ -53,12 +53,13 @@ export default function AffordabilityLayer({ visible, onDataLoad }: Affordabilit
                 <CircleMarker
                     key={region.region_code}
                     center={[region.lat, region.lon]}
-                    radius={8}
+                    radius={4}
                     pathOptions={{
                         fillColor: region.color,
-                        fillOpacity: 0.8,
-                        color: 'white',
-                        weight: 2
+                        fillOpacity: 0.65,    // Gemstone effect
+                        color: '#ffffff',
+                        weight: 1.5,          // Thicker stroke
+                        opacity: 0.9
                     }}
                 >
                     <Popup>
@@ -169,10 +170,10 @@ export default function AffordabilityLayer({ visible, onDataLoad }: Affordabilit
  */
 export function AffordabilityLegend({ summary }: { summary?: AllTelehealthStatusResponse['summary'] }) {
     const items = [
-        { color: '#22c55e', label: 'Telehealth Ready', sub: 'Affordable + Fast', count: summary?.telehealth_ready },
-        { color: '#f59e0b', label: 'Community Anchor', sub: 'Has nearby clinic', count: summary?.community_anchor },
-        { color: '#ef4444', label: 'Critical Gap', sub: 'No affordable access', count: summary?.critical_gap },
-        { color: '#6b7280', label: 'Data Unavailable', sub: 'Missing data', count: summary?.data_unavailable },
+        { color: '#10B981', label: 'Telehealth Ready', sub: 'Affordable + Fast', count: summary?.telehealth_ready },
+        { color: '#F59E0B', label: 'Community Anchor', sub: 'Has nearby clinic', count: summary?.community_anchor },
+        { color: '#EF4444', label: 'Critical Gap', sub: 'No affordable access', count: summary?.critical_gap },
+        { color: '#94A3B8', label: 'Data Unavailable', sub: 'Missing data', count: summary?.data_unavailable },
     ];
 
     return (
@@ -180,26 +181,30 @@ export function AffordabilityLegend({ summary }: { summary?: AllTelehealthStatus
             position: 'absolute',
             bottom: '20px',
             left: '20px',
-            backgroundColor: 'white',
-            padding: '14px 16px',
-            borderRadius: '10px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             zIndex: 1000,
-            minWidth: '200px',
+            minWidth: '220px',
+            // Glassmorphism
+            background: 'rgba(255, 255, 255, 0.92)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            padding: '16px 18px',
+            borderRadius: '12px',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            boxShadow: '0 8px 32px rgba(31, 38, 135, 0.12)',
             fontSize: '12px'
         }}>
             <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                marginBottom: '10px',
-                paddingBottom: '8px',
-                borderBottom: '1px solid #e5e7eb'
+                marginBottom: '12px',
+                paddingBottom: '10px',
+                borderBottom: '1px solid rgba(0, 0, 0, 0.08)'
             }}>
-                <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '13px' }}>
+                <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '14px', letterSpacing: '-0.02em' }}>
                     Telehealth Accessibility
                 </div>
-                <span style={{ fontSize: '10px', color: '#64748b' }}>Safety Net</span>
+                <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '500' }}>Safety Net</span>
             </div>
 
             {items.map(item => (

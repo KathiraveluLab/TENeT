@@ -26,32 +26,37 @@ export default function Legend({ totalRegions }: LegendProps) {
         <div style={{
             position: 'absolute',
             bottom: '80px',
-            right: '10px',
-            backgroundColor: 'white',
-            padding: '14px 16px',
-            borderRadius: '10px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            right: '20px',
             zIndex: 1000,
-            minWidth: '200px',
+            minWidth: '220px',
+            // Glassmorphism
+            background: 'rgba(255, 255, 255, 0.92)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            padding: '16px 18px',
+            borderRadius: '12px',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            boxShadow: '0 8px 32px rgba(31, 38, 135, 0.12)',
             fontSize: '12px',
         }}>
             <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                marginBottom: '10px',
-                paddingBottom: '8px',
-                borderBottom: '1px solid #e5e7eb'
+                marginBottom: '12px',
+                paddingBottom: '10px',
+                borderBottom: '1px solid rgba(0, 0, 0, 0.08)'
             }}>
                 <h4 style={{
                     margin: 0,
                     color: '#0f172a',
-                    fontSize: '13px',
-                    fontWeight: '700'
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    letterSpacing: '-0.02em'
                 }}>
                     Community Access Tiers
                 </h4>
-                <span style={{ fontSize: '10px', color: '#64748b' }}>CAT-4</span>
+                <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '500' }}>CAT-4</span>
             </div>
 
             {tiers.map(tier => (

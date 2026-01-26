@@ -209,58 +209,79 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
 
             // --- FILTER LOGIC ---
             if (filterMode === 'affordability') {
-                // Check if this is a "rural tier" location with expensive infrastructure
-                const isRuralTier = scenarioCost >= 400; // $450/mo rural pricing
+                const isRuralTier = scenarioCost >= 400;
 
                 if (burdenPct === null) {
-                    // No income data - but if rural, assume expensive
-                    markerColor = isRuralTier ? '#f97316' : '#e5e7eb'; // Orange for rural unknown, Gray otherwise
+                    markerColor = isRuralTier ? '#f97316' : '#94a3b8';
+                    markerRadius = 4;
                 } else if (isRuralTier) {
-                    // RURAL AREAS: Floor at Yellow minimum (never Green)
-                    // Rationale: $450/mo is objectively expensive infrastructure
                     if (burdenPct >= 2) {
-                        markerColor = '#ef4444'; // Red - Unattainable
+                        markerColor = '#EF4444'; // Rose Red - Unattainable
+                        markerRadius = 5;        // Larger for problems
                     } else {
-                        markerColor = '#f97316'; // Orange - Expensive Infrastructure
+                        markerColor = '#f97316'; // Orange
+                        markerRadius = 4;
                     }
                 } else {
-                    // URBAN AREAS: Standard burden thresholds
                     if (burdenPct < 1) {
-                        markerColor = '#22c55e'; // Green - Affordable
+                        markerColor = '#10B981'; // Emerald - Affordable
+                        markerRadius = 3;        // Smaller for good
                     } else if (burdenPct < 2) {
-                        markerColor = '#facc15'; // Yellow - Burdened
+                        markerColor = '#F59E0B'; // Amber - Burdened
+                        markerRadius = 4;
                     } else {
-                        markerColor = '#ef4444'; // Red - Unattainable
+                        markerColor = '#EF4444'; // Rose - Unattainable
+                        markerRadius = 5;        // Larger for problems
                     }
                 }
-                markerRadius = isDetailView ? 6 : 4;
 
             } else if (filterMode === 'latency') {
                 const lat = tile.avg_lat_ms || 0;
-                if (lat < 50) markerColor = '#22c55e'; // Green
-                else if (lat < 150) markerColor = '#facc15'; // Yellow
-                else markerColor = '#ef4444'; // Red
-                markerRadius = isDetailView ? 6 : 4;
+                if (lat < 50) {
+                    markerColor = '#10B981'; // Emerald
+                    markerRadius = 3;        // Small for good
+                } else if (lat < 150) {
+                    markerColor = '#F59E0B'; // Amber
+                    markerRadius = 4;
+                } else {
+                    markerColor = '#EF4444'; // Rose
+                    markerRadius = 5;        // Large for problems
+                }
 
             } else {
-                // 'combined' - Traffic Light Logic (Master Logic)
+                // 'combined' - Traffic Light Logic
                 const status = getTrafficLightStatus(tile, burdenPct, scenarioCost);
                 switch (status) {
-                    case 'RED': markerColor = '#ef4444'; break;
-                    case 'ORANGE': markerColor = '#f97316'; break;
-                    case 'YELLOW': markerColor = '#facc15'; break;
-                    case 'GREEN': markerColor = '#22c55e'; break;
-                    default: markerColor = '#9ca3af';
+                    case 'RED':
+                        markerColor = '#EF4444';  // Rose
+                        markerRadius = 5;
+                        break;
+                    case 'ORANGE':
+                        markerColor = '#f97316';
+                        markerRadius = 4;
+                        break;
+                    case 'YELLOW':
+                        markerColor = '#F59E0B';  // Amber
+                        markerRadius = 4;
+                        break;
+                    case 'GREEN':
+                        markerColor = '#10B981';  // Emerald
+                        markerRadius = 3;
+                        break;
+                    default:
+                        markerColor = '#94a3b8';
+                        markerRadius = 4;
                 }
-                markerRadius = isDetailView ? 6 : 4;
             }
 
+            // Gemstone effect marker
             const marker = L.circleMarker([tile.lat, tile.lon], {
-                radius: markerRadius,
+                radius: markerRadius,       // Dynamic based on status
                 fillColor: markerColor,
-                fillOpacity: 0.7,
-                color: markerColor === '#22c55e' ? '#15803d' : '#000', // Green border for green, black otherwise
-                weight: 1,
+                fillOpacity: 0.65,          // KEY: Lower opacity for gemstone effect
+                color: '#ffffff',           // Pure white stroke
+                weight: 1.5,                // Thicker stroke for definition
+                opacity: 0.9,               // Almost solid border
                 renderer: canvasRenderer
             });
 
@@ -430,23 +451,29 @@ const LegendItem = ({ color, border, label, sub }: { color: string, border?: str
 
 const panelStyle: React.CSSProperties = {
     position: 'absolute',
-    top: '10px',
-    left: '10px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    boxShadow: '0 2px 12px rgba(0,0,0,0.2)',
+    top: '20px',
+    left: '20px',
     zIndex: 1000,
-    minWidth: '220px',
+    minWidth: '280px',
+    // Glassmorphism effect
+    background: 'rgba(255, 255, 255, 0.92)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    border: '1px solid rgba(255, 255, 255, 0.3)',
+    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.12)',
+    borderRadius: '12px',
     fontSize: '13px',
     overflow: 'hidden'
 };
 
+// Clean header - no dark bar (Flaw 3 fix)
 const headerStyle: React.CSSProperties = {
-    padding: '10px 12px',
-    backgroundColor: '#0f172a',
-    color: 'white',
-    fontSize: '14px',
+    padding: '14px 16px',
+    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+    fontSize: '15px',
     fontWeight: '700',
+    letterSpacing: '-0.02em',
+    color: '#0f172a',  // Dark text on white, no background
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
