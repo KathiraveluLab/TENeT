@@ -10,7 +10,6 @@ Extends the existing equity endpoints with:
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
 
 from app.database import get_db, Community
 from core.simulation import simulate_all
