@@ -8,7 +8,6 @@ and state-level summary.
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
 
 from app.database import get_db, Community
 from app.digital_equity_integration import compute_digital_equity_for_community, convert_to_pydantic
