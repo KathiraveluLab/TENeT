@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api", tags=["search"])
 
 @router.get("/communities/search/autocomplete")
 async def autocomplete(
-    q: str = Query("", min_length=1, description="Search term"),
+    q: str = Query("", description="Search term"),
     limit: int = Query(10, le=50, description="Max results"),
     db: Session = Depends(get_db),
 ):
