@@ -49,11 +49,14 @@ class ConnectivityData(BaseModel):
 
 class AccessData(BaseModel):
     """Transportation and access information for a community"""
-    transport_modes: List[str] = Field(default_factory=list, description="Available transportation methods")
+    notes: Optional[str] = Field(None, description="General access information (e.g., 'Air-only access')")
+    seasonal: Optional[bool] = Field(None, description="Whether access is seasonal")
+    confidence: ConfidenceLevel = Field(..., description="Confidence in data quality")
+    transportation_types: List[str] = Field(default_factory=list, description="Available transportation methods")
+    # Extended fields (added in v0.3.0, all optional to stay backward-compatible)
+    transport_modes: List[str] = Field(default_factory=list, description="Available transport modes (alias)")
     primary_access: Optional[str] = Field(None, description="Primary access method (e.g., 'air', 'road')")
     seasonal_restrictions: bool = Field(False, description="Whether access has seasonal restrictions")
-    confidence: ConfidenceLevel = Field(..., description="Confidence in data quality")
-    notes: Optional[str] = Field(None, description="Additional access information")
 
 
 class DigitalEquityData(BaseModel):

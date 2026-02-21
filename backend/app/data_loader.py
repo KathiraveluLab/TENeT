@@ -295,12 +295,16 @@ def load_enhanced_communities(db: Session) -> List[Community]:
         if data["road"]:
             access_modes.append("road")
         
+        is_seasonal = data["tier"] == 3
+        access_notes = "Ice roads in winter" if is_seasonal and data["harbor"] else ""
         access_data = {
             "transport_modes": access_modes,
+            "transportation_types": access_modes,
             "primary_access": "air" if not data["road"] else "road",
-            "seasonal_restrictions": data["tier"] == 3,
+            "seasonal": is_seasonal,
+            "seasonal_restrictions": is_seasonal,
             "confidence": "high",
-            "notes": "Ice roads in winter" if data["tier"] == 3 and data["harbor"] else ""
+            "notes": access_notes
         }
         
         # Calculate data completeness
@@ -382,11 +386,13 @@ def sync_to_pydantic(db_community: Community) -> CommunityRecord:
             last_updated=connectivity_dict.get("last_updated")
         ),
         access=AccessData(
-            transport_modes=access_dict.get("transport_modes", []),
+            notes=access_dict.get("notes"),
+            seasonal=access_dict.get("seasonal"),
+            confidence=ConfidenceLevel(access_dict.get("confidence", "missing")),
+            transportation_types=access_dict.get("transportation_types", access_dict.get("transport_modes", [])),
+            transport_modes=access_dict.get("transport_modes", access_dict.get("transportation_types", [])),
             primary_access=access_dict.get("primary_access"),
             seasonal_restrictions=access_dict.get("seasonal_restrictions", False),
-            confidence=ConfidenceLevel(access_dict.get("confidence", "missing")),
-            notes=access_dict.get("notes")
         ),
         digital_equity=digital_equity,
         data_completeness=db_community.data_completeness or 0.0
