@@ -7,6 +7,7 @@ the completeness of the underlying datasets.
 
 from datetime import datetime, timezone
 from typing import Dict, Any
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.database import Community, HealthcareFacility, BroadbandCoverage
@@ -25,30 +26,30 @@ def compute_coverage(db: Session) -> Dict[str, Any]:
       - total_broadband_records
       - data_timestamps
     """
-    communities = db.query(Community).all()
-    total = len(communities)
+    # ── Single aggregation query instead of loading every row ──
+    row = (
+        db.query(
+            func.count(Community.id).label("total"),
+            func.sum(case((Community.access_tier.isnot(None), 1), else_=0)).label("has_income"),
+            func.sum(
+                case(
+                    (func.json_extract(Community.connectivity_data, "$.download_mbps").isnot(None), 1),
+                    else_=0,
+                )
+            ).label("has_broadband"),
+            func.sum(
+                case(
+                    (func.json_extract(Community.digital_equity_data, "$.nearest_facility_km").isnot(None), 1),
+                    else_=0,
+                )
+            ).label("has_clinic_proximity"),
+        )
+        .one()
+    )
 
+    total = row.total or 0
     if total == 0:
         return _empty_coverage()
-
-    has_income = 0
-    has_broadband = 0
-    has_clinic_proximity = 0
-
-    for c in communities:
-        # Income availability: if access_tier is set we derive income
-        if c.access_tier is not None:
-            has_income += 1
-
-        # Broadband data: stored in connectivity_data JSON
-        conn = c.connectivity_data or {}
-        if conn.get("download_mbps") is not None:
-            has_broadband += 1
-
-        # Clinic proximity: digital_equity_data has nearest_facility_km
-        eq = c.digital_equity_data or {}
-        if eq.get("nearest_facility_km") is not None:
-            has_clinic_proximity += 1
 
     facility_count = db.query(HealthcareFacility).count()
     broadband_count = db.query(BroadbandCoverage).count()
@@ -62,9 +63,9 @@ def compute_coverage(db: Session) -> Dict[str, Any]:
 
     return {
         "total_communities": total,
-        "pct_with_income_data": _pct(has_income, total),
-        "pct_with_broadband_data": _pct(has_broadband, total),
-        "pct_with_clinic_proximity": _pct(has_clinic_proximity, total),
+        "pct_with_income_data": _pct(row.has_income or 0, total),
+        "pct_with_broadband_data": _pct(row.has_broadband or 0, total),
+        "pct_with_clinic_proximity": _pct(row.has_clinic_proximity or 0, total),
         "total_facilities": facility_count,
         "total_broadband_records": broadband_count,
         "data_timestamps": {
