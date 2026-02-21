@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
 from app.database import get_db, Community
-from app.digital_equity_integration import compute_digital_equity_for_community
+from app.digital_equity_integration import compute_digital_equity_for_community, convert_to_pydantic
 from services.pdf_service import render_community_report_html, render_state_summary_html, html_to_pdf
 
 router = APIRouter(prefix="/api", tags=["export"])
@@ -33,21 +33,15 @@ async def community_report(
     if not community:
         raise HTTPException(status_code=404, detail=f"Community '{community_id}' not found")
 
-    # Ensure equity data is fresh
+    # Ensure equity data is available — compute and persist if missing
     equity = community.digital_equity_data
     if not equity:
         metrics = compute_digital_equity_for_community(community, db)
         if metrics:
-            equity = {
-                "affordability_status": metrics.affordability_status.value,
-                "affordability_ratio": metrics.affordability_ratio,
-                "value_index": metrics.value_index,
-                "equity_classification": metrics.equity_classification.value,
-                "classification_reason": metrics.classification_reason,
-                "nearest_facility_km": metrics.nearest_facility_km,
-                "has_community_anchor": metrics.has_community_anchor,
-                "facility_count_5km": metrics.facility_count_5km,
-            }
+            equity_data = convert_to_pydantic(metrics)
+            community.digital_equity_data = equity_data.dict()
+            db.commit()
+            equity = community.digital_equity_data
 
     html = render_community_report_html(community, equity)
 
