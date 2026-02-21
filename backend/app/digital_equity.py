@@ -47,7 +47,7 @@ class DigitalEquityMetrics(BaseModel):
     affordability_status: AffordabilityStatus
     affordability_ratio: Optional[float] = Field(
         None, 
-        description="Monthly cost as percentage of monthly income (e.g., 0.025 = 2.5%)"
+        description="Monthly cost as percentage of monthly income (e.g., 2.5 for 2.5%)"
     )
     monthly_income: Optional[float] = Field(None, description="Median monthly household income (USD)")
     estimated_monthly_cost: Optional[float] = Field(None, description="Estimated monthly broadband cost (USD)")
