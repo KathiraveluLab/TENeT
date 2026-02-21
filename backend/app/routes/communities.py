@@ -225,7 +225,7 @@ async def get_digital_equity(
                 detail="Unable to compute digital equity metrics - insufficient data"
             )
         equity_data = equity_to_pydantic(metrics)
-        community.digital_equity_data = equity_data.dict()
+        community.digital_equity_data = equity_data.model_dump()
         db.commit()
         return equity_data
     
