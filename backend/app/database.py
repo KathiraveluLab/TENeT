@@ -88,9 +88,9 @@ class HealthcareFacility(Base):
     name = Column(String(255), nullable=False)
     facility_type = Column(String(100), nullable=False)  # hospital, clinic, pharmacy
     
-    # Location
-    latitude = Column(Float, nullable=False)
-    longitude = Column(Float, nullable=False)
+    # Location (indexed for bounding-box spatial queries)
+    latitude = Column(Float, nullable=False, index=True)
+    longitude = Column(Float, nullable=False, index=True)
     
     # Associated community (if applicable)
     community_id = Column(String(50), nullable=True, index=True)

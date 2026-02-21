@@ -6,6 +6,7 @@ Handles data retrieval, analysis computation, and storage.
 """
 
 from typing import List, Tuple, Optional
+from math import radians, cos
 from sqlalchemy.orm import Session
 from datetime import datetime
 
@@ -119,11 +120,32 @@ def get_nearby_facilities(
     Returns:
         List of (latitude, longitude) tuples for facilities
     """
-    # Query all facilities
-    # In production, would use spatial query with PostGIS
-    facilities = db.query(HealthcareFacility).all()
-    
-    # Return as coordinate tuples
+    if community.latitude is None or community.longitude is None:
+        return []
+
+    # Bounding-box pre-filter so we don't load every facility row.
+    # 1° latitude ≈ 111 km; 1° longitude ≈ 111 km * cos(lat)
+    km_per_deg_lat = 111.0
+    km_per_deg_lon = max(111.0 * cos(radians(community.latitude)), 1.0)
+
+    delta_lat = radius_km / km_per_deg_lat
+    delta_lon = radius_km / km_per_deg_lon
+
+    facilities = (
+        db.query(HealthcareFacility)
+        .filter(
+            HealthcareFacility.latitude.between(
+                community.latitude - delta_lat,
+                community.latitude + delta_lat,
+            ),
+            HealthcareFacility.longitude.between(
+                community.longitude - delta_lon,
+                community.longitude + delta_lon,
+            ),
+        )
+        .all()
+    )
+
     return [(f.latitude, f.longitude) for f in facilities]
 
 
