@@ -17,6 +17,7 @@ import React, { useState } from 'react'
 import InfoRow from './InfoRow'
 import ConfidenceBadge from './ConfidenceBadge'
 import CompletenessIndicator from './CompletenessIndicator'
+import ReportButton from './ReportButton'
 import { fetchNecessityScore } from '../services/api'
 import '../styles/community-info-panel.css'
 
@@ -89,6 +90,9 @@ const CommunityInfoPanel = ({ community, isOpen, onClose, isLoading = false, sea
         >
           ×
         </button>
+        {community && (
+          <ReportButton communityId={community.community_id} communityName={community.name} />
+        )}
       </div>
 
       {isLoading ? (

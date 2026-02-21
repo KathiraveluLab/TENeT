@@ -1,44 +1,140 @@
-/* Base styles and CSS reset */
+/* ===== TENeT Design System — Base Styles ===== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
 :root {
-  --primary-color: #2E7D32;
-  --primary-light: #4CAF50;
-  --primary-dark: #1B5E20;
-  --secondary-color: #1976D2;
-  --background-color: #FAFAFA;
-  --surface-color: #FFFFFF;
-  --text-primary: #212121;
-  --text-secondary: #757575;
-  --border-color: #E0E0E0;
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  --border-radius: 8px;
-  --transition: all 0.3s ease;
-  
-  /* Modern UI Variables */
-  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  --gradient-surface: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
-  --shadow-modern: 0 8px 32px rgba(0, 0, 0, 0.12);
-  --shadow-elevated: 0 12px 48px rgba(0, 0, 0, 0.15);
-  --radius-modern: 16px;
-  --radius-large: 20px;
-  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  --backdrop-blur: blur(20px);
+  /* Core palette — refined, modern, research-grade */
+  --color-green:    #34D399;
+  --color-green-soft: rgba(52,211,153,0.10);
+  --color-yellow:   #FBBF24;
+  --color-yellow-soft: rgba(251,191,36,0.10);
+  --color-red:      #F87171;
+  --color-red-soft: rgba(248,113,113,0.10);
+  --color-blue:     #60A5FA;
+
+  /* Neutral scale — slightly cool-toned */
+  --color-gray-50:  #F9FAFB;
+  --color-gray-100: #F3F4F6;
+  --color-gray-200: #E5E7EB;
+  --color-gray-300: #D1D5DB;
+  --color-gray-400: #9CA3AF;
+  --color-gray-500: #6B7280;
+  --color-gray-600: #4B5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1F2937;
+  --color-gray-900: #111827;
+
+  /* Semantic */
+  --bg:             #F0F2F5;
+  --surface:        #FFFFFF;
+  --text-primary:   #111827;
+  --text-secondary: #6B7280;
+  --text-tertiary:  #9CA3AF;
+  --text-muted:     #D1D5DB;
+  --border:         #E5E7EB;
+  --border-light:   #F3F4F6;
+  --accent:         #6366F1;
+  --accent-hover:   #4F46E5;
+  --accent-light:   rgba(99,102,241,0.08);
+  --accent-soft:    rgba(99,102,241,0.15);
+
+  /* Elevation — layered depth */
+  --shadow-xs:   0 1px 2px rgba(0,0,0,0.03);
+  --shadow-sm:   0 1px 3px rgba(0,0,0,0.05), 0 1px 2px -1px rgba(0,0,0,0.05);
+  --shadow-md:   0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+  --shadow-lg:   0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.05);
+  --shadow-xl:   0 20px 25px -5px rgba(0,0,0,0.08), 0 8px 10px -6px rgba(0,0,0,0.04);
+  --shadow-glow: 0 0 20px rgba(99,102,241,0.15);
+  --shadow-ring: 0 0 0 3px var(--accent-light);
+
+  /* Glass — frosted depth panels */
+  --glass-bg:       rgba(255,255,255,0.78);
+  --glass-bg-heavy: rgba(255,255,255,0.92);
+  --glass-border:   rgba(255,255,255,0.45);
+  --glass-blur:     blur(16px) saturate(180%);
+
+  /* Radii */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Spacing scale */
+  --sp-0: 0px;
+  --sp-px: 1px;
+  --sp-0\.5: 2px;
+  --sp-1: 4px;
+  --sp-1\.5: 6px;
+  --sp-2: 8px;
+  --sp-2\.5: 10px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* Typography */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+
+  --text-2xs: 0.625rem;  /* 10px */
+  --text-xs:  0.6875rem; /* 11px */
+  --text-sm:  0.75rem;   /* 12px */
+  --text-base: 0.8125rem;/* 13px */
+  --text-md:  0.875rem;  /* 14px */
+  --text-lg:  1rem;      /* 16px */
+  --text-xl:  1.25rem;   /* 20px */
+  --text-2xl: 1.5rem;    /* 24px */
+
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* Motion */
+  --ease:       cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out:   cubic-bezier(0, 0, 0.2, 1);
+  --ease-in:    cubic-bezier(0.4, 0, 1, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 150ms;
+  --duration:      200ms;
+  --duration-slow: 350ms;
+  --transition: var(--duration) var(--ease);
+  --transition-slow: var(--duration-slow) var(--ease);
+
+  /* Legacy compat aliases */
+  --primary-color: var(--color-green);
+  --primary-light: #6EE7B7;
+  --primary-dark: #059669;
+  --secondary-color: var(--accent);
+  --background-color: var(--bg);
+  --surface-color: var(--surface);
+  --border-color: var(--border);
+  --shadow: var(--shadow-sm);
+  --border-radius: var(--radius-md);
+  --transition-smooth: all var(--transition);
 }
 
-* {
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+html { text-size-adjust: 100%; }
+
 body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--background-color);
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  background: var(--bg);
   color: var(--text-primary);
   width: 100vw;
   height: 100vh;
@@ -50,26 +146,50 @@ body {
   height: 100vh;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
-}
-
-/* Accessibility */
-*:focus {
-  outline: 2px solid var(--secondary-color);
+/* Focus ring */
+*:focus-visible {
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
+  border-radius: var(--radius-xs);
 }
 
-/* Responsive design utilities */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Screen reader only */
 .sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+/* Base scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-gray-300);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--color-gray-400); }
+
+/* Utility keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulse-ring {
+  0%   { transform: scale(0.9); opacity: 0.6; }
+  70%  { transform: scale(1.5); opacity: 0; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+@keyframes subtle-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-2px); }
 }

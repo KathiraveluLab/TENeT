@@ -64,6 +64,9 @@ class Community(Base):
     # Access/transport data (stored as JSON)
     access_data = Column(JSON, nullable=True)
     
+    # Digital equity analysis (stored as JSON)
+    digital_equity_data = Column(JSON, nullable=True)
+    
     # Data quality metrics
     data_completeness = Column(Float, nullable=True)  # 0.0 to 1.0
     

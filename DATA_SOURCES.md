@@ -213,10 +213,40 @@ TENeT calculates a **Healthcare Necessity Score (0-100)** for each community:
 For questions about data sources or methodology:
 - GitHub Issues: [Your Repository]
 - Email: [Your Contact]
-- Documentation: See ARCHITECTURE.md for technical details
+- Documentation: See ARCHITECTURE.md and METHODOLOGY.md for technical details
 
 ---
 
-**Last Updated:** January 11, 2026  
-**Data Version:** 0.2.0 (Enhanced Prototype)  
-**Next Review:** Q2 2026
+## 📐 Digital Equity Layer — Additional Sources
+
+### Income Data (Affordability Analysis)
+
+**Source:** American Community Survey (ACS) 5-Year Estimates  
+**URL:** https://data.census.gov  
+**License:** Public Domain
+
+For the prototype, median household income is derived from access tier proxies (see METHODOLOGY.md). Production integration would use ACS Table B19013 by ZCTA.
+
+### Broadband Pricing (Affordability Gate)
+
+**Metric:** Estimated monthly broadband cost (USD)  
+**Standard:** UN Broadband Commission 2% affordability threshold  
+**Current approach:** Tier-based cost estimates ($80–$450/mo)  
+**Production path:** FCC provider pricing data, ISP plan databases
+
+### Community Safety Net (Clinic Proximity)
+
+**Metric:** Healthcare facility distance within 5 km radius  
+**Source:** OpenStreetMap + Healthsites (see above)  
+**Limitation:** Does not yet include IHS/Tribal facilities or mobile clinics
+
+### Value Index
+
+**Formula:** Monthly Cost ÷ Download Mbps  
+**Purpose:** Exposes per-Mbps pricing inequity across urban/rural divide
+
+---
+
+**Last Updated:** February 21, 2026  
+**Data Version:** 0.3.0 (Digital Equity Release)  
+**Next Review:** Q3 2026

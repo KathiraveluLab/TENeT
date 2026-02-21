@@ -10,12 +10,18 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from app.models import (
-    CommunityRecord, CommunityListItem, HealthcareData, ConnectivityData, Location
+    CommunityRecord, CommunityListItem, HealthcareData, ConnectivityData, Location, DigitalEquityData
 )
 from app.database import get_db, Community
 from app.data_loader import sync_to_pydantic
 from app.healthcare_analyzer import analyze_community_healthcare
 from app.season_utils import Season, parse_season
+from app.digital_equity_integration import (
+    compute_digital_equity_for_community,
+    convert_to_pydantic as equity_to_pydantic,
+    update_community_equity_data,
+    batch_update_equity_data
+)
 
 
 router = APIRouter(prefix="/api", tags=["communities"])
@@ -181,3 +187,142 @@ async def get_healthcare_necessity(
         raise HTTPException(status_code=404, detail=analysis["error"])
     
     return analysis
+
+
+@router.get("/communities/{community_id}/digital-equity", response_model=DigitalEquityData)
+async def get_digital_equity(
+    community_id: str,
+    refresh: bool = Query(False, description="Force refresh of equity analysis"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get digital equity analysis for a specific community.
+    
+    Returns comprehensive analysis of real-world telehealth access including:
+    - Affordability status (based on 2% income threshold)
+    - Continuity of care (community healthcare anchors within 5km)
+    - Value index (cost per Mbps - pricing equity)
+    - Overall equity classification (ready/supported/excluded)
+    
+    Query parameters:
+    - refresh: Force recalculation of equity metrics (default: false)
+    """
+    community = db.query(Community).filter(Community.community_id == community_id).first()
+    
+    if not community:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Community with ID '{community_id}' not found"
+        )
+    
+    # Check if we need to compute or refresh
+    if refresh or not community.digital_equity_data:
+        metrics = compute_digital_equity_for_community(community, db)
+        if not metrics:
+            raise HTTPException(
+                status_code=500,
+                detail="Unable to compute digital equity metrics - insufficient data"
+            )
+        equity_data = equity_to_pydantic(metrics)
+        community.digital_equity_data = equity_data.dict()
+        db.commit()
+        return equity_data
+    
+    # Return existing data
+    return sync_to_pydantic(community).digital_equity
+
+
+@router.get("/digital-equity/summary")
+async def get_digital_equity_summary(db: Session = Depends(get_db)):
+    """
+    Get summary statistics for digital equity across all communities.
+    
+    Returns aggregate counts by equity classification:
+    - ready: Affordable home internet
+    - supported: Unaffordable but community anchor available
+    - excluded: Critical exclusion (no affordable access, no facility)
+    - insufficient_data: Cannot determine
+    """
+    communities = db.query(Community).all()
+    
+    summary = {
+        "ready": 0,
+        "supported": 0,
+        "excluded": 0,
+        "insufficient_data": 0,
+        "total": len(communities)
+    }
+    
+    affordability_stats = {
+        "affordable_count": 0,
+        "unaffordable_count": 0,
+        "avg_affordability_ratio": None,
+        "avg_value_index": None
+    }
+    
+    ratios = []
+    value_indices = []
+    
+    for community in communities:
+        if community.digital_equity_data:
+            equity_data = community.digital_equity_data
+            classification = equity_data.get("equity_classification", "insufficient_data")
+            summary[classification] = summary.get(classification, 0) + 1
+            
+            if equity_data.get("affordability_ratio"):
+                ratios.append(equity_data["affordability_ratio"])
+            
+            if equity_data.get("value_index"):
+                value_indices.append(equity_data["value_index"])
+            
+            if equity_data.get("affordability_status") == "affordable":
+                affordability_stats["affordable_count"] += 1
+            elif equity_data.get("affordability_status") == "unaffordable":
+                affordability_stats["unaffordable_count"] += 1
+    
+    if ratios:
+        affordability_stats["avg_affordability_ratio"] = round(sum(ratios) / len(ratios), 2)
+    
+    if value_indices:
+        affordability_stats["avg_value_index"] = round(sum(value_indices) / len(value_indices), 2)
+    
+    return {
+        "classification_summary": summary,
+        "affordability_stats": affordability_stats,
+        "methodology": {
+            "affordability_threshold": "2% of monthly income (UN Broadband Commission standard)",
+            "community_anchor_radius": "5 km",
+            "classification": {
+                "ready": "Affordable home internet (green)",
+                "supported": "Unaffordable but healthcare facility nearby (yellow)",
+                "excluded": "Unaffordable with no nearby facility (red)",
+                "insufficient_data": "Cannot determine (gray)"
+            }
+        }
+    }
+
+
+@router.post("/digital-equity/batch-update")
+async def batch_update_digital_equity(
+    limit: Optional[int] = Query(None, description="Limit number of communities to update"),
+    db: Session = Depends(get_db)
+):
+    """
+    Batch update digital equity data for all communities.
+    
+    This endpoint computes and stores equity metrics for multiple communities.
+    Use this to populate the digital equity layer after initial data load.
+    
+    Query parameters:
+    - limit: Optional limit on number of communities to process
+    
+    Returns count of successfully updated communities.
+    """
+    updated_count = batch_update_equity_data(db, limit)
+    
+    return {
+        "status": "success",
+        "updated_count": updated_count,
+        "message": f"Digital equity data updated for {updated_count} communities"
+    }
+
