@@ -7,6 +7,7 @@ Enhanced with season-aware analysis and healthcare necessity scoring.
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -243,48 +244,64 @@ async def get_digital_equity_summary(db: Session = Depends(get_db)):
     - excluded: Critical exclusion (no affordable access, no facility)
     - insufficient_data: Cannot determine
     """
-    communities = db.query(Community).all()
-    
+    # ── Aggregate in the database instead of loading every row ──
+    total = db.query(func.count(Community.id)).scalar()
+
+    # json_extract works on SQLite 3.9+ (standard on all modern installs)
+    classification_col = func.json_extract(
+        Community.digital_equity_data, "$.equity_classification"
+    )
+    classification_rows = (
+        db.query(classification_col.label("classification"), func.count().label("cnt"))
+        .filter(Community.digital_equity_data.isnot(None))
+        .group_by(classification_col)
+        .all()
+    )
+
     summary = {
         "ready": 0,
         "supported": 0,
         "excluded": 0,
         "insufficient_data": 0,
-        "total": len(communities)
+        "total": total,
     }
-    
+    for row in classification_rows:
+        key = row.classification or "insufficient_data"
+        if key in summary:
+            summary[key] = row.cnt
+
+    # Affordability aggregates in a single query
+    aff_col = func.json_extract(
+        Community.digital_equity_data, "$.affordability_status"
+    )
+    ratio_col = func.json_extract(
+        Community.digital_equity_data, "$.affordability_ratio"
+    )
+    value_col = func.json_extract(
+        Community.digital_equity_data, "$.value_index"
+    )
+
+    aff_row = (
+        db.query(
+            func.sum(case((aff_col == "affordable", 1), else_=0)).label("affordable_count"),
+            func.sum(case((aff_col == "unaffordable", 1), else_=0)).label("unaffordable_count"),
+            func.avg(case((ratio_col > 0, ratio_col), else_=None)).label("avg_ratio"),
+            func.avg(case((value_col > 0, value_col), else_=None)).label("avg_value"),
+        )
+        .filter(Community.digital_equity_data.isnot(None))
+        .one()
+    )
+
     affordability_stats = {
-        "affordable_count": 0,
-        "unaffordable_count": 0,
-        "avg_affordability_ratio": None,
-        "avg_value_index": None
+        "affordable_count": aff_row.affordable_count or 0,
+        "unaffordable_count": aff_row.unaffordable_count or 0,
+        "avg_affordability_ratio": (
+            round(aff_row.avg_ratio, 2) if aff_row.avg_ratio else None
+        ),
+        "avg_value_index": (
+            round(aff_row.avg_value, 2) if aff_row.avg_value else None
+        ),
     }
-    
-    ratios = []
-    value_indices = []
-    
-    for community in communities:
-        if community.digital_equity_data:
-            equity_data = community.digital_equity_data
-            classification = equity_data.get("equity_classification", "insufficient_data")
-            summary[classification] = summary.get(classification, 0) + 1
-            
-            if equity_data.get("affordability_ratio"):
-                ratios.append(equity_data["affordability_ratio"])
-            
-            if equity_data.get("value_index"):
-                value_indices.append(equity_data["value_index"])
-            
-            if equity_data.get("affordability_status") == "affordable":
-                affordability_stats["affordable_count"] += 1
-            elif equity_data.get("affordability_status") == "unaffordable":
-                affordability_stats["unaffordable_count"] += 1
-    
-    if ratios:
-        affordability_stats["avg_affordability_ratio"] = round(sum(ratios) / len(ratios), 2)
-    
-    if value_indices:
-        affordability_stats["avg_value_index"] = round(sum(value_indices) / len(value_indices), 2)
     
     return {
         "classification_summary": summary,
