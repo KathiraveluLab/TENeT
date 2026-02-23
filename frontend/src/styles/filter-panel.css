@@ -1,0 +1,99 @@
+/* ===== Filter Panel — Inside Drawer ===== */
+
+.filter-panel {
+  position: relative;
+  background: transparent;
+  border-radius: 0;
+  border: none;
+}
+
+.filter-panel.collapsed { min-width: auto; }
+
+.filter-panel-toggle { display: none; }
+
+.filter-badge {
+  background: var(--accent);
+  color: white;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  min-width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: var(--sp-1);
+  padding: 0 4px;
+  font-weight: 700;
+}
+
+.filter-panel-body {
+  padding: 0;
+  border-top: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-family: var(--font-sans);
+  border-radius: var(--radius-md);
+  transition: all var(--transition);
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.filter-option:hover {
+  background: var(--color-gray-50);
+}
+
+.filter-option.active {
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.filter-option input[type='checkbox'] {
+  margin: 0;
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.filter-icon {
+  font-size: 15px;
+}
+
+.filter-clear {
+  display: block;
+  width: 100%;
+  margin-top: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  font-family: var(--font-sans);
+  background: var(--color-gray-50);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all var(--transition);
+}
+
+.filter-clear:hover {
+  background: var(--color-red-soft);
+  border-color: var(--color-red);
+  color: var(--color-red);
+}
+
+.filter-clear:hover {
+  background: var(--color-gray-100);
+  color: var(--text-primary);
+}

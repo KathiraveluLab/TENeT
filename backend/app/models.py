@@ -53,6 +53,42 @@ class AccessData(BaseModel):
     seasonal: Optional[bool] = Field(None, description="Whether access is seasonal")
     confidence: ConfidenceLevel = Field(..., description="Confidence in data quality")
     transportation_types: List[str] = Field(default_factory=list, description="Available transportation methods")
+    # Extended fields (added in v0.3.0, all optional to stay backward-compatible)
+    transport_modes: List[str] = Field(default_factory=list, description="Available transport modes (alias)")
+    primary_access: Optional[str] = Field(None, description="Primary access method (e.g., 'air', 'road')")
+    seasonal_restrictions: bool = Field(False, description="Whether access has seasonal restrictions")
+
+
+class DigitalEquityData(BaseModel):
+    """
+    Digital equity metrics analyzing real-world telehealth access.
+    
+    Shifts focus from infrastructure availability to meaningful access based on:
+    - Affordability (UN Broadband Commission 2% threshold)
+    - Continuity of Care (community healthcare anchors)
+    - Pricing Equity (value index)
+    """
+    # Affordability metrics
+    affordability_status: str = Field(..., description="affordable, unaffordable, or insufficient_data")
+    affordability_ratio: Optional[float] = Field(None, description="Monthly cost as % of monthly income")
+    monthly_income: Optional[float] = Field(None, description="Median monthly household income (USD)")
+    estimated_monthly_cost: Optional[float] = Field(None, description="Estimated monthly broadband cost (USD)")
+    
+    # Continuity of care metrics
+    nearest_facility_km: Optional[float] = Field(None, description="Distance to nearest healthcare facility")
+    has_community_anchor: bool = Field(False, description="Healthcare facility within 5km")
+    facility_count_5km: int = Field(0, description="Facilities within 5km radius")
+    
+    # Pricing equity
+    value_index: Optional[float] = Field(None, description="Cost per Mbps (pricing fairness)")
+    
+    # Overall classification
+    equity_classification: str = Field(..., description="ready, supported, excluded, or insufficient_data")
+    classification_reason: str = Field(..., description="Human-readable explanation")
+    
+    # Metadata
+    last_updated: Optional[str] = Field(None, description="ISO timestamp of analysis")
+    confidence: ConfidenceLevel = Field(..., description="Confidence in equity analysis")
 
 
 class CommunityRecord(BaseModel):
@@ -71,6 +107,7 @@ class CommunityRecord(BaseModel):
     healthcare: HealthcareData = Field(..., description="Healthcare facility data")
     connectivity: ConnectivityData = Field(..., description="Internet connectivity data")
     access: AccessData = Field(..., description="Transportation and access data")
+    digital_equity: Optional[DigitalEquityData] = Field(None, description="Digital equity analysis (optional)")
     
     data_completeness: float = Field(
         ..., 

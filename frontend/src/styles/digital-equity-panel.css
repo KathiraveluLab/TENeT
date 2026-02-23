@@ -1,0 +1,188 @@
+/* ===== Digital Equity Panel — Premium ===== */
+
+.equity-panel {
+  position: absolute;
+  top: var(--sp-3);
+  right: var(--sp-3);
+  background: var(--glass-bg-heavy);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  padding: var(--sp-5);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--border-light);
+  z-index: 600;
+  min-width: 280px;
+  max-width: 320px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  animation: fadeIn 0.25s var(--ease-out);
+}
+
+.equity-title {
+  margin: 0 0 var(--sp-4) 0;
+  font-size: var(--text-sm);
+  font-weight: 800;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 2px solid var(--accent-soft);
+  padding-bottom: var(--sp-3);
+  background: linear-gradient(135deg, var(--accent), #A78BFA);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.equity-loading,
+.equity-error {
+  padding: var(--sp-4);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+}
+
+.equity-error { color: var(--color-red); }
+
+/* Sections */
+.equity-section {
+  margin-bottom: var(--sp-5);
+  animation: fadeIn 0.3s var(--ease-out) backwards;
+}
+
+.equity-section:nth-child(2) { animation-delay: 0.05s; }
+.equity-section:nth-child(3) { animation-delay: 0.1s; }
+.equity-section:nth-child(4) { animation-delay: 0.15s; }
+
+.equity-section:last-child { margin-bottom: 0; }
+
+.equity-section h4 {
+  margin: 0 0 var(--sp-3) 0;
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Stats Grid */
+.equity-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-2);
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-3) var(--sp-3);
+  border-radius: var(--radius-md);
+  background: var(--color-gray-50);
+  border: 1px solid var(--border-light);
+  transition: all var(--transition);
+}
+
+.stat-item:hover {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+.stat-item.ready       { border-left: 3px solid var(--color-green); background: var(--color-green-soft); }
+.stat-item.supported   { border-left: 3px solid var(--color-yellow); background: var(--color-yellow-soft); }
+.stat-item.excluded    { border-left: 3px solid var(--color-red); background: var(--color-red-soft); }
+.stat-item.insufficient { border-left: 3px solid var(--color-gray-400); }
+
+.stat-label {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 3px;
+}
+
+.stat-value {
+  font-size: var(--text-xl);
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+  margin-bottom: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-percent {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+/* Metrics List */
+.metric-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.metric-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--color-gray-50);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  border: 1px solid var(--border-light);
+  transition: background var(--transition);
+}
+
+.metric-item:hover { background: var(--color-gray-100); }
+
+.metric-label  { color: var(--text-secondary); font-weight: 500; }
+.metric-value  { color: var(--text-primary); font-weight: 700; }
+
+/* Methodology Section */
+.methodology {
+  background: var(--color-gray-50);
+  padding: var(--sp-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+}
+
+.methodology-text p {
+  margin: 0 0 var(--sp-1) 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: var(--leading-relaxed);
+}
+.methodology-text p:last-child { margin-bottom: 0; }
+.methodology-text strong { color: var(--text-primary); font-weight: 700; }
+
+/* Classification Legend */
+.classification-legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: var(--leading-normal);
+  font-weight: 500;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid white;
+  box-shadow: var(--shadow-sm);
+}
+
+.legend-row.ready     .legend-dot { background-color: var(--color-green); }
+.legend-row.supported .legend-dot { background-color: var(--color-yellow); }
+.legend-row.excluded  .legend-dot { background-color: var(--color-red); }

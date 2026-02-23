@@ -1,78 +1,59 @@
-/**
- * Confidence Badge Styles
- * Visual indicators for data quality levels
- */
+/* ===== Confidence Badge — Refined ===== */
 
 .confidence-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.15rem 0.4rem;
-  border-radius: 0.25rem;
-  font-size: 0.75rem;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
   font-weight: 600;
   white-space: nowrap;
-  transition: all 0.2s ease;
+  transition: all var(--transition);
+  cursor: help;
 }
 
 .confidence-icon {
-  font-size: 0.85rem;
+  font-size: 10px;
   font-weight: bold;
 }
 
 .confidence-label {
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
+  font-weight: 700;
 }
 
-/* High confidence - green */
 .confidence-high {
-  background-color: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
+  background: var(--color-green-soft);
+  color: #059669;
+  border: 1px solid rgba(52,211,153,0.25);
 }
+.confidence-high .confidence-icon { color: var(--color-green); }
 
-.confidence-high .confidence-icon {
-  color: #28a745;
-}
-
-/* Medium confidence - yellow */
 .confidence-medium {
-  background-color: #fff3cd;
-  color: #856404;
-  border: 1px solid #ffeaa7;
+  background: var(--color-yellow-soft);
+  color: #D97706;
+  border: 1px solid rgba(251,191,36,0.25);
 }
+.confidence-medium .confidence-icon { color: var(--color-yellow); }
 
-.confidence-medium .confidence-icon {
-  color: #ffc107;
-}
-
-/* Low confidence - orange */
 .confidence-low {
-  background-color: #ffe5d0;
-  color: #8b4513;
-  border: 1px solid #ffc9a0;
+  background: var(--color-red-soft);
+  color: #DC2626;
+  border: 1px solid rgba(248,113,113,0.25);
 }
+.confidence-low .confidence-icon { color: var(--color-red); }
 
-.confidence-low .confidence-icon {
-  color: #fd7e14;
-}
-
-/* Missing data - gray */
 .confidence-missing {
-  background-color: #e9ecef;
-  color: #495057;
-  border: 1px solid #dee2e6;
+  background: var(--color-gray-100);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
 }
+.confidence-missing .confidence-icon { color: var(--text-tertiary); }
 
-.confidence-missing .confidence-icon {
-  color: #6c757d;
-}
-
-/* Hover effect */
 .confidence-badge:hover {
-  transform: scale(1.05);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  cursor: help;
+  transform: scale(1.06);
+  box-shadow: var(--shadow-sm);
 }

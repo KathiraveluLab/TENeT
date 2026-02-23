@@ -1,74 +1,9 @@
-/* Main application layout */
+/* App shell */
 .app {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.app-header {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
-  color: white;
-  padding: 0.75rem 2rem;
-  box-shadow: 0 2px 8px rgba(46, 125, 50, 0.15);
-  z-index: 1000;
-  position: sticky;
-  top: 0;
-}
-
-.app-header h1 {
-  margin: 0;
-  font-size: 1.75rem;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-}
-
-.app-header p {
-  margin: 0.25rem 0 0 0;
-  opacity: 0.9;
-  font-size: 0.875rem;
-  font-weight: 400;
-}
-
-.app-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  overflow: hidden;
-  margin-top: 0;
-  height: calc(100vh - 80px); /* Account for navbar height */
   width: 100vw;
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-  .app-header {
-    padding: 1rem;
-  }
-  
-  .app-header h1 {
-    font-size: 1.5rem;
-  }
-  
-  .app-header p {
-    font-size: 0.875rem;
-  }
-}
-
-/* Loading and error states */
-.loading {
+  height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  color: var(--text-secondary);
-}
-
-.error {
-  background-color: #FFEBEE;
-  color: #C62828;
-  padding: 1rem;
-  border-radius: var(--border-radius);
-  border-left: 4px solid #C62828;
-  margin: 1rem;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
 }

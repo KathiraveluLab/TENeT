@@ -87,6 +87,68 @@ export async function fetchCommunityConnectivity(communityId) {
 }
 
 /**
+ * Fetch digital equity analysis for a specific community
+ */
+export async function fetchDigitalEquity(communityId, refresh = false) {
+  try {
+    const url = `${API_BASE_URL}/communities/${communityId}/digital-equity${refresh ? '?refresh=true' : ''}`
+    const response = await fetch(url)
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    return { data, error: null }
+  } catch (error) {
+    console.error(`Error fetching digital equity for ${communityId}:`, error)
+    return { data: null, error: error.message }
+  }
+}
+
+/**
+ * Fetch digital equity summary for all communities
+ */
+export async function fetchDigitalEquitySummary() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/digital-equity/summary`)
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    return { data, error: null }
+  } catch (error) {
+    console.error('Error fetching digital equity summary:', error)
+    return { data: null, error: error.message }
+  }
+}
+
+/**
+ * Trigger batch update of digital equity data
+ */
+export async function batchUpdateDigitalEquity(limit = null) {
+  try {
+    const url = limit 
+      ? `${API_BASE_URL}/digital-equity/batch-update?limit=${limit}`
+      : `${API_BASE_URL}/digital-equity/batch-update`
+    
+    const response = await fetch(url, { method: 'POST' })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    return { data, error: null }
+  } catch (error) {
+    console.error('Error batch updating digital equity:', error)
+    return { data: null, error: error.message }
+  }
+}
+
+/**
  * Check API health
  */
 export async function checkHealth() {
@@ -159,5 +221,56 @@ export async function fetchNecessityScore(communityId, season) {
   } catch (error) {
     console.error(`Error fetching necessity score for ${communityId}:`, error)
     return { data: null, error: error.message }
+  }
+}
+
+// ── New endpoints ────────────────────────────────────────────────
+
+/**
+ * Fetch data coverage / transparency stats
+ */
+export async function fetchSystemCoverage() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/system/coverage`)
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const data = await response.json()
+    return { data, error: null }
+  } catch (error) {
+    console.error('Error fetching system coverage:', error)
+    return { data: null, error: error.message }
+  }
+}
+
+/**
+ * Run sensitivity analysis / simulation with custom thresholds
+ */
+export async function runSimulation(threshold = 2.0, radius = 5.0) {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/simulate?threshold=${threshold}&radius=${radius}`
+    )
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const data = await response.json()
+    return { data, error: null }
+  } catch (error) {
+    console.error('Error running simulation:', error)
+    return { data: null, error: error.message }
+  }
+}
+
+/**
+ * Autocomplete search (lightweight)
+ */
+export async function autocompleteSearch(query, limit = 10) {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/communities/search/autocomplete?q=${encodeURIComponent(query)}&limit=${limit}`
+    )
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const data = await response.json()
+    return { data: data.results || [], error: null }
+  } catch (error) {
+    console.error('Error in autocomplete:', error)
+    return { data: [], error: error.message }
   }
 }

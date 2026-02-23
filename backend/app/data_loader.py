@@ -17,7 +17,7 @@ from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 from sqlalchemy.orm import Session
 
-from app.models import CommunityRecord, HealthcareData, ConnectivityData, AccessData, ConfidenceLevel, Location
+from app.models import CommunityRecord, HealthcareData, ConnectivityData, AccessData, ConfidenceLevel, Location, DigitalEquityData
 from app.database import Community, HealthcareFacility, BroadbandCoverage
 
 
@@ -295,12 +295,16 @@ def load_enhanced_communities(db: Session) -> List[Community]:
         if data["road"]:
             access_modes.append("road")
         
+        is_seasonal = data["tier"] == 3
+        access_notes = "Ice roads in winter" if is_seasonal and data["harbor"] else ""
         access_data = {
             "transport_modes": access_modes,
+            "transportation_types": access_modes,
             "primary_access": "air" if not data["road"] else "road",
-            "seasonal_restrictions": data["tier"] == 3,
+            "seasonal": is_seasonal,
+            "seasonal_restrictions": is_seasonal,
             "confidence": "high",
-            "notes": "Ice roads in winter" if data["tier"] == 3 and data["harbor"] else ""
+            "notes": access_notes
         }
         
         # Calculate data completeness
@@ -338,6 +342,25 @@ def sync_to_pydantic(db_community: Community) -> CommunityRecord:
     healthcare_dict = db_community.healthcare_data or {}
     connectivity_dict = db_community.connectivity_data or {}
     access_dict = db_community.access_data or {}
+    digital_equity_dict = db_community.digital_equity_data or {}
+    
+    # Parse digital equity data if available
+    digital_equity = None
+    if digital_equity_dict:
+        digital_equity = DigitalEquityData(
+            affordability_status=digital_equity_dict.get("affordability_status", "insufficient_data"),
+            affordability_ratio=digital_equity_dict.get("affordability_ratio"),
+            monthly_income=digital_equity_dict.get("monthly_income"),
+            estimated_monthly_cost=digital_equity_dict.get("estimated_monthly_cost"),
+            nearest_facility_km=digital_equity_dict.get("nearest_facility_km"),
+            has_community_anchor=digital_equity_dict.get("has_community_anchor", False),
+            facility_count_5km=digital_equity_dict.get("facility_count_5km", 0),
+            value_index=digital_equity_dict.get("value_index"),
+            equity_classification=digital_equity_dict.get("equity_classification", "insufficient_data"),
+            classification_reason=digital_equity_dict.get("classification_reason", "No data available"),
+            last_updated=digital_equity_dict.get("last_updated"),
+            confidence=ConfidenceLevel(digital_equity_dict.get("confidence", "missing"))
+        )
     
     return CommunityRecord(
         community_id=db_community.community_id,
@@ -363,11 +386,14 @@ def sync_to_pydantic(db_community: Community) -> CommunityRecord:
             last_updated=connectivity_dict.get("last_updated")
         ),
         access=AccessData(
-            transport_modes=access_dict.get("transport_modes", []),
+            notes=access_dict.get("notes"),
+            seasonal=access_dict.get("seasonal"),
+            confidence=ConfidenceLevel(access_dict.get("confidence", "missing")),
+            transportation_types=access_dict.get("transportation_types", access_dict.get("transport_modes", [])),
+            transport_modes=access_dict.get("transport_modes", access_dict.get("transportation_types", [])),
             primary_access=access_dict.get("primary_access"),
             seasonal_restrictions=access_dict.get("seasonal_restrictions", False),
-            confidence=ConfidenceLevel(access_dict.get("confidence", "missing")),
-            notes=access_dict.get("notes")
         ),
+        digital_equity=digital_equity,
         data_completeness=db_community.data_completeness or 0.0
     )

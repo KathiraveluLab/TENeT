@@ -13,7 +13,14 @@
 
 TENeT is an enhanced research platform for visualizing and analyzing telehealth necessity across Alaska communities. It provides transparent insights into healthcare facilities, internet connectivity, and season-adjusted transportation access—with explicit tracking of data quality and completeness.
 
-**New in v0.2 (Production Pipeline):**
+**New in v0.3 (Digital Equity Layer):**
+- 🌐 **Digital Equity Analysis** - Affordability gate with 2% income threshold
+- 🏥 **Community Safety Net** - 5km healthcare facility proximity checks
+- 💰 **Value Index** - Cost per Mbps pricing equity heatmap
+- 🎨 **Research-Grade UI** - Publication-ready CartoDB grayscale basemap
+- ✨ **Glassmorphism Panels** - Minimalist floating interface elements
+
+**Previous Release (v0.2 - Production Pipeline):**
 - 📈 **20+ Communities** (up from 8) with real coordinates
 - ❄️ **Season-Aware Analysis** (Summer/Winter/Year-Round)
 - 🏥 **Healthcare Necessity Scoring** (0-100 scale)
@@ -27,9 +34,21 @@ TENeT is an enhanced research platform for visualizing and analyzing telehealth 
 
 ## ✨ Key Features
 
+### 🌐 Digital Equity Layer (NEW)
+- **Affordability Analysis:** UN Broadband Commission 2% income threshold
+- **Community Anchors:** 5km healthcare facility proximity for continuity of care
+- **Value Index:** Cost per Mbps to expose pricing inequities
+- **Three-Tier Classification:**
+  - 🟢 **Ready** - Affordable home internet access
+  - 🟡 **Supported** - Community anchor provides fallback
+  - 🔴 **Excluded** - Critical digital/physical access gap
+- **Research-Grade Visualization:** Publication-quality markers and basemap
+
+See [DIGITAL_EQUITY_LAYER.md](DIGITAL_EQUITY_LAYER.md) for full documentation.
+
 ### 🗺️ Interactive Map with Season Awareness
 - Alaska-wide visualization of 20+ communities
-- Color-coded markers by access tier (1-3)
+- Multiple visualization modes (Digital Equity, Value Index, Access Tier)
 - Season toggle (Summer/Winter/Year-Round)
 - Real-time access difficulty adjustments
 - Click to explore detailed healthcare analysis

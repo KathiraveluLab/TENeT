@@ -1,0 +1,113 @@
+/* ===== Coverage Dashboard — Inside Drawer ===== */
+
+.coverage-dashboard {
+  position: relative;
+  background: transparent;
+  border-radius: 0;
+  border: none;
+  padding: 0;
+}
+
+.coverage-header { display: none; }
+
+.coverage-stats {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+.coverage-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  padding: var(--sp-3) var(--sp-2);
+  background: var(--color-gray-50);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  transition: all var(--transition);
+}
+
+.coverage-stat:hover {
+  border-color: var(--accent-soft);
+  background: var(--accent-light);
+}
+
+.stat-number {
+  font-size: var(--text-xl);
+  font-weight: 800;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: var(--text-2xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.coverage-bars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.coverage-bar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.coverage-bar-label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  min-width: 80px;
+  font-weight: 600;
+}
+
+.coverage-bar-track {
+  flex: 1;
+  height: 8px;
+  background: var(--color-gray-200);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.coverage-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.6s var(--ease-out);
+  background: linear-gradient(90deg, var(--accent), #A78BFA);
+}
+
+.coverage-bar-value {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--text-primary);
+  min-width: 36px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.coverage-meta {
+  margin-top: var(--sp-4);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border-light);
+}
+
+.coverage-meta p {
+  margin: 3px 0;
+}
+
+.coverage-loading,
+.coverage-error {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  padding: var(--sp-3) 0;
+}
