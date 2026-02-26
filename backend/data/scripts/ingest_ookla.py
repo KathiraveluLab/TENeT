@@ -363,7 +363,7 @@ def save_to_database(df: pd.DataFrame, year: int, quarter: int):
 # MAIN
 # ============================================================================
 
-def get_latest_available_quarter() -> Tuple[int, int]:
+def get_latest_available_quarter(today: Optional[datetime] = None) -> Tuple[int, int]:
     """
     Determine the latest Ookla quarter likely available on S3.
 
