@@ -376,7 +376,7 @@ def get_latest_available_quarter(today: Optional[datetime] = None) -> Tuple[int,
     To stay safe, we always return one full quarter behind the current date.
     Examples (today = Feb 2026  →  Q1 2026  →  returns 2025 Q4)
     """
-    now = datetime.now()
+    now = today or datetime.now()
     current_quarter = (now.month - 1) // 3 + 1
     year = now.year
 
