@@ -895,7 +895,7 @@ def get_telehealth_priority(region_code):
                 'feasible_for_video': connectivity_score > 60,
                 'coverage_25mbps_pct': round(broadband.any_tech_25mbps_pct * 100) if broadband and broadband.any_tech_25mbps_pct is not None else None,
                 'primary_access': broadband.primary_access if broadband else None,
-                'data_source': 'ookla' if (data_point and data_point.throughput_mbps is not None) else ('fcc' if broadband else None)
+                'data_source': 'ookla' if (data_point and data_point.throughput_mbps is not None) else ('fcc' if (broadband and broadband.any_tech_25mbps_pct is not None) else None)
             }
         }
         
