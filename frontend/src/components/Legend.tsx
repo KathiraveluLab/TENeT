@@ -8,10 +8,10 @@ interface LegendProps {
 // Helper for tier description
 const getTierCapability = (tier: number): string => {
     switch (tier) {
-        case 1: return 'HD Video Ready';
-        case 2: return 'Video Capable';
-        case 3: return 'Audio Only';
-        case 4: return 'Async/Text Only';
+        case 1: return 'High-speed broadband, HD video telehealth supported';
+        case 2: return 'Adequate connectivity, standard video calls supported';
+        case 3: return 'Limited bandwidth, voice/audio consultations only';
+        case 4: return 'Minimal/no connectivity, text or async care only';
         default: return '';
     }
 };
@@ -103,6 +103,29 @@ export default function Legend({ totalRegions }: LegendProps) {
                     <strong style={{ color: '#334155' }}>{totalRegions}</strong>
                 </div>
             )}
+
+            {/* Color scale indicator */}
+            <div style={{
+                marginTop: '10px',
+                paddingTop: '8px',
+                borderTop: '1px solid #e5e7eb',
+            }}>
+                <div style={{
+                    height: '6px',
+                    borderRadius: '3px',
+                    background: 'linear-gradient(to right, #22c55e, #eab308, #f97316, #ef4444)',
+                    marginBottom: '4px',
+                }} />
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    fontSize: '9px',
+                    color: '#94a3b8',
+                }}>
+                    <span>Full access</span>
+                    <span>No access</span>
+                </div>
+            </div>
         </div>
     );
 }

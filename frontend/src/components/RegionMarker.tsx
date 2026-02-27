@@ -142,8 +142,8 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
         return null;
     }
 
-    // Use telehealth status color if available, otherwise fall back to tier color
-    const markerColor = telehealthStatus ? telehealthStatus.color : getTierColor(region.tier_level);
+    // Always use tier color so markers don't change color on click
+    const markerColor = getTierColor(region.tier_level);
     const icon = createMarkerIcon(markerColor);
     const tierColor = getTierColor(region.tier_level);
     const tierLabel = getTierLabel(region.tier_level);
