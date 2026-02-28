@@ -113,7 +113,7 @@ export default function Legend({ totalRegions }: LegendProps) {
                 <div style={{
                     height: '6px',
                     borderRadius: '3px',
-                    background: 'linear-gradient(to right, #22c55e, #eab308, #f97316, #ef4444)',
+                    background: `linear-gradient(to right, ${getTierColor(1)}, ${getTierColor(2)}, ${getTierColor(3)}, ${getTierColor(4)})`,
                     marginBottom: '4px',
                 }} />
                 <div style={{
