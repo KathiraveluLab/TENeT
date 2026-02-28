@@ -363,18 +363,54 @@ def save_to_database(df: pd.DataFrame, year: int, quarter: int):
 # MAIN
 # ============================================================================
 
+def get_latest_available_quarter(today: Optional[datetime] = None) -> Tuple[int, int]:
+    """
+    Determine the latest Ookla quarter likely available on S3.
+
+    Ookla publishes data ~4-6 weeks after each quarter ends:
+        Q1 (Jan-Mar) → available ~May
+        Q2 (Apr-Jun) → available ~August
+        Q3 (Jul-Sep) → available ~November
+        Q4 (Oct-Dec) → available ~February
+
+    To stay safe, we always return one full quarter behind the current date.
+    Examples (today = Feb 2026  →  Q1 2026  →  returns 2025 Q4)
+    """
+    now = today or datetime.now()
+    current_quarter = (now.month - 1) // 3 + 1
+    year = now.year
+
+    quarter = current_quarter - 1
+    if quarter == 0:
+        quarter = 4
+        year -= 1
+
+    return year, quarter
+
+
 def main():
-    parser = argparse.ArgumentParser(description='Ingest Ookla Open Data for Alaska (Optimized)')
-    parser.add_argument('--year', type=int, default=2024, help='Year of data (default: 2024)')
-    parser.add_argument('--quarter', type=int, default=4, choices=[1, 2, 3, 4], 
-                        help='Quarter (1-4, default: 4)')
-    parser.add_argument('--dry-run', action='store_true', 
+    auto_year, auto_quarter = get_latest_available_quarter()
+
+    parser = argparse.ArgumentParser(
+        description='Ingest Ookla Open Data for Alaska (Optimized)',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=f'Latest auto-detected quarter: {auto_year} Q{auto_quarter}'
+    )
+    parser.add_argument('--year', type=int, default=auto_year,
+                        help=f'Year of data (default: auto-detected → {auto_year})')
+    parser.add_argument('--quarter', type=int, default=auto_quarter, choices=[1, 2, 3, 4],
+                        help=f'Quarter 1-4 (default: auto-detected → Q{auto_quarter})')
+    parser.add_argument('--dry-run', action='store_true',
                         help='Show what would be done without fetching data')
     parser.add_argument('--show-bounds', action='store_true',
                         help='Print Alaska tile bounds and exit')
-    
+
     args = parser.parse_args()
-    
+
+    print(f"[INFO] Target period: {args.year} Q{args.quarter}")
+    if args.year == auto_year and args.quarter == auto_quarter:
+        print(f"[INFO] (Auto-detected as latest available quarter based on today's date)")
+
     if args.show_bounds:
         bounds = get_alaska_tile_bounds(ZOOM_LEVEL)
         print(f"\nAlaska Tile Bounds at Zoom {ZOOM_LEVEL}:")
