@@ -791,17 +791,25 @@ def get_telehealth_priority(region_code):
         necessity_score = necessity['necessity_score']
         
         # 2. Get internet feasibility
-        from database.models import CATDataPoint
+        from database.models import CATDataPoint, BroadbandCoverage
         data_point = db.query(CATDataPoint).filter(
             CATDataPoint.region_code == region_code,
             CATDataPoint.is_active == True
         ).first()
-        
-        if data_point:
+
+        # Also fetch FCC broadband coverage for this region
+        broadband = db.query(BroadbandCoverage).filter(
+            BroadbandCoverage.region_code == region_code
+        ).first()
+
+        if data_point and data_point.throughput_mbps is not None:
             feasibility_result = CATDataHandler.check_cat4_telehealth_feasibility(
                 data_point, telehealth_mode='video'
             )
             connectivity_score = 100 if feasibility_result['feasible'] else 0
+        elif broadband and broadband.any_tech_25mbps_pct is not None:
+            # Use FCC 25 Mbps coverage percentage (stored as 0.0–1.0 decimal)
+            connectivity_score = round(broadband.any_tech_25mbps_pct * 100)
         else:
             connectivity_score = 0
         
@@ -884,7 +892,10 @@ def get_telehealth_priority(region_code):
             'connectivity_details': {
                 'bandwidth_mbps': data_point.throughput_mbps if data_point else None,
                 'latency_ms': data_point.latency_ms if data_point else None,
-                'feasible_for_video': connectivity_score > 60
+                'feasible_for_video': connectivity_score > 60,
+                'coverage_25mbps_pct': round(broadband.any_tech_25mbps_pct * 100) if broadband and broadband.any_tech_25mbps_pct is not None else None,
+                'primary_access': broadband.primary_access if broadband else None,
+                'data_source': 'ookla' if (data_point and data_point.throughput_mbps is not None) else ('fcc' if (broadband and broadband.any_tech_25mbps_pct is not None) else None)
             }
         }
         
