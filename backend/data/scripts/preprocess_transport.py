@@ -140,16 +140,15 @@ def normalize_community_name(name: str) -> str:
     if not isinstance(name, str):
         return name
 
-    name_str = str(name)
-    n_lower = str(name_str).lower()
-    n_clean = str(n_lower).strip()
-
+    name = str(name).lower().strip()
+    
     for keyword in FACILITY_KEYWORDS:
-        if str(n_clean).find(str(keyword)) != -1:
-            n_clean = str(re.split(rf"\b{keyword}\b", str(n_clean))[0])
+        if keyword in name:  # type: ignore
+            # Split only on the first occurrence for efficiency and correctness
+            name = re.split(rf"\b{keyword}\b", name, 1)[0].strip()
             break
-
-    return str(n_clean).strip()
+            
+    return name
 
 
 # Communities that should NOT have suffixes stripped (they are real community names)

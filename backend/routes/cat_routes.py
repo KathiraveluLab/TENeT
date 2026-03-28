@@ -69,7 +69,6 @@ def get_regions():
             )
             
             # Calculate healthcare necessity score
-            from services.healthcare_desert_calculator import HealthcareDesertCalculator
             necessity_data = HealthcareDesertCalculator.calculate_healthcare_necessity_score(
                 db, region.region_code, season
             )
@@ -1094,13 +1093,13 @@ def get_data_gaps_summary():
         }
         
         for gap_type, places in gap_stats.items():
-            pct = float(len(places)) / float(max(1, len(all_records))) * 100.0 if all_records else 0.0
+            pct = len(places) / max(1, len(all_records)) * 100.0 if all_records else 0.0
             bd = summary['gap_breakdown']
             if isinstance(bd, dict):
-                bd[str(gap_type)] = {
+                bd[gap_type] = {
                     'count': len(places),
-                    'percentage': float(f"{pct:.1f}"),
-                    'places': [p for i, p in enumerate(places) if i < 10]
+                    'percentage': round(float(pct), 1),  # type: ignore
+                    'places': list(places)[:10]  # type: ignore
                 }
         
         # Confidence distribution
@@ -1825,12 +1824,11 @@ def get_healthcare_by_region(region_code):
         # Sort by distance
         facilities_with_dist.sort(key=lambda x: x[1])
         
-        # Return top 20 nearest
-        limit_val_str = request.args.get('limit', '20')
-        limit = int(limit_val_str) if str(limit_val_str).isdigit() else 20
+        # Return top limit nearest
+        limit = request.args.get('limit', 20, type=int)
         
         result = []
-        for f, dist in [x for i, x in enumerate(facilities_with_dist) if i < limit]:
+        for f, dist in list(facilities_with_dist)[:limit]:  # type: ignore
             result.append({
                 'id': f.id,
                 'name': f.name,
