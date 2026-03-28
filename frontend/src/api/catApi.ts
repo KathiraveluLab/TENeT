@@ -20,6 +20,7 @@ export interface CATRegion {
     population: number | null;
     area_sqkm: number | null;
     access_score: number | null;
+    necessity_score: number;
 }
 
 export interface RegionsResponse {
@@ -135,6 +136,26 @@ export function getTierColor(tier: number): string {
         case 4: return '#ef4444'; // Red - Extreme
         default: return '#6b7280'; // Gray - Unknown
     }
+}
+
+/**
+ * Get map color based on Telehealth Necessity Score (0-100)
+ */
+export function getNeedColor(score: number): string {
+    if (score >= 75) return '#ef4444';      // Red - Critical Need
+    if (score >= 50) return '#f97316';      // Orange - High Need
+    if (score >= 25) return '#eab308';      // Yellow - Moderate Need
+    return '#22c55e';                       // Green - Low Need
+}
+
+/**
+ * Get label based on Telehealth Necessity Score (0-100)
+ */
+export function getNeedLabel(score: number): string {
+    if (score >= 75) return 'Critical Need';
+    if (score >= 50) return 'High Need';
+    if (score >= 25) return 'Moderate Need';
+    return 'Adequate Need';
 }
 
 /**

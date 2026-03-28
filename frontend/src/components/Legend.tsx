@@ -1,26 +1,23 @@
 import React from 'react';
-import { getTierColor, getTierLabel } from '../api/catApi';
+import { getNeedColor, getNeedLabel } from '../api/catApi';
 
 interface LegendProps {
     totalRegions?: number;
 }
 
-// Helper for tier description
-const getTierCapability = (tier: number): string => {
-    switch (tier) {
-        case 1: return 'High-speed broadband, HD video telehealth supported';
-        case 2: return 'Adequate connectivity, standard video calls supported';
-        case 3: return 'Limited bandwidth, voice/audio consultations only';
-        case 4: return 'Minimal/no connectivity, text or async care only';
-        default: return '';
-    }
+// Helper for need description
+const getNeedCapability = (score: number): string => {
+    if (score >= 75) return 'Severe lack of nearby healthcare facilities';
+    if (score >= 50) return 'Limited access to clinics or hospitals';
+    if (score >= 25) return 'Adequate access with some travel distance';
+    return 'Good access to nearby healthcare facilities';
 };
 
 /**
  * Map legend showing CAT tier color coding
  */
 export default function Legend({ totalRegions }: LegendProps) {
-    const tiers = [1, 2, 3, 4];
+    const needLevels = [87, 62, 37, 12];
 
     return (
         <div style={{
@@ -54,14 +51,14 @@ export default function Legend({ totalRegions }: LegendProps) {
                     fontWeight: '700',
                     letterSpacing: '-0.02em'
                 }}>
-                    Community Access Tiers
+                    Telehealth Need
                 </h4>
-                <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '500' }}>CAT-4</span>
+                <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '500' }}>Score (0-100)</span>
             </div>
 
-            {tiers.map(tier => (
+            {needLevels.map(score => (
                 <div
-                    key={tier}
+                    key={score}
                     style={{
                         display: 'flex',
                         alignItems: 'flex-start',
@@ -73,17 +70,17 @@ export default function Legend({ totalRegions }: LegendProps) {
                         width: '12px',
                         height: '12px',
                         borderRadius: '50%',
-                        backgroundColor: getTierColor(tier),
+                        backgroundColor: getNeedColor(score),
                         flexShrink: 0,
                         marginTop: '3px',
                         boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
                     }} />
                     <div>
                         <div style={{ color: '#1e293b', fontWeight: '500' }}>
-                            Tier {tier}: {getTierLabel(tier)}
+                            {getNeedLabel(score)}
                         </div>
                         <div style={{ color: '#64748b', fontSize: '10px' }}>
-                            {getTierCapability(tier)}
+                            {getNeedCapability(score)}
                         </div>
                     </div>
                 </div>
@@ -113,7 +110,7 @@ export default function Legend({ totalRegions }: LegendProps) {
                 <div style={{
                     height: '6px',
                     borderRadius: '3px',
-                    background: `linear-gradient(to right, ${getTierColor(1)}, ${getTierColor(2)}, ${getTierColor(3)}, ${getTierColor(4)})`,
+                    background: `linear-gradient(to right, ${getNeedColor(12)}, ${getNeedColor(37)}, ${getNeedColor(62)}, ${getNeedColor(87)})`,
                     marginBottom: '4px',
                 }} />
                 <div style={{
@@ -122,8 +119,8 @@ export default function Legend({ totalRegions }: LegendProps) {
                     fontSize: '9px',
                     color: '#94a3b8',
                 }}>
-                    <span>Full access</span>
-                    <span>No access</span>
+                    <span>Low Need</span>
+                    <span>High Need</span>
                 </div>
             </div>
         </div>

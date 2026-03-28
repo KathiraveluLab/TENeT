@@ -48,10 +48,10 @@ class HealthcareDesertCalculator:
         return R * c
     
     @staticmethod
-    def get_nearest_clinic_distance(db: Session, region_code: str) -> Optional[float]:
+    def get_nearest_facility_distances(db: Session, region_code: str) -> Optional[Dict[str, float]]:
         """
-        Calculate distance from region center to nearest healthcare site.
-        Returns distance in kilometers.
+        Calculate distance from region center to nearest clinic and nearest hospital.
+        Returns distances in kilometers.
         """
         region = db.query(CATRegion).filter(
             CATRegion.region_code == region_code
@@ -76,16 +76,24 @@ class HealthcareDesertCalculator:
         all_sites = db.query(HealthcareSite).all()
         
         if not all_sites:
-            return 999  # No healthcare sites in database
+            return {'clinic': 999.0, 'hospital': 999.0}  # No healthcare sites in database
         
-        min_distance = float('inf')
+        min_clinic = float('inf')
+        min_hospital = float('inf')
+        
         for site in all_sites:
             distance = HealthcareDesertCalculator.calculate_distance(
-                avg_lat, avg_lon, site.latitude, site.longitude
+                avg_lat, avg_lon, float(site.latitude), float(site.longitude)
             )
-            min_distance = min(min_distance, distance)
+            if site.site_type == 'hospital':
+                min_hospital = min(min_hospital, distance)
+            else:
+                min_clinic = min(min_clinic, distance)
         
-        return min_distance
+        return {
+            'clinic': min_clinic if min_clinic != float('inf') else 999.0,
+            'hospital': min_hospital if min_hospital != float('inf') else 999.0
+        }
     
     @staticmethod
     def calculate_healthcare_necessity_score(
@@ -111,13 +119,22 @@ class HealthcareDesertCalculator:
         4. Transportation difficulty - season-adjusted (20% weight)
         """
         
-        # 1. Distance factor (0-100)
-        distance = HealthcareDesertCalculator.get_nearest_clinic_distance(db, region_code)
-        if distance is None:
-            distance = 500  # Assume very remote
+        # 1. Distance factor (0-100) incorporates both clinic and hospital
+        distances = HealthcareDesertCalculator.get_nearest_facility_distances(db, region_code)
+        if distances is None:
+            clinic_dist = 500.0
+            hospital_dist = 500.0
+        else:
+            clinic_dist = distances['clinic']
+            hospital_dist = distances['hospital']
+            
+        # Normalize: 0km=0 points, 300+km=100 points for clinic
+        clinic_score = min(100.0, (clinic_dist / 300.0) * 100.0)
+        # Hospital distance is more vital, scales over 500km
+        hospital_score = min(100.0, (hospital_dist / 500.0) * 100.0)
         
-        # Normalize: 0km=0 points, 300+km=100 points
-        distance_score = min(100, (distance / 300) * 100)
+        # Strong penalty for lacking hospital access
+        distance_score = (0.6 * hospital_score) + (0.4 * clinic_score)
         
         # 2. Health site density (0-100)
         num_sites = db.query(HealthcareSite).filter(
@@ -170,30 +187,31 @@ class HealthcareDesertCalculator:
                 # Invert modifier: low availability = high difficulty
                 availability_penalty = (1.0 - road_modifier) * 30  # Up to 30 points
                 # Normalize: 0-60min=0, 240+min=100 (with adjustments)
-                base_transport_score = min(100, (adjusted_travel_time / 240) * 100)
-                transport_score = min(100, base_transport_score + availability_penalty)
+                base_transport_score = min(100.0, float(adjusted_travel_time / 240.0) * 100.0)
+                transport_score = min(100.0, float(base_transport_score + availability_penalty))
         else:
             # Unknown travel time - use seasonal default
             if season == SEASON_WINTER:
-                transport_score = 70  # Assume winter is harder
+                transport_score = 70.0  # Assume winter is harder
             elif season == SEASON_SUMMER:
-                transport_score = 40  # Assume summer is easier
+                transport_score = 40.0  # Assume summer is easier
             else:
-                transport_score = 50  # Year-round moderate
+                transport_score = 50.0  # Year-round moderate
         
         # Calculate weighted score
-        necessity_score = (
-            0.40 * distance_score +
-            0.20 * density_score +
-            0.20 * specialist_score +
+        necessity_score = float(
+            0.50 * distance_score +
+            0.15 * density_score +
+            0.15 * specialist_score +
             0.20 * transport_score
         )
         
         return {
-            'necessity_score': round(necessity_score, 2),
-            'distance_to_nearest_clinic_km': round(distance, 2),
-            'num_healthcare_sites': num_sites,
-            'has_specialist_access': has_specialists,
+            'necessity_score': round(float(necessity_score), 2),  # type: ignore
+            'distance_to_nearest_clinic_km': round(float(clinic_dist), 2),  # type: ignore
+            'distance_to_nearest_hospital_km': round(float(hospital_dist), 2),  # type: ignore
+            'num_healthcare_sites': int(num_sites),
+            'has_specialist_access': bool(has_specialists),
             'avg_travel_time_minutes': data_point.travel_time_minutes if data_point else None,
             'season_scenario': {
                 'active_season': season,
@@ -203,10 +221,10 @@ class HealthcareDesertCalculator:
                              'Actual conditions may vary.'
             },
             'breakdown': {
-                'distance_component': round(distance_score, 2),
-                'density_component': round(density_score, 2),
-                'specialist_component': round(specialist_score, 2),
-                'transport_component': round(transport_score, 2),
+                'distance_component': round(float(distance_score), 2),  # type: ignore
+                'density_component': round(float(density_score), 2),  # type: ignore
+                'specialist_component': round(float(specialist_score), 2),  # type: ignore
+                'transport_component': round(float(transport_score), 2),  # type: ignore
                 'transport_season_adjusted': True
             }
         }

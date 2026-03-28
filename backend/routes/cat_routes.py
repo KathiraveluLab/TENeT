@@ -68,6 +68,13 @@ def get_regions():
                 base_tier, base_score, region.properties, season
             )
             
+            # Calculate healthcare necessity score
+            from services.healthcare_desert_calculator import HealthcareDesertCalculator
+            necessity_data = HealthcareDesertCalculator.calculate_healthcare_necessity_score(
+                db, region.region_code, season
+            )
+            necessity_score = necessity_data['necessity_score'] if necessity_data else 0
+            
             result.append({
                 'id': region.id,
                 'region_name': region.region_name,
@@ -78,8 +85,9 @@ def get_regions():
                 'area_sqkm': region.area_sqkm,
                 'access_score': adjusted_score,  # Season-adjusted score
                 'base_access_score': base_score,
-                'centroid_lat': region.centroid_lat,
-                'centroid_lon': region.centroid_lon,
+                'necessity_score': necessity_score,
+                'centroid_lat': float(region.centroid_lat) if region.centroid_lat else None,
+                'centroid_lon': float(region.centroid_lon) if region.centroid_lon else None,
                 'description': explanation,  # Season-adjusted explanation
                 'season': season,
                 'created_at': region.created_at.isoformat() if region.created_at else None
@@ -151,15 +159,15 @@ def _calculate_seasonal_tier(base_tier: int, base_score: float, properties: dict
             tier_penalty += 1
             score_penalty += 20
         
-        adjusted_tier = min(4, base_tier + tier_penalty)
-        adjusted_score = max(0, base_score - score_penalty)
+        adjusted_tier = min(4, int(base_tier) + int(tier_penalty))
+        adjusted_score = max(0.0, float(base_score) - float(score_penalty))
         
         if tier_penalty > 0:
             explanation = f"Winter access: {', '.join(restricted_modes) if restricted_modes else 'Limited transport'}"
         else:
             explanation = f"Winter access: Air available; {base_explanation}"
         
-        return adjusted_tier, round(adjusted_score, 1), explanation
+        return adjusted_tier, float(f"{adjusted_score:.1f}"), explanation
     
     elif season == SEASON_SUMMER:
         # Summer can improve access slightly for communities with seasonal routes
@@ -177,8 +185,8 @@ def _calculate_seasonal_tier(base_tier: int, base_score: float, properties: dict
         if base_tier == 4 and (has_water or has_air):
             tier_bonus = -1
         
-        adjusted_tier = max(1, base_tier + tier_bonus)
-        adjusted_score = min(100, base_score + score_bonus)
+        adjusted_tier = max(1, int(base_tier) + int(tier_bonus))
+        adjusted_score = min(100.0, float(base_score) + float(score_bonus))
         
         if tier_bonus < 0:
             explanation = f"Summer access: Seasonal routes available; improved from Tier {base_tier}"
@@ -187,7 +195,7 @@ def _calculate_seasonal_tier(base_tier: int, base_score: float, properties: dict
         else:
             explanation = base_explanation
         
-        return adjusted_tier, round(adjusted_score, 1), explanation
+        return adjusted_tier, float(f"{adjusted_score:.1f}"), explanation
     
     return base_tier, base_score, base_explanation
 
@@ -572,9 +580,10 @@ def evaluate_feasibility(region_code):
             response['mode_results'] = result['mode_results']
             
             if not result['feasible'] and result['failure_reasons']:
-                response['explanation'] = result['failure_reasons'][0]
+                expl_str = str(result['failure_reasons'][0])
+                response['explanation'] = expl_str
                 # Determine failed gate from explanation
-                explanation = response['explanation'].lower()
+                explanation = expl_str.lower()
                 if 'bandwidth' in explanation:
                     response['failed_gate'] = 'BANDWIDTH'
                 elif 'latency' in explanation:
@@ -802,14 +811,17 @@ def get_telehealth_priority(region_code):
             BroadbandCoverage.region_code == region_code
         ).first()
 
-        if data_point and data_point.throughput_mbps is not None:
-            feasibility_result = CATDataHandler.check_cat4_telehealth_feasibility(
-                data_point, telehealth_mode='video'
-            )
-            connectivity_score = 100 if feasibility_result['feasible'] else 0
-        elif broadband and broadband.any_tech_25mbps_pct is not None:
-            # Use FCC 25 Mbps coverage percentage (stored as 0.0–1.0 decimal)
+        if broadband and broadband.wired_25mbps_pct is not None and broadband.wired_25mbps_pct >= 0:
+            # Prefer wired connectivity percentage to avoid 100% satellite false-positives in remote areas
+            connectivity_score = round(broadband.wired_25mbps_pct * 100)
+        elif broadband and broadband.any_tech_25mbps_pct is not None and broadband.primary_access != 'SATELLITE_DEPENDENT':
             connectivity_score = round(broadband.any_tech_25mbps_pct * 100)
+        elif data_point and data_point.throughput_mbps is not None:
+            # Scale throughput mbps to a score (0 to 100) assuming 100 Mbps is an ideal connection
+            connectivity_score = min(100, round((data_point.throughput_mbps / 100.0) * 100))
+        elif broadband and broadband.any_tech_25mbps_pct is not None:
+            # Fallback to any_tech but severely penalize if satellite dependent
+            connectivity_score = round((broadband.any_tech_25mbps_pct * 100) / 2)
         else:
             connectivity_score = 0
         
@@ -1066,8 +1078,9 @@ def get_data_gaps_summary():
                 gaps = r.data_gaps.split(';')
                 for gap in gaps:
                     gap = gap.strip()
-                    if gap in gap_stats:
-                        gap_stats[gap].append({
+                    lst = gap_stats.get(gap)
+                    if isinstance(lst, list):
+                        lst.append({
                             'place_id': r.place_id,
                             'place_name': r.place_name,
                             'confidence': r.confidence
@@ -1081,11 +1094,14 @@ def get_data_gaps_summary():
         }
         
         for gap_type, places in gap_stats.items():
-            summary['gap_breakdown'][gap_type] = {
-                'count': len(places),
-                'percentage': round(len(places) / len(all_records) * 100, 1) if all_records else 0,
-                'places': places[:10]  # Return first 10 for each gap type
-            }
+            pct = float(len(places)) / float(max(1, len(all_records))) * 100.0 if all_records else 0.0
+            bd = summary['gap_breakdown']
+            if isinstance(bd, dict):
+                bd[str(gap_type)] = {
+                    'count': len(places),
+                    'percentage': float(f"{pct:.1f}"),
+                    'places': [p for i, p in enumerate(places) if i < 10]
+                }
         
         # Confidence distribution
         summary['confidence_distribution'] = {
@@ -1139,19 +1155,34 @@ _ISP_CONFIG = _load_isp_config()
 
 def _get_regional_internet_cost(zcta: str) -> tuple:
     """Get internet cost for a ZCTA based on regional ISP availability."""
-    gci_urban = set(_ISP_CONFIG.get('zcta_mappings', {}).get('gci_urban', []))
-    extreme_rural = set(_ISP_CONFIG.get('zcta_mappings', {}).get('extreme_rural', []))
+    try:
+        gmap = _ISP_CONFIG.get('zcta_mappings', {})
+        if not isinstance(gmap, dict):
+            gmap = {}
+        gu_list = gmap.get('gci_urban', [])
+        er_list = gmap.get('extreme_rural', [])
+        gci_urban = set(gu_list if isinstance(gu_list, list) else [])
+        extreme_rural = set(er_list if isinstance(er_list, list) else [])
+    except Exception:
+        gci_urban = set()
+        extreme_rural = set()
+        
     pricing = _ISP_CONFIG.get('isp_pricing', {})
-    
+    if not isinstance(pricing, dict):
+        pricing = {}
+        
     if zcta in extreme_rural:
-        p = pricing.get('extreme_rural', {'cost': 450, 'name': 'Extreme Rural'})
-        return (p['cost'], p['name'])
+        p = pricing.get('extreme_rural', {'cost': 450.0, 'name': 'Extreme Rural'})
+        if not isinstance(p, dict): p = {'cost': 450.0, 'name': 'Extreme Rural'}
+        return (float(p.get('cost', 450.0)), str(p.get('name', 'Extreme Rural')))
     elif zcta in gci_urban:
-        p = pricing.get('gci', {'cost': 125, 'name': 'GCI'})
-        return (p['cost'], p['name'])
+        p = pricing.get('gci', {'cost': 125.0, 'name': 'GCI'})
+        if not isinstance(p, dict): p = {'cost': 125.0, 'name': 'GCI'}
+        return (float(p.get('cost', 125.0)), str(p.get('name', 'GCI')))
     else:
-        p = pricing.get('fastwyre', {'cost': 350, 'name': 'FastWyre'})
-        return (p['cost'], p['name'])
+        p = pricing.get('fastwyre', {'cost': 350.0, 'name': 'FastWyre'})
+        if not isinstance(p, dict): p = {'cost': 350.0, 'name': 'FastWyre'}
+        return (float(p.get('cost', 350.0)), str(p.get('name', 'FastWyre')))
 
 
 def _haversine_km(lat1, lon1, lat2, lon2):
@@ -1199,7 +1230,7 @@ def get_region_affordability(region_code):
                     min_dist = dist
                     best = c
         
-        if not best:
+        if best is None:
             # No income data found - return unavailable status
             return jsonify({
                 'has_income_data': False,
@@ -1210,22 +1241,29 @@ def get_region_affordability(region_code):
             }), 200
         
         # Calculate affordability
-        cost, isp_name = _get_regional_internet_cost(best.zcta)
-        monthly_income = best.median_income / 12
-        burden_pct = (cost / monthly_income) * 100 if monthly_income > 0 else 100
-        threshold = _ISP_CONFIG.get('thresholds', {}).get('affordability_burden_pct', 2.0)
-        is_affordable = burden_pct < threshold
+        assert best is not None
+        zcta_str = str(best.zcta) if hasattr(best, 'zcta') and best.zcta else ""
+        cost, isp_name = _get_regional_internet_cost(zcta_str)
+        med_inc = float(getattr(best, 'median_income', 0) or 0)
+        monthly_income = med_inc / 12.0
+        burden_pct = float((cost / monthly_income) * 100.0) if monthly_income > 0 else 100.0
+        
+        t_conf = _ISP_CONFIG.get('thresholds', {})
+        t_val = t_conf.get('affordability_burden_pct', 2.0) if isinstance(t_conf, dict) else 2.0
+        threshold = float(t_val) if isinstance(t_val, (int, float)) else 2.0
+        
+        is_affordable = bool(burden_pct < threshold)
         
         return jsonify({
             'has_income_data': True,
             'income_source': 'ZCTA',
-            'zcta': best.zcta,
-            'distance_km': round(min_dist, 1),
-            'median_income': best.median_income,
-            'monthly_income': round(monthly_income, 2),
-            'internet_cost': cost,
-            'isp': isp_name,
-            'burden_pct': round(burden_pct, 2),
+            'zcta': zcta_str,
+            'distance_km': float(f"{min_dist:.1f}"),
+            'median_income': med_inc,
+            'monthly_income': float(f"{monthly_income:.2f}"),
+            'internet_cost': float(cost),
+            'isp': str(isp_name),
+            'burden_pct': float(f"{burden_pct:.2f}"),
             'threshold_pct': threshold,
             'is_affordable': is_affordable,
             'status': 'AFFORDABLE' if is_affordable else 'UNAFFORDABLE',
@@ -1328,7 +1366,7 @@ def get_region_safety_net(region_code):
             'nearest_clinic': {
                 'name': nearest_clinic.name if nearest_clinic else None,
                 'type': nearest_clinic.site_type if nearest_clinic else None,
-                'distance_km': round(nearest_distance, 1) if nearest_clinic else None
+                'distance_km': float(f"{nearest_distance:.1f}") if nearest_clinic else None
             } if nearest_clinic else None,
             'classification': classification,
             'classification_color': color,
@@ -1381,15 +1419,21 @@ def get_region_telehealth_status(region_code):
         burden_pct = None
         internet_cost = None
         
-        if has_income_data:
-            internet_cost, isp_name = _get_regional_internet_cost(best_zcta.zcta)
-            monthly_income = best_zcta.median_income / 12
-            burden_pct = (internet_cost / monthly_income) * 100 if monthly_income > 0 else 100
-            threshold = _ISP_CONFIG.get('thresholds', {}).get('affordability_burden_pct', 2.0)
+        if has_income_data and best_zcta is not None:
+            assert best_zcta is not None
+            zcta_str = str(best_zcta.zcta) if hasattr(best_zcta, 'zcta') and best_zcta.zcta else ""
+            internet_cost, isp_name = _get_regional_internet_cost(zcta_str)
+            med_inc = float(getattr(best_zcta, 'median_income', 0) or 0)
+            monthly_income = med_inc / 12.0
+            burden_pct = float((internet_cost / monthly_income) * 100.0) if monthly_income > 0 else 100.0
+            
+            t_conf = _ISP_CONFIG.get('thresholds', {})
+            t_val = t_conf.get('affordability_burden_pct', 2.0) if isinstance(t_conf, dict) else 2.0
+            threshold = float(t_val) if isinstance(t_val, (int, float)) else 2.0
             
             # Absolute cost threshold: $400+/mo is inherently unaffordable regardless of income
-            absolute_cost_threshold = 400
-            is_affordable = burden_pct < threshold and internet_cost < absolute_cost_threshold
+            absolute_cost_threshold = 400.0
+            is_affordable = bool(burden_pct < threshold) and bool(internet_cost < absolute_cost_threshold)
         else:
             # No income data - check if cost is extreme rural ($450+)
             # Get cost based on region location
@@ -1476,13 +1520,13 @@ def get_region_telehealth_status(region_code):
             'affordability': {
                 'has_data': has_income_data,
                 'is_affordable': is_affordable,
-                'burden_pct': round(burden_pct, 2) if burden_pct else None,
+                'burden_pct': float(f"{burden_pct:.2f}") if burden_pct else None,
                 'internet_cost': internet_cost
             },
             'clinic_proximity': {
                 'has_nearby': has_nearby_clinic,
                 'nearest_name': nearest_clinic.name if nearest_clinic else None,
-                'nearest_distance_km': round(nearest_distance, 1) if nearest_clinic else None,
+                'nearest_distance_km': float(f"{nearest_distance:.1f}") if nearest_clinic else None,
                 'threshold_km': distance_threshold_km
             }
         }), 200
@@ -1541,13 +1585,18 @@ def get_all_telehealth_status():
             median_income = None
             isp_name = 'Unknown'
             
-            if has_income_data:
-                internet_cost, isp_name = _get_regional_internet_cost(best_zcta.zcta)
-                median_income = best_zcta.median_income
-                monthly_income = best_zcta.median_income / 12
-                burden_pct = (internet_cost / monthly_income) * 100 if monthly_income > 0 else 100
-                threshold = _ISP_CONFIG.get('thresholds', {}).get('affordability_burden_pct', 2.0)
-                is_affordable = burden_pct < threshold and internet_cost < 400
+            if has_income_data and best_zcta is not None:
+                assert best_zcta is not None
+                internet_cost, isp_name = _get_regional_internet_cost(str(getattr(best_zcta, 'zcta', '')))
+                median_income = float(getattr(best_zcta, 'median_income', 0) or 0)
+                monthly_income = median_income / 12.0
+                burden_pct = float((internet_cost / monthly_income) * 100.0) if monthly_income > 0 else 100.0
+                
+                t_conf = _ISP_CONFIG.get('thresholds', {})
+                t_val = t_conf.get('affordability_burden_pct', 2.0) if isinstance(t_conf, dict) else 2.0
+                threshold = float(t_val) if isinstance(t_val, (int, float)) else 2.0
+                
+                is_affordable = bool(burden_pct < threshold) and bool(internet_cost < 400.0)
             else:
                 internet_cost = 450  # Default fastwyre
                 isp_name = 'FastWyre (est.)'
@@ -1606,11 +1655,11 @@ def get_all_telehealth_status():
                 'color': color,
                 'internet_cost': internet_cost,
                 'isp_name': isp_name,
-                'burden_pct': round(burden_pct, 1) if burden_pct else None,
+                'burden_pct': float(f"{burden_pct:.1f}") if burden_pct else None,
                 'median_income': median_income,
                 'has_nearby_clinic': has_nearby_clinic,
                 'nearest_clinic_name': nearest_clinic_name,
-                'nearest_clinic_km': round(nearest_distance, 1) if nearest_distance != float('inf') else None,
+                'nearest_clinic_km': float(f"{nearest_distance:.1f}") if nearest_distance != float('inf') else None,
                 'access_mode': access_modes or 'unknown',
                 'recommendation': recommendation
             })
@@ -1777,14 +1826,16 @@ def get_healthcare_by_region(region_code):
         facilities_with_dist.sort(key=lambda x: x[1])
         
         # Return top 20 nearest
-        limit = request.args.get('limit', 20, type=int)
+        limit_val_str = request.args.get('limit', '20')
+        limit = int(limit_val_str) if str(limit_val_str).isdigit() else 20
+        
         result = []
-        for f, dist in facilities_with_dist[:limit]:
+        for f, dist in [x for i, x in enumerate(facilities_with_dist) if i < limit]:
             result.append({
                 'id': f.id,
                 'name': f.name,
                 'type': f.site_type,
-                'distance_km': round(dist, 1),
+                'distance_km': float(f"{dist:.1f}"),
                 'latitude': f.latitude,
                 'longitude': f.longitude,
                 'has_emergency': f.has_emergency,
@@ -1803,11 +1854,11 @@ def get_healthcare_by_region(region_code):
             'count': len(result),
             'nearest_hospital': {
                 'name': nearest_hospital_tuple[0].name,
-                'distance_km': round(nearest_hospital_tuple[1], 1)
+                'distance_km': float(f"{nearest_hospital_tuple[1]:.1f}")
             } if nearest_hospital_tuple else None,
             'nearest_clinic': {
                 'name': nearest_clinic_tuple[0].name,
-                'distance_km': round(nearest_clinic_tuple[1], 1)
+                'distance_km': float(f"{nearest_clinic_tuple[1]:.1f}")
             } if nearest_clinic_tuple else None
         }), 200
 
