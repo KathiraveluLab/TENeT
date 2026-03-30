@@ -6,6 +6,12 @@ __pycache__/
 # C extensions
 *.so
 
+Backend/.venv
+Backend/.env
+Backend/TENeT/TENeT/.env
+Backend/alaska_all_data
+**/ .env
+
 # Distribution / packaging
 .Python
 build/
