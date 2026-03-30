@@ -1,18 +1,20 @@
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from .logic import get_health_data
+from .logic import get_health_data, get_internet_data, calculateScore
 @api_view(['GET'])
 def get_tenet_data(request):
-    # internet_data = get_internet_data()
+    internet_data = get_internet_data()
     health_data = get_health_data()
-    print(health_data)
     return Response({
-        "internet": [61.0, -150.0, 64.0, -145.0],
+        "internet": internet_data,
         "health": health_data
     })
-# def coverage_view(request):
-#     gdf = get_internet_data()
-
-#     geojson = gdf.to_json()
-
-#     return Response(geojson)
+@api_view(['POST'])
+def calculate(request):
+    longtiude = request.data.get("longtiude")
+    latitiude = request.data.get("latitiude")
+    radius = request.data.get("MapRadius")
+    res = calculateScore(latitiude,longtiude,radius)
+    return Response({
+        "result":res
+    })

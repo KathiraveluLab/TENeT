@@ -1,5 +1,4 @@
 import React from "react";
-import { MapContainer, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import Home from "./pages/Home.jsx";
 import Map from "./pages/Map.jsx"

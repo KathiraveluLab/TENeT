@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import WorldMapImage from "../assets/worldmap.png"
-import { Mail, Phone, MapPin } from "lucide-react";
 export default function Home() {
   const [scrollY, setScrollY] = useState(0);
   const [selected, setselected] = useState("Home");
