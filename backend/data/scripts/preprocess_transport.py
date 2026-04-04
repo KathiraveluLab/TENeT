@@ -17,6 +17,7 @@ import numpy as np
 import re
 from datetime import datetime
 import math
+from pyproj import Transformer
 
 # Helpers
 EXCLUDE_KEYWORDS = [
@@ -139,14 +140,15 @@ def normalize_community_name(name: str) -> str:
     if not isinstance(name, str):
         return name
 
-    name = name.lower().strip()
-
+    name = str(name).lower().strip()
+    
     for keyword in FACILITY_KEYWORDS:
-        if keyword in name:
-            name = re.split(rf"\b{keyword}\b", name)[0]
+        if keyword in name:  # type: ignore
+            # Split only on the first occurrence for efficiency and correctness
+            name = re.split(rf"\b{keyword}\b", name, 1)[0].strip()
             break
-
-    return name.strip()
+            
+    return name
 
 
 # Communities that should NOT have suffixes stripped (they are real community names)
@@ -175,10 +177,11 @@ def infer_parent(community: str) -> str:
         return community
     
     # Try suffix stripping
-    original = community
+    original = str(community)
     for suffix in FACILITY_SUFFIXES:
-        if community.endswith(suffix):
-            community = community[:-len(suffix)].strip()
+        if str(community).endswith(str(suffix)):
+            idx = int(len(str(suffix)))
+            community = str(community)[:-idx].strip()  # type: ignore
             break
     
     # Check mapping again after suffix stripping
@@ -216,7 +219,7 @@ def alaska_albers_to_latlon(x, y):
     # Transform coordinates
     lon, lat = transformer.transform(x, y)
 
-    return round(lat, 6), round(lon, 6)
+    return float(f"{lat:.6f}"), float(f"{lon:.6f}")
 
 
 # -----------------------------

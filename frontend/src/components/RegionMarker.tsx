@@ -5,6 +5,8 @@ import {
     CATRegion,
     getTierColor,
     getTierLabel,
+    getNeedColor,
+    getNeedLabel,
     Season,
     TelehealthPriorityResponse,
     fetchTelehealthPriority,
@@ -142,11 +144,11 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
         return null;
     }
 
-    // Always use tier color so markers don't change color on click
-    const markerColor = getTierColor(region.tier_level);
+    // Use need score to color marker
+    const markerColor = getNeedColor(region.necessity_score);
     const icon = createMarkerIcon(markerColor);
-    const tierColor = getTierColor(region.tier_level);
-    const tierLabel = getTierLabel(region.tier_level);
+    const needColor = getNeedColor(region.necessity_score);
+    const needLabel = getNeedLabel(region.necessity_score);
 
     return (
         <Marker
@@ -171,17 +173,17 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
                         display: 'inline-block',
                         padding: '2px 8px',
                         borderRadius: '12px',
-                        backgroundColor: tierColor,
+                        backgroundColor: needColor,
                         color: 'white',
                         fontSize: '12px',
                         fontWeight: '600',
                         marginBottom: '8px'
                     }}>
-                        Tier {region.tier_level}
+                        Telehealth Need Score: {region.necessity_score}
                     </div>
 
                     <div style={{ fontSize: '13px', color: '#374151' }}>
-                        <strong>Access Level:</strong> {tierLabel}
+                        <strong>Telehealth Priority:</strong> {needLabel}
                     </div>
 
                     {/* AFFORDABILITY & SAFETY NET BADGES */}
@@ -328,15 +330,12 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
                                     fontSize: '12px',
                                     color: '#374151',
                                     display: 'grid',
-                                    gridTemplateColumns: '1fr 1fr',
-                                    gap: '4px 12px',
+                                    gridTemplateColumns: '1fr',
+                                    gap: '4px',
                                     marginBottom: '8px'
                                 }}>
                                     <div>
-                                        <strong>Need Score:</strong> {priority.necessity_score}
-                                    </div>
-                                    <div>
-                                        <strong>Connectivity:</strong> {priority.connectivity_score}%
+                                        <strong>Telehealth Need Score:</strong> {priority.necessity_score}
                                     </div>
                                 </div>
 

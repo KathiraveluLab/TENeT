@@ -210,9 +210,9 @@ def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 
 def generate_summary(facilities: list) -> dict:
     """Generate summary statistics."""
-    summary = {
+    by_type: dict = {}
+    summary: dict = {
         'total_facilities': len(facilities),
-        'by_type': {},
         'with_emergency': 0,
         'with_specialists': 0,
         'with_phone': 0,
@@ -222,7 +222,7 @@ def generate_summary(facilities: list) -> dict:
     for f in facilities:
         # Count by type
         ftype = f['facility_type']
-        summary['by_type'][ftype] = summary['by_type'].get(ftype, 0) + 1
+        by_type[ftype] = by_type.get(ftype, 0) + 1
         
         # Count features
         if f['has_emergency']:
@@ -233,7 +233,8 @@ def generate_summary(facilities: list) -> dict:
             summary['with_phone'] += 1
         if f['website']:
             summary['with_website'] += 1
-    
+            
+    summary['by_type'] = by_type
     return summary
 
 
