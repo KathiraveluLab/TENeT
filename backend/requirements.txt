@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+geopandas
+pandas
+requests
+python-multipart
+pydantic
