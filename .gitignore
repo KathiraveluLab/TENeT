@@ -213,4 +213,4 @@ node_modules/
 .DS_Store
 
 # Project data
-data/
+#data/

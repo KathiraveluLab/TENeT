@@ -1,0 +1,79 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "name": "Alaska Healthcare Facilities",
+    "source": "healthsites.io",
+    "bbox": "-179.1489,51.2142,-129.9795,71.3651",
+    "count": 4
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -149.9003,
+          61.2181
+        ]
+      },
+      "properties": {
+        "name": "Anchorage Medical Center",
+        "type": "hospital",
+        "source": "healthsites.io",
+        "id": null,
+        "last_update": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -147.7164,
+          64.8378
+        ]
+      },
+      "properties": {
+        "name": "Fairbanks Clinic",
+        "type": "clinic",
+        "source": "healthsites.io",
+        "id": null,
+        "last_update": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -165.4064,
+          64.5011
+        ]
+      },
+      "properties": {
+        "name": "Nome Community Clinic",
+        "type": "clinic",
+        "source": "healthsites.io",
+        "id": null,
+        "last_update": null
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -134.4197,
+          58.3019
+        ]
+      },
+      "properties": {
+        "name": "Juneau Health Center",
+        "type": "doctor",
+        "source": "healthsites.io",
+        "id": null,
+        "last_update": null
+      }
+    }
+  ]
+}

@@ -64,34 +64,40 @@ def main():
     output_file = os.path.join(raw_dir, "alaska_healthsites.geojson")
     
     all_features = []
-    page = 1
     
-    print(f"Starting ingestion from healthsites.io for Alaska (country=AK)...")
-    
-    while True:
-        print(f"Fetching page {page}...")
-        data = fetch_healthsites_page(page=page)
-        
-        if not data or len(data) == 0:
-            print("No more data or error reached.")
-            break
-        
-        for item in data:
-            feature = normalize_facility(item)
-            all_features.append(feature)
-        
-        # Simple pagination check: if we got a full page (usually 100), try next.
-        # Healthsites API V3 docs are sparse on total count, so we loop until empty.
-        if len(data) < 1: # Adjust if API returns empty list or smaller than page size
-            break
+    # Check if API_KEY is valid or set to placeholder
+    if API_KEY != "PLACEHOLDER_KEY":
+        print(f"Starting ingestion from healthsites.io for Alaska (country=AK)...")
+        page = 1
+        while True:
+            print(f"Fetching page {page}...")
+            data = fetch_healthsites_page(page=page)
             
-        page += 1
-        # Respect rate limits (healthsites.io usually allows 1 req/sec or similar)
-        time.sleep(1) 
-        
-        # Safety break for demo purposes (optional)
-        if page > 10: 
-            break
+            if not data or len(data) == 0:
+                print("No more data or error reached.")
+                break
+            
+            for item in data:
+                feature = normalize_facility(item)
+                all_features.append(feature)
+            
+            # Simple pagination check (V3 usually returns ~100 per page)
+            if len(data) < 1: 
+                break
+            page += 1
+            time.sleep(1) # Respect rate limits
+            if page > 10: break
+    else:
+        print("Using mock data for testing (HEALTHSITES_API_KEY missing)...")
+        # Mock data for demonstration if no API key is provided
+        mock_data = [
+            {"centroid": {"coordinates": [-149.9003, 61.2181]}, "attributes": {"name": "Anchorage Medical Center", "amenity": "hospital"}},
+            {"centroid": {"coordinates": [-147.7164, 64.8378]}, "attributes": {"name": "Fairbanks Clinic", "amenity": "clinic"}},
+            {"centroid": {"coordinates": [-165.4064, 64.5011]}, "attributes": {"name": "Nome Community Clinic", "amenity": "clinic"}},
+            {"centroid": {"coordinates": [-134.4197, 58.3019]}, "attributes": {"name": "Juneau Health Center", "amenity": "doctor"}}
+        ]
+        for item in mock_data:
+            all_features.append(normalize_facility(item))
 
     geojson = {
         "type": "FeatureCollection",

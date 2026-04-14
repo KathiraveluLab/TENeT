@@ -41,12 +41,10 @@ const MapComponent: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // In a real scenario, this would be an API call to the backend
-        // or a static fetch from the public folder.
-        // For the challenge, we will assume the file is served.
-        fetch('/data/alaska_healthsites.geojson')
+        // Fetch the Alaska healthsites GeoJSON from the backend
+        fetch('http://localhost:8000/data/raw/alaska_healthsites.geojson')
             .then(res => {
-                if (!res.ok) throw new Error("File not found");
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                 return res.json();
             })
             .then(data => {
