@@ -1,0 +1,11 @@
+X,Y,OBJECTID,CommunityName,CommunityID,Airport,HarborDock,StateFerry,CargoBarge,RoadConnection,Coastal,Description
+-1537200.80409957,470990.071658981,1,Adak,{C712D789-18CD-4C6C-A0FB-E5B7BB9B1B86},Yes,Yes,No,Yes,No,Yes,"Adak Airport is a State of Alaska owned and maintained airport."
+-1537200.80409957,470990.071658981,2,Adak Station,{A497C6A1-5CD2-4D23-8F63-B8F6B7E98F94},Yes,Yes,No,No,No,Yes,"Station facilities located near the airport."
+72481.1057280804,890170.012883828,3,Afognak,{E9058891-286D-4157-9647-CD6050993960},No,No,No,No,No,Yes,"Transportation is provided by float plane or boat from nearby hubs."
+-10519.3318614154,771139.191692125,4,Akhiok,{68670103-A544-40F0-AD9E-7215DEC2434C},Yes,Yes,No,Yes,No,Yes,"Akhiok is accessible by water or air only. The State owns the runway."
+-401780.778584857,1237051.63336104,5,Akiachak,{D381614D-1B3D-4C01-A916-B139441D4A88},Yes,Yes,No,Yes,No,No,"A state-owned gravel airstrip and public seaplane base are available."
+-390087.745779022,1235043.28228904,6,Akiak,{B9E3D976-5DA3-4850-884A-E7818D521898},Yes,No,No,Yes,No,No,"Akiak has a state-owned airport with a gravel runway."
+-766479.910475392,525927.743350198,7,Akutan,{D57C95FC-45D5-44E0-B99B-5325C15EBE66},Yes,Yes,Yes,Yes,No,Yes,"Akutan is only accessible by boat and amphibious aircraft."
+-542392.68206103,1456437.72182411,8,Alakanuk,{8142710A-7405-430F-9A0B-C44338B4B31A},Yes,Yes,No,Yes,No,Yes,"A state-owned and -managed gravel airstrip is available."
+57879.5116973947,1844678.29560101,9,Alatna,{88A2EC6A-4FB2-4D64-9FA0-19C13D5A37FB},No,No,No,No,No,No,"Alatna has no road link, but winter trails connect to Allakaket."
+660487.360363678,1470329.38068821,10,Alcan Border,{3A2BEA63-41B6-445E-BF20-B04461C94803},No,No,No,No,Yes,No,"The Alcan Highway connects through Whitehorse to the border."

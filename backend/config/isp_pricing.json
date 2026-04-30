@@ -1,0 +1,98 @@
+{
+    "isp_pricing": {
+        "gci": {
+            "name": "GCI",
+            "cost": 125,
+            "description": "Major city pricing (GCI unlimited)"
+        },
+        "fastwyre": {
+            "name": "FastWyre/Rural",
+            "cost": 450,
+            "description": "Rural Interior Alaska (capped plans)"
+        },
+        "starlink": {
+            "name": "Starlink",
+            "cost": 120,
+            "description": "Satellite (available everywhere)"
+        },
+        "extreme_rural": {
+            "name": "Extreme Rural",
+            "cost": 450,
+            "description": "Very remote villages (capped, expensive)"
+        }
+    },
+    "zcta_mappings": {
+        "gci_urban": [
+            "99501",
+            "99502",
+            "99503",
+            "99504",
+            "99505",
+            "99506",
+            "99507",
+            "99508",
+            "99509",
+            "99510",
+            "99511",
+            "99513",
+            "99514",
+            "99515",
+            "99516",
+            "99517",
+            "99518",
+            "99519",
+            "99520",
+            "99521",
+            "99522",
+            "99523",
+            "99524",
+            "99529",
+            "99530",
+            "99540",
+            "99599",
+            "99701",
+            "99702",
+            "99703",
+            "99705",
+            "99706",
+            "99707",
+            "99708",
+            "99709",
+            "99710",
+            "99711",
+            "99712",
+            "99714",
+            "99716",
+            "99725",
+            "99775",
+            "99801",
+            "99802",
+            "99803",
+            "99811",
+            "99812",
+            "99821"
+        ],
+        "extreme_rural": [
+            "99559",
+            "99723",
+            "99762",
+            "99741"
+        ],
+        "comment": "ZCTAs not in these lists default to fastwyre pricing"
+    },
+    "thresholds": {
+        "affordability_burden_pct": 2.0,
+        "speed_critical_mbps": 5,
+        "speed_telehealth_mbps": 25
+    },
+    "metadata": {
+        "version": "1.0",
+        "last_updated": "2024-01-06",
+        "sources": {
+            "gci_pricing": "https://www.gci.com",
+            "fastwyre_pricing": "FastWyre Alaska",
+            "starlink_pricing": "https://www.starlink.com"
+        },
+        "notes": "Fort Yukon ($450/mo) used as extreme rural reference case per maintainer guidance"
+    }
+}

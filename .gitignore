@@ -201,6 +201,34 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+<<<<<<< experimental-dakshhhhh16
+# Node.js / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Frontend build outputs
+frontend/dist/
+frontend/build/
+frontend/.vite/
+
+# Frontend environment
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+=======
 # Marimo
 marimo/_static/
 marimo/_lsp/
@@ -211,3 +239,4 @@ node_modules/
 
 # OS generated files
 .DS_Store
+>>>>>>> main

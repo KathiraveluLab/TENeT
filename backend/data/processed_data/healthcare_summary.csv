@@ -1,0 +1,9 @@
+metric,value
+total_facilities,325
+with_emergency,23
+with_specialists,34
+with_phone,85
+with_website,81
+type_clinic,211
+type_hospital,62
+type_pharmacy,52
