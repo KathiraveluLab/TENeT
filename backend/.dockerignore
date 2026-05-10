@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.so
+venv/
+.venv/
+.git/
+.gitignore
+.mypy_cache/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.DS_Store
+*.swp
+*.swo
+Dockerfile
+.dockerignore
