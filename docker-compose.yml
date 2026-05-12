@@ -1,0 +1,29 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "${BACKEND_PORT:-5001}:5001"
+    volumes:
+      - ./backend:/app
+    environment:
+      - FLASK_DEBUG=1
+      - FLASK_HOST=0.0.0.0
+      - FLASK_PORT=5001
+      - DB_TYPE=sqlite
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+    environment:
+      - VITE_API_BASE_URL=http://localhost:${BACKEND_PORT:-5001}/api/cat
+    depends_on:
+      - backend
+    restart: unless-stopped
