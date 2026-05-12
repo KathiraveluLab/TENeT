@@ -31,8 +31,13 @@ def health():
     return jsonify({"status": "ok", "message": "TENeT Backend is running"})
 
 if __name__ == '__main__':
+    os.makedirs(os.path.join('data', 'uploads'), exist_ok=True)
     host = os.getenv('FLASK_HOST', '0.0.0.0')
-    port = int(os.getenv('FLASK_PORT', '5001'))
+    try:
+        port = int(os.getenv('FLASK_PORT', '5001'))
+    except ValueError:
+        port = 5001
     debug = os.getenv('FLASK_DEBUG', '1') == '1'
-    print(f"Starting TENeT Backend on http://{host}:{port}")
+    display_host = 'localhost' if host == '0.0.0.0' else host
+    print(f"Starting TENeT Backend on http://{display_host}:{port}")
     app.run(host=host, port=port, debug=debug)

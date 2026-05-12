@@ -32,7 +32,7 @@ interface RegionMarkerProps {
 }
 
 // API base for fetching broadband data
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api/cat';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/cat';
 
 /**
  * Create a custom circle marker icon with dynamic color - "Gemstone" style
@@ -578,4 +578,3 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
         </Marker>
     );
 }
-

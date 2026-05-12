@@ -6,24 +6,21 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      - FLASK_DEBUG=1
-      - FLASK_HOST=0.0.0.0
-      - FLASK_PORT=5001
-      - DB_TYPE=sqlite
+      FLASK_DEBUG: "${FLASK_DEBUG:-1}"
+      FLASK_HOST: "${FLASK_HOST:-0.0.0.0}"
+      FLASK_PORT: "${FLASK_PORT:-5001}"
+      DB_TYPE: "${DB_TYPE:-sqlite}"
+      DB_PATH: "${DB_PATH:-/app/data/tenet.db}"
     restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
-      target: dev
+      target: prod
+      args:
+        VITE_API_BASE_URL: "${VITE_API_BASE_URL:-/api/cat}"
     ports:
-      - "${FRONTEND_PORT:-5173}:5173"
-    volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/index.html:/app/index.html
-      - ./frontend/vite.config.ts:/app/vite.config.ts
-    environment:
-      - VITE_API_BASE_URL=http://localhost:${BACKEND_PORT:-5001}/api/cat
+      - "${FRONTEND_PORT:-5173}:80"
     depends_on:
       - backend
     restart: unless-stopped
