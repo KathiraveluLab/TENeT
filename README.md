@@ -22,10 +22,9 @@ Built for **state administrators, healthcare planners, ISPs, and researchers** w
 ```bash
 git clone https://github.com/KathiraveluLab/TENeT.git
 cd TENeT
-git checkout experimental-dakshhhhh16
 
 cp .env.example .env
-docker compose up --build
+make dev
 ```
 
 That's it. Open:
@@ -33,18 +32,75 @@ That's it. Open:
 - **Backend API:** http://localhost:5001
 - **Health check:** http://localhost:5001/api/health
 
+`make dev` builds the containers, creates `backend/data/tenet.db` if it is missing,
+seeds local development data, and starts the backend plus frontend together.
+
 ### Useful Commands
 
 | Command | What it does |
 |---------|-------------|
-| `make dev` | Start the full stack (same as `docker compose up --build`) |
+| `make dev` | Build, seed if needed, and start the full stack |
 | `make stop` | Stop all containers |
-| `make seed` | Seed the database with sample data |
+| `make down` | Alias for `make stop` |
+| `make build` | Rebuild containers without cache |
+| `make seed` | Seed the database with local CAT, healthcare, broadband, income, and performance data |
 | `make reset-db` | Delete and re-seed the database |
-| `make test` | Run backend tests |
+| `make test` | Run backend pytest and frontend build check |
+| `make backend-test` | Run only backend pytest |
+| `make frontend-test` | Run only frontend build check |
 | `make logs` | Tail container logs |
 | `make clean` | Remove containers, volumes, and images |
 | `make help` | Show all available commands |
+
+### Database Workflow
+
+The local SQLite database lives at `backend/data/tenet.db` by default and is not
+committed. The seed workflow is deterministic and works without private files or
+external API keys:
+
+```bash
+make seed      # create or refresh local seed data
+make reset-db  # remove backend/data/tenet.db, then seed from scratch
+```
+
+Seeded data includes:
+
+- CAT community regions and access data from `backend/data/processed_data/clean_transport_profiles_1.csv`
+- Healthcare facilities from `backend/data/processed_data/healthcare_facilities.csv`
+- Broadband coverage from `backend/data/processed_data/broadband_data_gaps.csv`
+- Local sample Census income records for affordability workflows
+- Local sample Ookla-like performance records for the performance layer
+
+### Environment
+
+Start from the checked-in template:
+
+```bash
+cp .env.example .env
+```
+
+Common local variables:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `BACKEND_PORT` | `5001` | Host port for Flask |
+| `FRONTEND_PORT` | `5173` | Host port for Vite |
+| `FLASK_HOST` | `0.0.0.0` | Backend bind address inside Docker |
+| `FLASK_PORT` | `5001` | Backend container port |
+| `DB_PATH` | `/app/data/tenet.db` | SQLite path inside the backend container |
+| `VITE_API_BASE_URL` | `/api/cat` | Frontend API base URL proxied by nginx in Docker |
+
+### Troubleshooting
+
+If the map loads but has no markers, run:
+
+```bash
+make reset-db
+make dev
+```
+
+If ports are already in use, change `BACKEND_PORT` or `FRONTEND_PORT` in `.env`.
+If dependencies look stale, run `make clean` and then `make dev`.
 
 ### Local Development (without Docker)
 
