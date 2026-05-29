@@ -28,6 +28,49 @@ export interface RegionsResponse {
     total: number;
 }
 
+export type TelehealthStatusName =
+    | 'TELEHEALTH_READY'
+    | 'COMMUNITY_ANCHOR'
+    | 'CRITICAL_GAP'
+    | 'DATA_UNAVAILABLE';
+
+export type AffordabilityStatusName = 'affordable' | 'unaffordable' | 'unknown';
+
+export interface RegionSummary {
+    id: number;
+    region_code: string;
+    name: string;
+    lat: number | null;
+    lon: number | null;
+    cat_tier: number | null;
+    telehealth_status: TelehealthStatusName | string;
+    desert_score: number | null;
+    affordability_status: AffordabilityStatusName | string;
+    data_confidence: 'high' | 'medium' | 'low' | 'missing' | 'unknown' | string;
+    has_data_gap: boolean;
+    region: string | null;
+}
+
+export interface RegionSummaryResponse {
+    regions: RegionSummary[];
+    count: number;
+}
+
+export interface RegionSearchParams {
+    q?: string;
+    name?: string;
+    tier?: number | string | null;
+    status?: string | null;
+    desert_min?: number | string | null;
+    desert_max?: number | string | null;
+    data_gap?: boolean | string | null;
+    region?: string | null;
+}
+
+export interface RegionSearchResponse extends RegionSummaryResponse {
+    filters?: Record<string, unknown>;
+}
+
 export interface StatisticsResponse {
     total_regions: number;
     total_data_points: number;
@@ -94,6 +137,41 @@ export async function fetchRegions(season: Season = 'year_round', tier?: number)
     }
 
     const data: RegionsResponse = await response.json();
+    return data.regions;
+}
+
+/**
+ * Fetch lightweight community summaries for sidebar navigation.
+ */
+export async function fetchRegionSummary(): Promise<RegionSummary[]> {
+    const response = await fetch(`${API_BASE}/regions/summary`);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch region summary: ${response.statusText}`);
+    }
+
+    const data: RegionSummaryResponse = await response.json();
+    return data.regions;
+}
+
+/**
+ * Search lightweight community summaries for sidebar discovery.
+ */
+export async function searchRegions(params: RegionSearchParams = {}): Promise<RegionSummary[]> {
+    const query = new URLSearchParams();
+
+    Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            query.append(key, String(value));
+        }
+    });
+
+    const suffix = query.toString() ? `?${query.toString()}` : '';
+    const response = await fetch(`${API_BASE}/regions/search${suffix}`);
+    if (!response.ok) {
+        throw new Error(`Failed to search regions: ${response.statusText}`);
+    }
+
+    const data: RegionSearchResponse = await response.json();
     return data.regions;
 }
 
