@@ -11,11 +11,62 @@ Built for **state administrators, healthcare planners, ISPs, and researchers** w
 
 ---
 
-## Why This Exists
+## Quick Start
 
-Alaska has over 400 scattered communities. Many are fly-in only. Roads freeze. Rivers close. Broadband coverage that looks great on an FCC map often doesn't match reality on the ground. Hospitals can be hundreds of miles away.
+### Prerequisites
 
-TENeT connects all these dots into a single view so you can see which communities are well-served, which are struggling, and which are in genuine crisis - without digging through a dozen spreadsheets.
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) (v2+)
+
+### Setup
+
+```bash
+git clone https://github.com/KathiraveluLab/TENeT.git
+cd TENeT
+git checkout experimental-dakshhhhh16
+
+cp .env.example .env
+docker compose up --build
+```
+
+That's it. Open:
+- **Frontend:** http://localhost:5173
+- **Backend API:** http://localhost:5001
+- **Health check:** http://localhost:5001/api/health
+
+### Useful Commands
+
+| Command | What it does |
+|---------|-------------|
+| `make dev` | Start the full stack (same as `docker compose up --build`) |
+| `make stop` | Stop all containers |
+| `make seed` | Seed the database with sample data |
+| `make reset-db` | Delete and re-seed the database |
+| `make test` | Run backend tests |
+| `make logs` | Tail container logs |
+| `make clean` | Remove containers, volumes, and images |
+| `make help` | Show all available commands |
+
+### Local Development (without Docker)
+
+<details>
+<summary>Click to expand</summary>
+
+**Backend:**
+```bash
+cd backend
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+python app.py
+```
+
+**Frontend (separate terminal):**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+</details>
 
 ---
 
@@ -39,6 +90,7 @@ TENeT connects all these dots into a single view so you can see which communitie
 | **Backend** | Flask 3.0 · Python |
 | **Database** | SQLite · SQLAlchemy ORM |
 | **Maps** | OpenStreetMap tiles via Leaflet |
+| **Infra** | Docker · Docker Compose |
 
 ---
 
@@ -46,13 +98,19 @@ TENeT connects all these dots into a single view so you can see which communitie
 
 ```
 TENeT/
+├── docker-compose.yml           → Single-command startup
+├── Makefile                     → Developer shortcuts
+├── .env.example                 → Environment template
+│
 ├── frontend/                    → React app (the interactive Alaska map)
+│   ├── Dockerfile
 │   └── src/
 │       ├── api/                 → Talks to the backend
 │       ├── components/          → Map layers, legends, popups, controls
 │       └── types/               → TypeScript definitions
 │
 └── backend/                     → Flask API server (port 5001)
+    ├── Dockerfile
     ├── routes/                  → API endpoints (regions, performance, affordability)
     ├── services/                → Core logic (desert scoring, season adjustments)
     ├── database/                → Models, seeders, DB config
@@ -61,61 +119,6 @@ TENeT/
         ├── raw/                 → Original source datasets
         ├── processed_data/      → Cleaned CSVs ready for the database
         └── scripts/             → Data preprocessing pipelines
-```
-
----
-
-## Getting Started
-
-### Prerequisites
-
-| Tool | Version |
-|------|---------|
-| Python | 3.9 or higher |
-| Node.js | 18 or higher |
-| npm | comes with Node.js |
-
-### 1. Clone the repo and switch to the development branch
-
-```bash
-git clone https://github.com/KathiraveluLab/TENeT.git
-cd TENeT
-git checkout experimental-dakshhhhh16
-```
-
-> **Note:** All active development lives on the `experimental-dakshhhhh16` branch. The `main` branch may not have the latest features.
-
-### 2. Start the backend
-
-```bash
-cd backend
-pip3 install -r requirements.txt
-python3 app.py
-```
-
-The API will be live at **http://localhost:5001**. You should see:
-
-```
-Database initialized successfully
-Starting TENeT Backend on http://localhost:5001
-```
-
-### 3. Start the frontend (in a new terminal)
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The app will be live at **http://localhost:5173**. Open it in your browser and the Alaska map loads automatically.
-
-### 4. Verify it works
-
-Open **http://localhost:5001/api/health** in your browser. You should see:
-
-```json
-{ "status": "ok", "message": "TENeT Backend is running" }
 ```
 
 ---
@@ -174,7 +177,6 @@ The transport tier feeds into the Telehealth Need Score alongside healthcare des
 
 ## Upcoming Features
 
-- **Docker Setup** - One-command launch with `docker-compose`
 - **Sidebar Search** - Find any community by name, fly-to on map
 - **PDF Reports** - One-click downloadable summaries for grant applications
 - **Region Comparison** - Compare 2–3 communities side by side
@@ -185,4 +187,6 @@ The transport tier feeds into the Telehealth Need Score alongside healthcare des
 
 ---
 
+## License
 
+See [LICENSE](./LICENSE) for details.

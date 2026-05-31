@@ -1,3 +1,5 @@
+import os
+
 from flask import Flask, jsonify, g
 from flask_cors import CORS
 from database.config import init_db, get_db
@@ -29,6 +31,8 @@ def health():
     return jsonify({"status": "ok", "message": "TENeT Backend is running"})
 
 if __name__ == '__main__':
-    print("Starting TENeT Backend on http://localhost:5001")
-    print("CAT API available at http://localhost:5001/api/cat")
-    app.run(debug=True, port=5001)
+    host = os.getenv('FLASK_HOST', '0.0.0.0')
+    port = int(os.getenv('FLASK_PORT', '5001'))
+    debug = os.getenv('FLASK_DEBUG', '1') == '1'
+    print(f"Starting TENeT Backend on http://{host}:{port}")
+    app.run(host=host, port=port, debug=debug)
