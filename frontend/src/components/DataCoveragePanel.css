@@ -1,0 +1,49 @@
+.data-coverage-hover {
+    position: absolute;
+    left: 20px;
+    bottom: 80px;
+    z-index: 1000;
+}
+
+.data-coverage-trigger {
+    border: 1px solid rgba(148, 163, 184, 0.75);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.94);
+    color: #1e293b;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.16);
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: help;
+}
+
+.data-coverage-panel {
+    position: absolute;
+    left: 0;
+    bottom: calc(100% + 10px);
+    width: min(280px, calc(100vw - 32px));
+    max-height: min(70vh, 620px);
+    overflow: auto;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(8px);
+    transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.data-coverage-hover:hover .data-coverage-panel,
+.data-coverage-hover:focus-within .data-coverage-panel {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+@media (max-width: 900px) {
+    .data-coverage-hover {
+        left: 12px;
+        bottom: 14px;
+    }
+
+    .data-coverage-panel {
+        max-height: 52vh;
+    }
+}

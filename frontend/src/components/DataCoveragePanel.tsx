@@ -5,6 +5,7 @@ import {
     getConfidenceColor,
     getDataGapInfo
 } from '../api/catApi';
+import './DataCoveragePanel.css';
 
 interface DataCoveragePanelProps {
     isExpanded?: boolean;
@@ -37,46 +38,57 @@ export default function DataCoveragePanel({ isExpanded = false, onToggle }: Data
         loadData();
     }, []);
 
+    const renderShell = (content: React.ReactNode) => (
+        <div className="data-coverage-hover">
+            <button type="button" className="data-coverage-trigger" aria-label="Show data coverage layer legend">
+                Data
+            </button>
+            <div className="data-coverage-panel" style={panelStyle}>
+                {content}
+            </div>
+        </div>
+    );
+
     if (loading) {
-        return (
-            <div style={panelStyle}>
+        return renderShell(
+            <>
                 <div style={headerStyle}>
-                    <span>📊 Data Coverage</span>
+                    <span>Data Coverage</span>
                 </div>
                 <div style={{ padding: '12px', fontSize: '12px', color: '#6b7280' }}>
                     Loading...
                 </div>
-            </div>
+            </>,
         );
     }
 
     if (error || !summary) {
-        return (
-            <div style={panelStyle}>
+        return renderShell(
+            <>
                 <div style={headerStyle}>
-                    <span>📊 Data Coverage</span>
+                    <span>Data Coverage</span>
                 </div>
                 <div style={{ padding: '12px', fontSize: '12px', color: '#dc2626' }}>
                     {error || 'No data available'}
                 </div>
-            </div>
+            </>,
         );
     }
 
     const gapsPercentage = Math.round((summary.places_with_gaps / summary.total_places) * 100);
     const satellitePercent = Math.round((summary.primary_access.SATELLITE / summary.total_places) * 100);
 
-    return (
-        <div style={panelStyle}>
+    return renderShell(
+        <>
             {/* Header */}
             <div
                 style={{ ...headerStyle, cursor: onToggle ? 'pointer' : 'default' }}
                 onClick={onToggle}
             >
-                <span>📊 Data Coverage Layer</span>
+                <span>Data Coverage Layer</span>
                 {onToggle && (
                     <span style={{ fontSize: '10px', marginLeft: '8px' }}>
-                        {isExpanded ? '▼' : '▶'}
+                        {isExpanded ? 'Hide gaps' : 'Show gaps'}
                     </span>
                 )}
             </div>
@@ -181,7 +193,7 @@ export default function DataCoveragePanel({ isExpanded = false, onToggle }: Data
             </div>
 
             {/* Expanded: Gap Breakdown */}
-            {isExpanded && (
+            {(isExpanded || !onToggle) && (
                 <div style={{ padding: '10px 12px' }}>
                     <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>
                         Data Gap Types
@@ -201,9 +213,7 @@ export default function DataCoveragePanel({ isExpanded = false, onToggle }: Data
                                     fontSize: '11px',
                                     borderBottom: '1px solid #f3f4f6'
                                 }}>
-                                    <span>
-                                        {info.icon} {info.label}
-                                    </span>
+                                    <span>{info.label}</span>
                                     <span style={{
                                         color: info.severity === 'error' ? '#dc2626' :
                                             info.severity === 'warning' ? '#f97316' : '#6b7280',
@@ -227,16 +237,12 @@ export default function DataCoveragePanel({ isExpanded = false, onToggle }: Data
             }}>
                 Data source: FCC Broadband Availability
             </div>
-        </div>
+        </>,
     );
 }
 
 // Styles - Clean Glass (Flaw 3 fix)
 const panelStyle: React.CSSProperties = {
-    position: 'absolute',
-    bottom: '80px',
-    left: '20px',
-    zIndex: 1000,
     minWidth: '240px',
     maxWidth: '280px',
     // Glassmorphism - consistent with other panels

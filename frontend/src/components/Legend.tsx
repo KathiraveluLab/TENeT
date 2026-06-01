@@ -1,11 +1,12 @@
 import React from 'react';
 import { getNeedColor, getNeedLabel } from '../api/catApi';
+import MetricTooltip from './MetricTooltip';
+import './Legend.css';
 
 interface LegendProps {
     totalRegions?: number;
 }
 
-// Helper for need description
 const getNeedCapability = (score: number): string => {
     if (score >= 75) return 'Severe lack of nearby healthcare facilities';
     if (score >= 50) return 'Limited access to clinics or hospitals';
@@ -13,117 +14,77 @@ const getNeedCapability = (score: number): string => {
     return 'Good access to nearby healthcare facilities';
 };
 
-/**
- * Map legend showing CAT tier color coding
- */
 export default function Legend({ totalRegions }: LegendProps) {
     const needLevels = [87, 62, 37, 12];
 
     return (
-        <div style={{
-            position: 'absolute',
-            bottom: '80px',
-            right: '20px',
-            zIndex: 1000,
-            minWidth: '220px',
-            // Glassmorphism
-            background: 'rgba(255, 255, 255, 0.92)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            padding: '16px 18px',
-            borderRadius: '12px',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            boxShadow: '0 8px 32px rgba(31, 38, 135, 0.12)',
-            fontSize: '12px',
-        }}>
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '12px',
-                paddingBottom: '10px',
-                borderBottom: '1px solid rgba(0, 0, 0, 0.08)'
-            }}>
-                <h4 style={{
-                    margin: 0,
-                    color: '#0f172a',
-                    fontSize: '14px',
-                    fontWeight: '700',
-                    letterSpacing: '-0.02em'
-                }}>
-                    Telehealth Need
-                </h4>
-                <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '500' }}>Score (0-100)</span>
-            </div>
+        <div className="legend-hover-shell">
+            <button type="button" className="legend-trigger" aria-label="Show discovery legend">
+                Legend
+            </button>
 
-            {needLevels.map(score => (
-                <div
-                    key={score}
-                    style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        marginBottom: '8px',
-                        gap: '10px'
-                    }}
-                >
-                    <div style={{
-                        width: '12px',
-                        height: '12px',
-                        borderRadius: '50%',
-                        backgroundColor: getNeedColor(score),
-                        flexShrink: 0,
-                        marginTop: '3px',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
-                    }} />
-                    <div>
-                        <div style={{ color: '#1e293b', fontWeight: '500' }}>
-                            {getNeedLabel(score)}
-                        </div>
-                        <div style={{ color: '#64748b', fontSize: '10px' }}>
-                            {getNeedCapability(score)}
+            <div className="legend-panel">
+                <div className="legend-header">
+                    <h4>Discovery Legend</h4>
+                    <span>Plain-language guide</span>
+                </div>
+
+                <div className="legend-section-title">
+                    Healthcare Desert Score
+                    <MetricTooltip term="Healthcare Desert Score">
+                        A 0-100 need score. Higher means the community has farther or weaker access to nearby healthcare.
+                    </MetricTooltip>
+                </div>
+
+                {needLevels.map(score => (
+                    <div key={score} className="legend-row">
+                        <span
+                            className="legend-dot"
+                            style={{ backgroundColor: getNeedColor(score) }}
+                            aria-hidden="true"
+                        />
+                        <div>
+                            <div className="legend-row-label">{getNeedLabel(score)}</div>
+                            <div className="legend-row-note">{getNeedCapability(score)}</div>
                         </div>
                     </div>
-                </div>
-            ))}
+                ))}
 
-            {totalRegions !== undefined && (
-                <div style={{
-                    marginTop: '10px',
-                    paddingTop: '8px',
-                    borderTop: '1px solid #e5e7eb',
-                    fontSize: '10px',
-                    color: '#64748b',
-                    display: 'flex',
-                    justifyContent: 'space-between'
-                }}>
-                    <span>Communities</span>
-                    <strong style={{ color: '#334155' }}>{totalRegions}</strong>
+                <div className="legend-section">
+                    <div className="legend-section-title">
+                        CAT Tiers
+                        <MetricTooltip term="CAT Tier">
+                            Community Access Tier summarizes how isolated a community is for practical care access and transport.
+                        </MetricTooltip>
+                    </div>
+                    <div className="legend-tier-list">
+                        <div><strong>Tier 1:</strong> strongest access; road-connected or easier service reach.</div>
+                        <div><strong>Tier 2:</strong> moderate access; some travel or logistics constraints.</div>
+                        <div><strong>Tier 3:</strong> limited access; remote travel makes care harder to reach.</div>
+                        <div><strong>Tier 4:</strong> most isolated; highest transport and service-access barriers.</div>
+                    </div>
                 </div>
-            )}
 
-            {/* Color scale indicator */}
-            <div style={{
-                marginTop: '10px',
-                paddingTop: '8px',
-                borderTop: '1px solid #e5e7eb',
-            }}>
-                <div style={{
-                    height: '6px',
-                    borderRadius: '3px',
-                    background: `linear-gradient(to right, ${getNeedColor(12)}, ${getNeedColor(37)}, ${getNeedColor(62)}, ${getNeedColor(87)})`,
-                    marginBottom: '4px',
-                }} />
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    fontSize: '9px',
-                    color: '#94a3b8',
-                }}>
-                    <span>Low Need</span>
-                    <span>High Need</span>
+                {totalRegions !== undefined && (
+                    <div className="legend-footer-row">
+                        <span>Communities</span>
+                        <strong>{totalRegions}</strong>
+                    </div>
+                )}
+
+                <div className="legend-scale">
+                    <div
+                        className="legend-gradient"
+                        style={{
+                            background: `linear-gradient(to right, ${getNeedColor(12)}, ${getNeedColor(37)}, ${getNeedColor(62)}, ${getNeedColor(87)})`,
+                        }}
+                    />
+                    <div className="legend-scale-labels">
+                        <span>Low Need</span>
+                        <span>High Need</span>
+                    </div>
                 </div>
             </div>
         </div>
     );
 }
-
