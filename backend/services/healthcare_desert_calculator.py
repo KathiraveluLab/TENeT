@@ -135,7 +135,9 @@ class HealthcareDesertCalculator:
             return {"clinic": None, "hospital": None, "nearest": None}
 
         sites = db.query(HealthcareSite).filter(
-            HealthcareSite.is_active == True
+            HealthcareSite.is_active == True,
+            HealthcareSite.latitude.isnot(None),
+            HealthcareSite.longitude.isnot(None)
         ).all()
         if not sites:
             return {"clinic": 999, "hospital": 999, "nearest": 999}
