@@ -19,9 +19,14 @@ def load_transport_profiles():
     Load community transport profiles from preprocessed CSV.
     Creates CATRegion and CATDataPoint entries for each community.
     """
-    csv_path = os.path.join(
+    data_dir = os.path.join(
         os.path.dirname(os.path.dirname(__file__)),
-        'data', 'processed_data', 'clean_transport_profiles_1.csv'
+        'data', 'processed_data'
+    )
+    fixed_csv_path = os.path.join(data_dir, 'clean_transport_profiles_fixed.csv')
+    csv_path = fixed_csv_path if os.path.exists(fixed_csv_path) else os.path.join(
+        data_dir,
+        'clean_transport_profiles_1.csv'
     )
     
     if not os.path.exists(csv_path):

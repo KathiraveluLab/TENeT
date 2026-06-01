@@ -9,6 +9,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database.config import init_db, SessionLocal
+from database.models import CATGatingRule
 from database.handlers import (
     CATDataHandler,
     CAT4_MIN_BANDWIDTH_MBPS,
@@ -21,6 +22,9 @@ from database.handlers import (
 
 def create_sample_gating_rules(db):
     """Create sample gating rules for each tier"""
+    db.query(CATGatingRule).delete()
+    db.commit()
+
     rules = [
         {
             'rule_name': 'Tier 1 Basic Access',

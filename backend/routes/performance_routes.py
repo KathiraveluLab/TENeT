@@ -76,6 +76,15 @@ def get_speed_label(speed_kbps: float) -> str:
     return 'Critical'
 
 
+def reverse_geocode_coords(coords):
+    """Best-effort reverse geocoding with a deterministic local fallback."""
+    try:
+        import reverse_geocoder as rg
+        return rg.search(coords)
+    except Exception:
+        return [{'name': 'Remote Alaska Area', 'admin1': 'Alaska', 'cc': 'US'} for _ in coords]
+
+
 @performance_bp.route('/performance', methods=['GET'])
 def get_performance():
     """
@@ -497,8 +506,6 @@ def get_top_gaps():
         limit: Number of gaps to return (default: 10)
         min_tests: Minimum test count to consider (default: 5)
     """
-    import reverse_geocoder as rg
-    
     db = SessionLocal()
     try:
         limit = request.args.get('limit', type=int, default=10)
@@ -537,10 +544,7 @@ def get_top_gaps():
         # Reverse geocode to get location names
         coords = [(g.centroid_lat, g.centroid_lon) for g in gaps]
         
-        try:
-            locations = rg.search(coords)
-        except Exception:
-            locations = [{'name': 'Unknown', 'admin1': 'Alaska'} for _ in gaps]
+        locations = reverse_geocode_coords(coords)
         
         result = []
         seen_locations = set()
@@ -615,8 +619,6 @@ def get_location_name():
         lat: Latitude
         lon: Longitude
     """
-    import reverse_geocoder as rg
-    
     try:
         lat = request.args.get('lat', type=float)
         lon = request.args.get('lon', type=float)
@@ -624,7 +626,7 @@ def get_location_name():
         if lat is None or lon is None:
             return jsonify({'error': 'lat and lon are required'}), 400
         
-        results = rg.search([(lat, lon)])
+        results = reverse_geocode_coords([(lat, lon)])
         
         if results:
             location = results[0]
