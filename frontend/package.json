@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "test": "npm run build"
   },
   "dependencies": {
     "leaflet": "^1.9.4",

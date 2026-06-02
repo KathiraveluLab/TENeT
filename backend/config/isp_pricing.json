@@ -78,6 +78,11 @@
             "99762",
             "99741"
         ],
+        "starlink_satellite": [
+            "99654",
+            "99667",
+            "99753"
+        ],
         "comment": "ZCTAs not in these lists default to fastwyre pricing"
     },
     "thresholds": {

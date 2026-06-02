@@ -2,6 +2,8 @@
 FROM node:20-alpine AS dev
 
 WORKDIR /app
+ARG VITE_API_BASE_URL=/api/cat
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -16,6 +18,8 @@ CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 FROM node:20-alpine AS build
 
 WORKDIR /app
+ARG VITE_API_BASE_URL=/api/cat
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
 COPY package.json package-lock.json ./
 RUN npm ci

@@ -1160,11 +1160,14 @@ def _get_regional_internet_cost(zcta: str) -> tuple:
             gmap = {}
         gu_list = gmap.get('gci_urban', [])
         er_list = gmap.get('extreme_rural', [])
+        sl_list = gmap.get('starlink_satellite', [])
         gci_urban = set(gu_list if isinstance(gu_list, list) else [])
         extreme_rural = set(er_list if isinstance(er_list, list) else [])
+        starlink_satellite = set(sl_list if isinstance(sl_list, list) else [])
     except Exception:
         gci_urban = set()
         extreme_rural = set()
+        starlink_satellite = set()
         
     pricing = _ISP_CONFIG.get('isp_pricing', {})
     if not isinstance(pricing, dict):
@@ -1178,6 +1181,10 @@ def _get_regional_internet_cost(zcta: str) -> tuple:
         p = pricing.get('gci', {'cost': 125.0, 'name': 'GCI'})
         if not isinstance(p, dict): p = {'cost': 125.0, 'name': 'GCI'}
         return (float(p.get('cost', 125.0)), str(p.get('name', 'GCI')))
+    elif zcta in starlink_satellite:
+        p = pricing.get('starlink', {'cost': 120.0, 'name': 'Starlink'})
+        if not isinstance(p, dict): p = {'cost': 120.0, 'name': 'Starlink'}
+        return (float(p.get('cost', 120.0)), str(p.get('name', 'Starlink')))
     else:
         p = pricing.get('fastwyre', {'cost': 350.0, 'name': 'FastWyre'})
         if not isinstance(p, dict): p = {'cost': 350.0, 'name': 'FastWyre'}
@@ -1903,4 +1910,3 @@ def get_healthcare_summary():
         return jsonify({'error': str(e)}), 500
     finally:
         db.close()
-

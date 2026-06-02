@@ -46,54 +46,132 @@ class HealthcareDesertCalculator:
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
         
         return R * c
-    
+
     @staticmethod
-    def get_nearest_facility_distances(db: Session, region_code: str) -> Optional[Dict[str, float]]:
-        """
-        Calculate distance from region center to nearest clinic and nearest hospital.
-        Returns distances in kilometers.
-        """
+    def score_distance_component(distance_km: float) -> float:
+        """Normalize distance to nearest facility: 0km=0, 300+km=100."""
+        return min(100, (max(distance_km, 0) / 300) * 100)
+
+    @staticmethod
+    def score_density_component(num_sites: int) -> float:
+        """Score facility density. Fewer facilities means higher need."""
+        if num_sites <= 0:
+            return 100
+        if num_sites == 1:
+            return 70
+        if num_sites == 2:
+            return 40
+        return 10
+
+    @staticmethod
+    def score_specialist_component(has_specialists: bool) -> float:
+        """Score specialist access. No specialists means higher need."""
+        return 0 if has_specialists else 100
+
+    @staticmethod
+    def score_transport_component(
+        travel_time_minutes: Optional[float],
+        season: str = SEASON_YEAR_ROUND,
+        road_quality: str = ROAD_QUALITY_LOCAL,
+        transport_mode: str = "road",
+    ) -> float:
+        """Score seasonal transport difficulty on a 0-100 scale."""
+        if season not in VALID_SEASONS:
+            season = SEASON_YEAR_ROUND
+        if road_quality not in VALID_ROAD_QUALITIES:
+            road_quality = ROAD_QUALITY_LOCAL
+
+        if not travel_time_minutes:
+            if season == SEASON_WINTER:
+                return 70
+            if season == SEASON_SUMMER:
+                return 40
+            return 50
+
+        mode = transport_mode if transport_mode in {"road", "water", "air"} else "road"
+        friction = get_road_friction(road_quality, season) if mode == "road" else 1.0
+        adjusted_travel_time = travel_time_minutes * friction
+
+        modifier = get_seasonal_modifier(mode, season, road_quality)
+        if modifier < 0.1:
+            return 100
+
+        availability_penalty = (1.0 - modifier) * 30
+        base_transport_score = min(100, (adjusted_travel_time / 240) * 100)
+        return min(100, base_transport_score + availability_penalty)
+
+    @staticmethod
+    def _region_center(db: Session, region_code: str) -> Optional[Tuple[float, float]]:
         region = db.query(CATRegion).filter(
             CATRegion.region_code == region_code
         ).first()
-        
+
         if not region:
             return None
-        
-        # Get data points in region to calculate center
+
         data_points = db.query(CATDataPoint).filter(
             CATDataPoint.region_code == region_code
         ).all()
-        
-        if not data_points:
-            return None
-        
-        # Calculate region center from data points
-        avg_lat = sum(p.latitude for p in data_points) / len(data_points)
-        avg_lon = sum(p.longitude for p in data_points) / len(data_points)
-        
-        # Find nearest healthcare site
-        all_sites = db.query(HealthcareSite).all()
-        
-        if not all_sites:
-            return {'clinic': 999.0, 'hospital': 999.0}  # No healthcare sites in database
-        
-        min_clinic = float('inf')
-        min_hospital = float('inf')
-        
-        for site in all_sites:
+
+        if data_points:
+            avg_lat = sum(p.latitude for p in data_points) / len(data_points)
+            avg_lon = sum(p.longitude for p in data_points) / len(data_points)
+            return avg_lat, avg_lon
+
+        if region.centroid_lat is not None and region.centroid_lon is not None:
+            return region.centroid_lat, region.centroid_lon
+
+        return None
+
+    @staticmethod
+    def get_nearest_facility_distances(db: Session, region_code: str) -> Dict[str, Optional[float]]:
+        """
+        Calculate distances from a region center to nearest facility classes.
+
+        Returns clinic, hospital, and nearest-facility distances in kilometers.
+        """
+        center = HealthcareDesertCalculator._region_center(db, region_code)
+        if not center:
+            return {"clinic": None, "hospital": None, "nearest": None}
+
+        sites = db.query(HealthcareSite).filter(
+            HealthcareSite.is_active == True,
+            HealthcareSite.latitude.isnot(None),
+            HealthcareSite.longitude.isnot(None)
+        ).all()
+        if not sites:
+            return {"clinic": 999, "hospital": 999, "nearest": 999}
+
+        avg_lat, avg_lon = center
+        distances = {"clinic": float("inf"), "hospital": float("inf"), "nearest": float("inf")}
+        clinic_types = {"clinic", "health_center", "community_health_center"}
+
+        for site in sites:
             distance = HealthcareDesertCalculator.calculate_distance(
-                avg_lat, avg_lon, float(site.latitude), float(site.longitude)
+                avg_lat, avg_lon, site.latitude, site.longitude
             )
-            if site.site_type == 'hospital':
-                min_hospital = min(min_hospital, distance)
-            else:
-                min_clinic = min(min_clinic, distance)
-        
+            distances["nearest"] = min(distances["nearest"], distance)
+
+            site_type = (site.site_type or "").lower()
+            if site_type in clinic_types:
+                distances["clinic"] = min(distances["clinic"], distance)
+            if site_type == "hospital":
+                distances["hospital"] = min(distances["hospital"], distance)
+
         return {
-            'clinic': min_clinic if min_clinic != float('inf') else 999.0,
-            'hospital': min_hospital if min_hospital != float('inf') else 999.0
+            key: (999 if value == float("inf") else value)
+            for key, value in distances.items()
         }
+    
+    @staticmethod
+    def get_nearest_clinic_distance(db: Session, region_code: str) -> Optional[float]:
+        """
+        Calculate distance from region center to nearest clinic-like site.
+        Returns distance in kilometers.
+        """
+        return HealthcareDesertCalculator.get_nearest_facility_distances(
+            db, region_code
+        )["clinic"]
     
     @staticmethod
     def calculate_healthcare_necessity_score(
@@ -113,23 +191,27 @@ class HealthcareDesertCalculator:
             road_quality: 'highway', 'local', or 'seasonal'
         
         Factors:
-        1. Distance to nearest clinic (40% weight)
-        2. Number of health sites in region (20% weight)
-        3. Specialist availability (20% weight)
+        1. Distance to nearest clinic/hospital (50% weight)
+        2. Number of health sites in region (15% weight)
+        3. Specialist availability (15% weight)
         4. Transportation difficulty - season-adjusted (20% weight)
         """
         
         # 1. Distance factor (0-100) incorporates both clinic and hospital
-        distances = HealthcareDesertCalculator.get_nearest_facility_distances(db, region_code)
-        if distances is None:
+        facility_distances = HealthcareDesertCalculator.get_nearest_facility_distances(
+            db, region_code
+        )
+        if facility_distances["nearest"] is None:
             clinic_dist = 500.0
             hospital_dist = 500.0
+            nearest_dist = 500.0
         else:
-            clinic_dist = distances['clinic']
-            hospital_dist = distances['hospital']
+            clinic_dist = facility_distances['clinic']
+            hospital_dist = facility_distances['hospital']
+            nearest_dist = facility_distances['nearest']
             
         # Normalize: 0km=0 points, 300+km=100 points for clinic
-        clinic_score = min(100.0, (clinic_dist / 300.0) * 100.0)
+        clinic_score = HealthcareDesertCalculator.score_distance_component(clinic_dist)
         # Hospital distance is more vital, scales over 500km
         hospital_score = min(100.0, (hospital_dist / 500.0) * 100.0)
         
@@ -141,15 +223,7 @@ class HealthcareDesertCalculator:
             HealthcareSite.region_code == region_code
         ).count()
         
-        # Fewer sites = higher score
-        if num_sites == 0:
-            density_score = 100
-        elif num_sites == 1:
-            density_score = 70
-        elif num_sites == 2:
-            density_score = 40
-        else:
-            density_score = 10
+        density_score = HealthcareDesertCalculator.score_density_component(num_sites)
         
         # 3. Specialist availability (0-100)
         has_specialists = db.query(HealthcareSite).filter(
@@ -157,7 +231,7 @@ class HealthcareDesertCalculator:
             HealthcareSite.has_specialists == True
         ).count() > 0
         
-        specialist_score = 0 if has_specialists else 100
+        specialist_score = HealthcareDesertCalculator.score_specialist_component(has_specialists)
         
         # Validate season and road_quality inputs
         if season not in VALID_SEASONS:
@@ -171,32 +245,12 @@ class HealthcareDesertCalculator:
             CATDataPoint.region_code == region_code
         ).first()
         
-        if data_point and data_point.travel_time_minutes:
-            base_travel_time = data_point.travel_time_minutes
-            
-            # Apply road friction multiplier
-            friction = get_road_friction(road_quality, season)
-            adjusted_travel_time = base_travel_time * friction
-            
-            # Apply seasonal availability penalty
-            # Lower availability = harder to travel = higher score
-            road_modifier = get_seasonal_modifier('road', season, road_quality)
-            if road_modifier < 0.1:  # Route effectively unavailable
-                transport_score = 100  # Maximum difficulty
-            else:
-                # Invert modifier: low availability = high difficulty
-                availability_penalty = (1.0 - road_modifier) * 30  # Up to 30 points
-                # Normalize: 0-60min=0, 240+min=100 (with adjustments)
-                base_transport_score = min(100.0, float(adjusted_travel_time / 240.0) * 100.0)
-                transport_score = min(100.0, float(base_transport_score + availability_penalty))
-        else:
-            # Unknown travel time - use seasonal default
-            if season == SEASON_WINTER:
-                transport_score = 70.0  # Assume winter is harder
-            elif season == SEASON_SUMMER:
-                transport_score = 40.0  # Assume summer is easier
-            else:
-                transport_score = 50.0  # Year-round moderate
+        transport_score = HealthcareDesertCalculator.score_transport_component(
+            data_point.travel_time_minutes if data_point else None,
+            season,
+            road_quality,
+            "road",
+        )
         
         # Calculate weighted score
         necessity_score = float(
@@ -207,11 +261,12 @@ class HealthcareDesertCalculator:
         )
         
         return {
-            'necessity_score': round(float(necessity_score), 2),  # type: ignore
-            'distance_to_nearest_clinic_km': round(float(clinic_dist), 2),  # type: ignore
-            'distance_to_nearest_hospital_km': round(float(hospital_dist), 2),  # type: ignore
-            'num_healthcare_sites': int(num_sites),
-            'has_specialist_access': bool(has_specialists),
+            'necessity_score': round(necessity_score, 2),
+            'distance_to_nearest_clinic_km': round(float(clinic_dist), 2),
+            'distance_to_nearest_hospital_km': round(float(hospital_dist), 2),
+            'distance_to_nearest_facility_km': round(float(nearest_dist), 2),
+            'num_healthcare_sites': num_sites,
+            'has_specialist_access': has_specialists,
             'avg_travel_time_minutes': data_point.travel_time_minutes if data_point else None,
             'season_scenario': {
                 'active_season': season,
@@ -263,4 +318,3 @@ class HealthcareDesertCalculator:
         results.sort(key=lambda x: x['necessity_score'], reverse=True)
         
         return results
-

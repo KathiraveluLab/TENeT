@@ -136,7 +136,7 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
         if (!visible) return;
 
         setLoading(true);
-        const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api/cat';
+        const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/cat';
         fetch(`${API_BASE}/boundaries`)
             .then(res => res.json())
             .then(data => {
