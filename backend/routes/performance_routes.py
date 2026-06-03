@@ -4,7 +4,6 @@ API routes for Ookla Performance data (Measured Network Performance Layer)
 from flask import Blueprint, request, jsonify
 from database.config import SessionLocal
 from database.models import OoklaPerformance, BroadbandCoverage, CATRegion, CensusIncome
-from sqlalchemy import func
 import math
 import json
 import os
@@ -44,6 +43,7 @@ SPEED_CRITICAL = 5000     # 5 Mbps
 LATENCY_GOOD = 50
 LATENCY_ACCEPTABLE = 150
 LATENCY_POOR = 300
+MIN_POPULATED_PERIOD_TILES = 50
 
 
 def get_speed_color(speed_kbps: float) -> str:
@@ -85,6 +85,27 @@ def reverse_geocode_coords(coords):
         return [{'name': 'Remote Alaska Area', 'admin1': 'Alaska', 'cc': 'US'} for _ in coords]
 
 
+def _latest_performance_period(db):
+    periods = db.query(
+        OoklaPerformance.year,
+        OoklaPerformance.quarter
+    ).distinct().order_by(
+        OoklaPerformance.year.desc(),
+        OoklaPerformance.quarter.desc()
+    ).all()
+
+    for period in periods:
+        sample = db.query(OoklaPerformance.id).filter(
+            OoklaPerformance.year == period.year,
+            OoklaPerformance.quarter == period.quarter
+        ).limit(MIN_POPULATED_PERIOD_TILES).all()
+
+        if len(sample) >= MIN_POPULATED_PERIOD_TILES:
+            return period
+
+    return periods[0] if periods else None
+
+
 @performance_bp.route('/performance', methods=['GET'])
 def get_performance():
     """
@@ -106,33 +127,7 @@ def get_performance():
         # If no year/quarter specified, prefer the newest populated period.
         # Tiny offline fallback samples should not outrank a real Ookla ingest.
         if not year or not quarter:
-            latest = db.query(
-                OoklaPerformance.year,
-                OoklaPerformance.quarter,
-                func.count(OoklaPerformance.id).label('tile_count')
-            ).group_by(
-                OoklaPerformance.year,
-                OoklaPerformance.quarter
-            ).having(
-                func.count(OoklaPerformance.id) >= 50
-            ).order_by(
-                OoklaPerformance.year.desc(),
-                OoklaPerformance.quarter.desc()
-            ).first()
-
-            if not latest:
-                latest = db.query(
-                    OoklaPerformance.year,
-                    OoklaPerformance.quarter,
-                    func.count(OoklaPerformance.id).label('tile_count')
-                ).group_by(
-                    OoklaPerformance.year,
-                    OoklaPerformance.quarter
-                ).order_by(
-                    OoklaPerformance.year.desc(),
-                    OoklaPerformance.quarter.desc()
-                ).first()
-
+            latest = _latest_performance_period(db)
             if latest:
                 year, quarter = latest.year, latest.quarter
             else:
