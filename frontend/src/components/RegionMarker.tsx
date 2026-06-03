@@ -151,9 +151,9 @@ export default function RegionMarker({
         }
     }, [region.region_code, region.region_name, season]);
 
-    useEffect(() => {
-        onMarkerReady?.(region.region_code, markerRef.current);
-        return () => onMarkerReady?.(region.region_code, null);
+    const markerRefCallback = useCallback((marker: L.Marker | null) => {
+        markerRef.current = marker;
+        onMarkerReady?.(region.region_code, marker);
     }, [onMarkerReady, region.region_code]);
 
     // Skip regions without coordinates
