@@ -49,6 +49,20 @@ export default function MetricTooltip({ term, children }: MetricTooltipProps) {
         };
     }, [open, updatePosition]);
 
+    const tooltipPanel = open
+        ? createPortal(
+            <span
+                className={`metric-tooltip-panel ${placement}`}
+                role="tooltip"
+                style={position}
+            >
+                <strong>{term}</strong>
+                <span>{children}</span>
+            </span>,
+            document.body,
+        )
+        : null;
+
     return (
         <span
             className="metric-tooltip"
@@ -65,14 +79,7 @@ export default function MetricTooltip({ term, children }: MetricTooltipProps) {
             >
                 i
             </button>
-            <span
-                className={`metric-tooltip-panel ${open ? 'open' : ''} ${placement}`}
-                role="tooltip"
-                style={position}
-            >
-                <strong>{term}</strong>
-                <span>{children}</span>
-            </span>
+            {tooltipPanel}
         </span>
     );
 }

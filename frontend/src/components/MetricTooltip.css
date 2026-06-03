@@ -21,7 +21,6 @@
     position: fixed;
     z-index: 2500;
     width: min(260px, calc(100vw - 24px));
-    display: none;
     border: 1px solid #cbd5e1;
     border-radius: 8px;
     background: #ffffff;
@@ -38,10 +37,6 @@
     margin-bottom: 3px;
     color: #0f172a;
     font-size: 12px;
-}
-
-.metric-tooltip-panel.open {
-    display: block;
 }
 
 .metric-tooltip-panel.above {
