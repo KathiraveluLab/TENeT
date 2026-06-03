@@ -1,7 +1,7 @@
 """
 API routes for Community Access Tier (CAT) data management
 """
-from database.models import CATRegion, HealthcareSite, CensusIncome, BroadbandCoverage
+from database.models import CATRegion, CATDataPoint, HealthcareSite, CensusIncome, BroadbandCoverage
 from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
 import os
@@ -199,17 +199,92 @@ def _build_telehealth_context(db, regions):
     return context
 
 
-def _desert_score_for_region(db, region):
-    if region.centroid_lat is None or region.centroid_lon is None:
-        return None
+def _build_desert_score_lookup(db, regions):
+    region_codes = [region.region_code for region in regions if region.region_code]
+    if not region_codes:
+        return {}
 
-    try:
-        score_data = HealthcareDesertCalculator.calculate_healthcare_necessity_score(
-            db, region.region_code
+    data_points = db.query(CATDataPoint).filter(
+        CATDataPoint.region_code.in_(region_codes)
+    ).all()
+    points_by_region = {}
+    for point in data_points:
+        points_by_region.setdefault(point.region_code, []).append(point)
+
+    sites = db.query(HealthcareSite).all()
+    active_sites = [
+        site for site in sites
+        if site.is_active and site.latitude is not None and site.longitude is not None
+    ]
+
+    sites_by_region = {}
+    specialist_regions = set()
+    for site in sites:
+        if not site.region_code:
+            continue
+        sites_by_region[site.region_code] = sites_by_region.get(site.region_code, 0) + 1
+        if site.has_specialists:
+            specialist_regions.add(site.region_code)
+
+    score_lookup = {}
+    clinic_types = {'clinic', 'health_center', 'community_health_center'}
+
+    for region in regions:
+        if region.centroid_lat is None or region.centroid_lon is None:
+            score_lookup[region.region_code] = None
+            continue
+
+        region_points = points_by_region.get(region.region_code, [])
+        if region_points:
+            center_lat = sum(point.latitude for point in region_points) / len(region_points)
+            center_lon = sum(point.longitude for point in region_points) / len(region_points)
+            travel_time = region_points[0].travel_time_minutes
+        else:
+            center_lat = region.centroid_lat
+            center_lon = region.centroid_lon
+            travel_time = None
+
+        if active_sites:
+            clinic_dist = float('inf')
+            hospital_dist = float('inf')
+
+            for site in active_sites:
+                distance = _haversine_km(center_lat, center_lon, site.latitude, site.longitude)
+
+                site_type = (site.site_type or '').lower()
+                if site_type in clinic_types:
+                    clinic_dist = min(clinic_dist, distance)
+                if site_type == 'hospital':
+                    hospital_dist = min(hospital_dist, distance)
+
+            clinic_dist = 999 if clinic_dist == float('inf') else clinic_dist
+            hospital_dist = 999 if hospital_dist == float('inf') else hospital_dist
+        else:
+            clinic_dist = 999
+            hospital_dist = 999
+
+        clinic_score = HealthcareDesertCalculator.score_distance_component(clinic_dist)
+        hospital_score = min(100.0, (hospital_dist / 500.0) * 100.0)
+        distance_score = (0.6 * hospital_score) + (0.4 * clinic_score)
+        density_score = HealthcareDesertCalculator.score_density_component(
+            sites_by_region.get(region.region_code, 0)
         )
-        return score_data.get('necessity_score') if score_data else None
-    except Exception:
-        return None
+        specialist_score = HealthcareDesertCalculator.score_specialist_component(
+            region.region_code in specialist_regions
+        )
+        transport_score = HealthcareDesertCalculator.score_transport_component(
+            travel_time,
+            transport_mode='road',
+        )
+
+        score_lookup[region.region_code] = round(float(
+            0.50 * distance_score +
+            0.15 * density_score +
+            0.15 * specialist_score +
+            0.20 * transport_score
+        ), 2)
+
+    return score_lookup
 
 
 def _build_region_summary(db, regions):
@@ -218,6 +293,7 @@ def _build_region_summary(db, regions):
         [region.region_code for region in regions if region.region_code]
     )
     telehealth_lookup = _build_telehealth_context(db, regions)
+    desert_score_lookup = _build_desert_score_lookup(db, regions)
 
     summaries = []
     for region in regions:
@@ -231,7 +307,7 @@ def _build_region_summary(db, regions):
             'lon': _to_float_or_none(region.centroid_lon),
             'cat_tier': region.tier_level if region.tier_level is not None else None,
             'telehealth_status': telehealth.get('telehealth_status', 'DATA_UNAVAILABLE'),
-            'desert_score': _desert_score_for_region(db, region),
+            'desert_score': desert_score_lookup.get(region.region_code),
             'affordability_status': telehealth.get('affordability_status', 'unknown'),
             'data_confidence': _data_confidence(broadband),
             'has_data_gap': _has_broadband_data_gap(broadband),
