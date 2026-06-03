@@ -84,19 +84,30 @@ def _nearest_income_record(region, census_records):
     if region.centroid_lat is None or region.centroid_lon is None:
         return None
 
+    region_lat = float(region.centroid_lat)
+    region_lon = float(region.centroid_lon)
+    max_distance_km = 55
+    lat_window = max_distance_km / 111.0
+    lon_window = max_distance_km / (111.0 * max(math.cos(math.radians(region_lat)), 0.1))
+
     nearest = None
     min_dist = float('inf')
     for record in census_records:
         if record.centroid_lat is None or record.centroid_lon is None:
             continue
 
+        record_lat = float(record.centroid_lat)
+        record_lon = float(record.centroid_lon)
+        if abs(record_lat - region_lat) > lat_window or abs(record_lon - region_lon) > lon_window:
+            continue
+
         distance = _haversine_km(
-            region.centroid_lat,
-            region.centroid_lon,
-            record.centroid_lat,
-            record.centroid_lon,
+            region_lat,
+            region_lon,
+            record_lat,
+            record_lon,
         )
-        if distance < min_dist and distance < 55:
+        if distance < min_dist and distance < max_distance_km:
             min_dist = distance
             nearest = record
 
