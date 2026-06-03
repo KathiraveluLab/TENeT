@@ -169,7 +169,7 @@ export default function RegionMarker({
 
     return (
         <Marker
-            ref={markerRef}
+            ref={markerRefCallback}
             position={[region.centroid_lat, region.centroid_lon]}
             icon={icon}
             eventHandlers={{
