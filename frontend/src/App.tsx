@@ -1,14 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, ZoomControl } from 'react-leaflet';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { fetchRegions, CATRegion, Season, AllTelehealthStatusResponse } from './api/catApi';
+import { fetchRegions, CATRegion, RegionSummary, Season, AllTelehealthStatusResponse } from './api/catApi';
 import RegionMarker from './components/RegionMarker';
 import Legend from './components/Legend';
 import SeasonSelector from './components/SeasonSelector';
 import DataCoveragePanel from './components/DataCoveragePanel';
 import PerformanceLayer from './components/PerformanceLayer';
 import AffordabilityLayer, { AffordabilityLegend } from './components/AffordabilityLayer';
+import Sidebar from './components/sidebar/Sidebar';
+import { useRegionSummary } from './hooks/useRegionSummary';
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -18,24 +20,99 @@ L.Icon.Default.mergeOptions({
 });
 
 // Alaska-specific coordinates
-const ALASKA_CENTER: [number, number] = [64.2008, -149.4937];
+const ALASKA_CENTER: [number, number] = [62.8, -146.0];
 const ALASKA_ZOOM = 5;
 
 const ALASKA_BOUNDS: [[number, number], [number, number]] = [
-  [51.0, -190.0],
+  [51.0, -181.0],
   [71.5, -129.0]
 ];
+
+interface SelectionControllerProps {
+  selectedRegionCode: string | null;
+  regionSummaries: RegionSummary[];
+  markerRefs: React.MutableRefObject<Record<string, L.Marker | L.CircleMarker>>;
+}
+
+function SelectionController({
+  selectedRegionCode,
+  regionSummaries,
+  markerRefs,
+}: SelectionControllerProps) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!selectedRegionCode) return;
+
+    const selected = regionSummaries.find(region => region.region_code === selectedRegionCode);
+    if (!selected || selected.lat === null || selected.lon === null) return;
+
+    map.flyTo([selected.lat, selected.lon], Math.max(map.getZoom(), 8), { duration: 1.1 });
+
+    window.setTimeout(() => {
+      markerRefs.current[selectedRegionCode]?.openPopup();
+    }, 350);
+  }, [map, markerRefs, regionSummaries, selectedRegionCode]);
+
+  return null;
+}
 
 function App() {
   const [regions, setRegions] = useState<CATRegion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [season, setSeason] = useState<Season>('year_round');
-  const [dataPanelExpanded, setDataPanelExpanded] = useState(false);
   const [performanceLayerVisible, setPerformanceLayerVisible] = useState(false);
   const [affordabilityLayerVisible, setAffordabilityLayerVisible] = useState(false);
   const [gapModeActive, setGapModeActive] = useState(false);
   const [affordabilitySummary, setAffordabilitySummary] = useState<AllTelehealthStatusResponse['summary'] | undefined>(undefined);
+  const [selectedRegionCode, setSelectedRegionCode] = useState<string | null>(null);
+  const [visibleRegionCodes, setVisibleRegionCodes] = useState<string[] | null>(null);
+  const markerRefs = useRef<Record<string, L.Marker | L.CircleMarker>>({});
+  const {
+    regions: regionSummaries,
+    loading: summaryLoading,
+    error: summaryError,
+  } = useRegionSummary();
+
+  const registerMarker = useCallback((regionCode: string, marker: L.Marker | null) => {
+    if (marker) {
+      markerRefs.current[regionCode] = marker;
+    } else {
+      delete markerRefs.current[regionCode];
+    }
+  }, []);
+
+  const registerAffordabilityMarker = useCallback((regionCode: string, marker: L.CircleMarker | null) => {
+    if (marker) {
+      markerRefs.current[regionCode] = marker;
+    } else {
+      delete markerRefs.current[regionCode];
+    }
+  }, []);
+
+  const handleSelectRegion = useCallback((regionCode: string) => {
+    setSelectedRegionCode(regionCode);
+  }, []);
+
+  const handleVisibleRegionsChange = useCallback((regionCodes: string[]) => {
+    setVisibleRegionCodes(regionCodes);
+  }, []);
+
+  const visibleRegionCodeSet = useMemo(
+    () => visibleRegionCodes ? new Set(visibleRegionCodes) : null,
+    [visibleRegionCodes],
+  );
+
+  const mapRegions = useMemo(() => {
+    if (!visibleRegionCodeSet) return regions;
+    return regions.filter(region => visibleRegionCodeSet.has(region.region_code));
+  }, [regions, visibleRegionCodeSet]);
+  const activeSidebarLayer = gapModeActive
+    ? 'gap'
+    : affordabilityLayerVisible
+      ? 'affordability'
+      : 'cat';
 
   const toggleAffordabilityLayer = () => {
     if (!affordabilityLayerVisible) {
@@ -81,36 +158,63 @@ function App() {
   };
 
   return (
-    <div style={{ height: '100vh', width: '100%', margin: 0, padding: 0, position: 'relative' }}>
-      <MapContainer
-        center={ALASKA_CENTER}
-        zoom={ALASKA_ZOOM}
-        maxBounds={ALASKA_BOUNDS}
-        maxBoundsViscosity={1.0}
-        minZoom={4}
-        zoomControl={true}
-        style={{ height: '100%', width: '100%' }}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-        />
+    <div style={{ height: '100vh', width: '100%', margin: 0, padding: 0, display: 'flex', overflow: 'hidden' }}>
+      <Sidebar
+        regions={regionSummaries}
+        loading={summaryLoading}
+        error={summaryError}
+        selectedRegionCode={selectedRegionCode}
+        activeLayer={activeSidebarLayer}
+        onSelectRegion={handleSelectRegion}
+        onVisibleRegionsChange={handleVisibleRegionsChange}
+      />
 
-        {!gapModeActive && !affordabilityLayerVisible && regions.map(region => (
-          <RegionMarker key={region.region_code} region={region} season={season} />
-        ))}
+      <div style={{ position: 'relative', flex: 1, minWidth: 0, height: '100vh' }}>
+        <MapContainer
+          center={ALASKA_CENTER}
+          zoom={ALASKA_ZOOM}
+          maxBounds={ALASKA_BOUNDS}
+          maxBoundsViscosity={1.0}
+          minZoom={4}
+          zoomControl={true}
+          style={{ height: '100%', width: '100%' }}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          />
 
-        <PerformanceLayer
-          visible={performanceLayerVisible}
-          onToggle={() => setPerformanceLayerVisible(false)}
-          onModeChange={setGapModeActive}
-        />
+          <SelectionController
+            selectedRegionCode={selectedRegionCode}
+            regionSummaries={regionSummaries}
+            markerRefs={markerRefs}
+          />
 
-        <AffordabilityLayer
-          visible={affordabilityLayerVisible}
-          onDataLoad={setAffordabilitySummary}
-        />
-      </MapContainer>
+          {!gapModeActive && !affordabilityLayerVisible && mapRegions.map(region => (
+            <RegionMarker
+              key={region.region_code}
+              region={region}
+              season={season}
+              selected={region.region_code === selectedRegionCode}
+              onSelect={handleSelectRegion}
+              onMarkerReady={registerMarker}
+            />
+          ))}
+
+          <PerformanceLayer
+            visible={performanceLayerVisible}
+            onToggle={() => setPerformanceLayerVisible(false)}
+            onModeChange={setGapModeActive}
+          />
+
+          <AffordabilityLayer
+            visible={affordabilityLayerVisible}
+            selectedRegionCode={selectedRegionCode}
+            onSelect={handleSelectRegion}
+            onMarkerReady={registerAffordabilityMarker}
+            onDataLoad={setAffordabilitySummary}
+          />
+        </MapContainer>
 
       {loading && (
         <div style={{
@@ -288,11 +392,9 @@ function App() {
 
       {/* Data Coverage Panel - bottom left */}
       {!loading && !gapModeActive && !affordabilityLayerVisible && (
-        <DataCoveragePanel
-          isExpanded={dataPanelExpanded}
-          onToggle={() => setDataPanelExpanded(!dataPanelExpanded)}
-        />
+        <DataCoveragePanel />
       )}
+      </div>
     </div>
   );
 }
