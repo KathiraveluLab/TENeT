@@ -142,12 +142,8 @@ def main():
     except Exception as e:
         print(f"   Warning: Could not seed Census income: {e}")
 
-    print("\n7. Seeding sample Ookla performance...")
-    try:
-        from database.seed_ookla_sample_data import seed_ookla_sample_data
-        seed_ookla_sample_data()
-    except Exception as e:
-        print(f"   Warning: Could not seed Ookla performance: {e}")
+    print("\n7. Skipping synthetic Ookla performance samples...")
+    print("   Gap Finder uses real Ookla tiles. Run data/scripts/ingest_ookla.py to load them.")
     
     # Get statistics
     print("\n8. Database Statistics:")

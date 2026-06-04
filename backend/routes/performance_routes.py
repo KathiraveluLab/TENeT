@@ -4,7 +4,6 @@ API routes for Ookla Performance data (Measured Network Performance Layer)
 from flask import Blueprint, request, jsonify
 from database.config import SessionLocal
 from database.models import OoklaPerformance, BroadbandCoverage, CATRegion, CensusIncome
-from sqlalchemy import func
 import math
 import json
 import os
@@ -44,6 +43,7 @@ SPEED_CRITICAL = 5000     # 5 Mbps
 LATENCY_GOOD = 50
 LATENCY_ACCEPTABLE = 150
 LATENCY_POOR = 300
+MIN_POPULATED_PERIOD_TILES = 50
 
 
 def get_speed_color(speed_kbps: float) -> str:
@@ -85,6 +85,27 @@ def reverse_geocode_coords(coords):
         return [{'name': 'Remote Alaska Area', 'admin1': 'Alaska', 'cc': 'US'} for _ in coords]
 
 
+def _latest_performance_period(db):
+    periods = db.query(
+        OoklaPerformance.year,
+        OoklaPerformance.quarter
+    ).distinct().order_by(
+        OoklaPerformance.year.desc(),
+        OoklaPerformance.quarter.desc()
+    ).all()
+
+    for period in periods:
+        sample = db.query(OoklaPerformance.id).filter(
+            OoklaPerformance.year == period.year,
+            OoklaPerformance.quarter == period.quarter
+        ).limit(MIN_POPULATED_PERIOD_TILES).all()
+
+        if len(sample) >= MIN_POPULATED_PERIOD_TILES:
+            return period
+
+    return periods[0] if periods else None
+
+
 @performance_bp.route('/performance', methods=['GET'])
 def get_performance():
     """
@@ -103,40 +124,34 @@ def get_performance():
         
         query = db.query(OoklaPerformance)
         
-        # If no year/quarter specified, get latest
+        # If no year/quarter specified, prefer the newest populated period.
+        # Tiny offline fallback samples should not outrank a real Ookla ingest.
         if not year or not quarter:
-            latest = db.query(
-                OoklaPerformance.year, 
-                OoklaPerformance.quarter
-            ).order_by(
-                OoklaPerformance.year.desc(),
-                OoklaPerformance.quarter.desc()
-            ).first()
-            
+            latest = _latest_performance_period(db)
             if latest:
-                year, quarter = latest
+                year, quarter = latest.year, latest.quarter
             else:
                 return jsonify({
                     'tiles': [],
                     'count': 0,
                     'message': 'No performance data available'
                 }), 200
-        
+
         query = query.filter(
             OoklaPerformance.year == year,
             OoklaPerformance.quarter == quarter
         )
-        
+
         # Filter to Alaska geographic bounds with hardcoded exclusions
-        # - North of 60°N: 141st meridian (-141°W) is the border
-        # - Panhandle (54-60°N): Only include actual AK coast, exclude BC interior
+        # - Include the Aleutian chain, mainland Alaska, and Southeast Alaska.
+        # - Exclude known BC/Yukon spillover zones from broad quadkey prefixes.
         #
         # Exclusion coordinates (confirmed Canadian locations):
         # - 59.50°N, 133.50°W (near Atlin, BC)
         # - 60.00°N, 130.50°W (near Watson Lake, YT)
-        
+
         from sqlalchemy import or_, and_, not_
-        
+
         # Hardcoded exclusion zones (Canadian areas that slip through bounds)
         exclusion_zones = [
             # Exclude area around 59-61°N, 130-134°W (BC/Yukon border region)
@@ -147,11 +162,18 @@ def get_performance():
                 OoklaPerformance.centroid_lon <= -130.0
             )
         ]
-        
+
         query = query.filter(
             and_(
                 or_(
-                    # Northern Alaska (above 60°N) - 141st meridian border
+                    # Aleutians and far western islands.
+                    and_(
+                        OoklaPerformance.centroid_lat >= 51.0,
+                        OoklaPerformance.centroid_lat < 54.0,
+                        OoklaPerformance.centroid_lon >= -180.0,
+                        OoklaPerformance.centroid_lon <= -165.0
+                    ),
+                    # Northern Alaska (above 60°N) - 141st meridian border.
                     and_(
                         OoklaPerformance.centroid_lat > 60.0,
                         OoklaPerformance.centroid_lon >= -168.0,
@@ -162,23 +184,23 @@ def get_performance():
                         OoklaPerformance.centroid_lat >= 54.0,
                         OoklaPerformance.centroid_lat <= 60.0,
                         OoklaPerformance.centroid_lon >= -168.0,
-                        OoklaPerformance.centroid_lon <= -135.0  # Tightened from -130
+                        OoklaPerformance.centroid_lon <= -130.0
                     )
                 ),
                 # Exclude the hardcoded Canadian zones
                 not_(or_(*exclusion_zones))
             )
         )
-        
+
         if min_tests > 1:
             query = query.filter(OoklaPerformance.tests >= min_tests)
-        
+
         tiles = query.all()
-        
+
         result = []
         for tile in tiles:
             speed_mbps = tile.avg_d_kbps / 1000 if tile.avg_d_kbps else None
-            
+
             result.append({
                 'quadkey': tile.quadkey,
                 'lat': tile.centroid_lat,
@@ -191,11 +213,11 @@ def get_performance():
                 'color': get_speed_color(tile.avg_d_kbps),
                 'label': get_speed_label(tile.avg_d_kbps)
             })
-        
+
         # Calculate summary stats
         speeds = [t.avg_d_kbps for t in tiles if t.avg_d_kbps]
         latencies = [t.avg_lat_ms for t in tiles if t.avg_lat_ms]
-        
+
         summary = {
             'avg_download_mbps': round(sum(speeds) / len(speeds) / 1000, 2) if speeds else None,
             'avg_latency_ms': round(sum(latencies) / len(latencies), 1) if latencies else None,
@@ -205,7 +227,7 @@ def get_performance():
             'tiles_good': sum(1 for t in tiles if t.avg_d_kbps and SPEED_GOOD <= t.avg_d_kbps < SPEED_EXCELLENT),
             'tiles_poor': sum(1 for t in tiles if t.avg_d_kbps and t.avg_d_kbps < SPEED_POOR)
         }
-        
+
         return jsonify({
             'tiles': result,
             'count': len(result),
@@ -213,12 +235,11 @@ def get_performance():
             'quarter': quarter,
             'summary': summary
         }), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
         db.close()
-
 
 @performance_bp.route('/performance/gaps', methods=['GET'])
 def get_service_gaps():
