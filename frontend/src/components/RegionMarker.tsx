@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import {
@@ -29,6 +29,9 @@ import {
 interface RegionMarkerProps {
     region: CATRegion;
     season: Season;
+    selected?: boolean;
+    onSelect?: (regionCode: string) => void;
+    onMarkerReady?: (regionCode: string, marker: L.Marker | null) => void;
 }
 
 // API base for fetching broadband data
@@ -37,23 +40,25 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/cat';
 /**
  * Create a custom circle marker icon with dynamic color - "Gemstone" style
  */
-function createMarkerIcon(color: string): L.DivIcon {
+function createMarkerIcon(color: string, selected = false): L.DivIcon {
+    const size = selected ? 16 : 10;
+    const anchor = size / 2;
     return L.divIcon({
         className: 'custom-marker',
         html: `
             <div style="
-                width: 10px;
-                height: 10px;
+                width: ${size}px;
+                height: ${size}px;
                 background-color: ${color};
-                opacity: 0.8;
-                border: 1.5px solid rgba(255, 255, 255, 0.9);
+                opacity: ${selected ? 1 : 0.8};
+                border: ${selected ? 3 : 1.5}px solid rgba(255, 255, 255, 0.95);
                 border-radius: 50%;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                box-shadow: 0 ${selected ? 2 : 1}px ${selected ? 8 : 3}px rgba(0,0,0,0.25);
             "></div>
         `,
-        iconSize: [10, 10],
-        iconAnchor: [5, 5],
-        popupAnchor: [0, -5],
+        iconSize: [size, size],
+        iconAnchor: [anchor, anchor],
+        popupAnchor: [0, -anchor],
     });
 }
 
@@ -61,7 +66,14 @@ function createMarkerIcon(color: string): L.DivIcon {
  * Marker component for a CAT region with color-coded tier display
  * and season-adjusted telehealth priority on popup open
  */
-export default function RegionMarker({ region, season }: RegionMarkerProps) {
+export default function RegionMarker({
+    region,
+    season,
+    selected = false,
+    onSelect,
+    onMarkerReady,
+}: RegionMarkerProps) {
+    const markerRef = useRef<L.Marker | null>(null);
     const [priority, setPriority] = useState<TelehealthPriorityResponse | null>(null);
     const [broadband, setBroadband] = useState<BroadbandCoverage | null>(null);
     const [healthcare, setHealthcare] = useState<HealthcareByRegion | null>(null);
@@ -139,6 +151,11 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
         }
     }, [region.region_code, region.region_name, season]);
 
+    const markerRefCallback = useCallback((marker: L.Marker | null) => {
+        markerRef.current = marker;
+        onMarkerReady?.(region.region_code, marker);
+    }, [onMarkerReady, region.region_code]);
+
     // Skip regions without coordinates
     if (region.centroid_lat === null || region.centroid_lon === null) {
         return null;
@@ -146,20 +163,35 @@ export default function RegionMarker({ region, season }: RegionMarkerProps) {
 
     // Use need score to color marker
     const markerColor = getNeedColor(region.necessity_score);
-    const icon = createMarkerIcon(markerColor);
+    const icon = createMarkerIcon(markerColor, selected);
     const needColor = getNeedColor(region.necessity_score);
     const needLabel = getNeedLabel(region.necessity_score);
 
     return (
         <Marker
+            ref={markerRefCallback}
             position={[region.centroid_lat, region.centroid_lon]}
             icon={icon}
             eventHandlers={{
+                click: () => onSelect?.(region.region_code),
                 popupopen: handlePopupOpen,
             }}
         >
-            <Popup>
-                <div style={{ minWidth: '260px' }}>
+            <Popup
+                autoPan
+                keepInView
+                maxWidth={420}
+                minWidth={320}
+                autoPanPaddingTopLeft={[64, 120]}
+                autoPanPaddingBottomRight={[64, 80]}
+            >
+                <div style={{
+                    minWidth: '300px',
+                    maxWidth: '390px',
+                    maxHeight: 'min(68vh, 620px)',
+                    overflowY: 'auto',
+                    paddingRight: '4px'
+                }}>
                     <h3 style={{
                         margin: '0 0 8px 0',
                         color: '#1e40af',

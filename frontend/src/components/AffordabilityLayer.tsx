@@ -1,15 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { CircleMarker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import {
-    RegionTelehealthStatus,
     AllTelehealthStatusResponse,
     fetchAllTelehealthStatus
 } from '../api/catApi';
 
 interface AffordabilityLayerProps {
     visible: boolean;
+    selectedRegionCode?: string | null;
+    onSelect?: (regionCode: string) => void;
+    onMarkerReady?: (regionCode: string, marker: L.CircleMarker | null) => void;
     onDataLoad?: (summary: AllTelehealthStatusResponse['summary']) => void;
 }
+
+const AFFORDABILITY_MARKER_PANE = 'affordability-marker-pane';
 
 /**
  * Affordability Layer - shows all regions colored by telehealth accessibility status
@@ -18,11 +23,44 @@ interface AffordabilityLayerProps {
  * Red = Critical Gap (unaffordable AND no nearby clinic)
  * Gray = Data Unavailable
  */
-export default function AffordabilityLayer({ visible, onDataLoad }: AffordabilityLayerProps) {
+export default function AffordabilityLayer({
+    visible,
+    selectedRegionCode,
+    onSelect,
+    onMarkerReady,
+    onDataLoad
+}: AffordabilityLayerProps) {
     const [data, setData] = useState<AllTelehealthStatusResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const map = useMap();
+    const markerRefs = useRef<Record<string, L.CircleMarker>>({});
+
+    useEffect(() => {
+        const pane = map.getPane(AFFORDABILITY_MARKER_PANE) ?? map.createPane(AFFORDABILITY_MARKER_PANE);
+        pane.style.zIndex = '650';
+        pane.style.pointerEvents = 'auto';
+    }, [map]);
+
+    const registerAffordabilityMarker = useCallback((regionCode: string, marker: L.CircleMarker | null) => {
+        if (marker) {
+            markerRefs.current[regionCode] = marker;
+        } else {
+            delete markerRefs.current[regionCode];
+        }
+        onMarkerReady?.(regionCode, marker);
+    }, [onMarkerReady]);
+
+    useEffect(() => {
+        if (!visible || !selectedRegionCode) return;
+
+        const marker = markerRefs.current[selectedRegionCode];
+        if (!marker) return;
+
+        window.setTimeout(() => {
+            marker.openPopup();
+        }, 380);
+    }, [data, selectedRegionCode, visible]);
 
     useEffect(() => {
         if (visible && !data) {
@@ -51,19 +89,43 @@ export default function AffordabilityLayer({ visible, onDataLoad }: Affordabilit
         <>
             {data.regions.map((region) => (
                 <CircleMarker
+                    ref={(marker) => registerAffordabilityMarker(region.region_code, marker)}
                     key={region.region_code}
                     center={[region.lat, region.lon]}
-                    radius={4}
+                    radius={region.region_code === selectedRegionCode ? 6 : 4}
+                    pane={AFFORDABILITY_MARKER_PANE}
+                    interactive
+                    bubblingMouseEvents={false}
                     pathOptions={{
                         fillColor: region.color,
-                        fillOpacity: 0.65,    // Gemstone effect
+                        fillOpacity: region.region_code === selectedRegionCode ? 0.95 : 0.65,
                         color: '#ffffff',
-                        weight: 1.5,          // Thicker stroke
+                        weight: region.region_code === selectedRegionCode ? 2.5 : 1.5,
                         opacity: 0.9
                     }}
+                    eventHandlers={{
+                        click: (event) => {
+                            event.originalEvent?.stopPropagation();
+                            onSelect?.(region.region_code);
+                            event.target.openPopup();
+                        },
+                    }}
                 >
-                    <Popup>
-                        <div style={{ minWidth: '260px' }}>
+                    <Popup
+                        autoPan
+                        keepInView
+                        maxWidth={380}
+                        minWidth={280}
+                        autoPanPaddingTopLeft={[64, 120]}
+                        autoPanPaddingBottomRight={[64, 80]}
+                    >
+                        <div style={{
+                            minWidth: '260px',
+                            maxWidth: '350px',
+                            maxHeight: 'min(64vh, 560px)',
+                            overflowY: 'auto',
+                            paddingRight: '4px'
+                        }}>
                             <h4 style={{ margin: '0 0 8px 0', color: '#1e40af', fontSize: '16px' }}>
                                 {region.region_name}
                             </h4>
@@ -232,4 +294,3 @@ export function AffordabilityLegend({ summary }: { summary?: AllTelehealthStatus
         </div>
     );
 }
-
