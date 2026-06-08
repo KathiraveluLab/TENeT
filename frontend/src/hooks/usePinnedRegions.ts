@@ -13,9 +13,10 @@ function readPinnedRegions(): string[] {
     }
 }
 
-export function usePinnedRegions() {
+export function usePinnedRegions(initialPinnedRegionCodes?: string[]) {
     const [pinnedRegionCodes, setPinnedRegionCodes] = useState<string[]>(
-        () => readPinnedRegions().slice(0, MAX_PINNED_REGIONS)
+        () => (initialPinnedRegionCodes?.length ? initialPinnedRegionCodes : readPinnedRegions())
+            .slice(0, MAX_PINNED_REGIONS)
     );
 
     useEffect(() => {
@@ -39,10 +40,18 @@ export function usePinnedRegions() {
         });
     }, []);
 
+    const replacePinned = useCallback((regionCodes: string[]) => {
+        const uniqueCodes = regionCodes.filter((code, index) => (
+            typeof code === 'string' && code && regionCodes.indexOf(code) === index
+        ));
+        setPinnedRegionCodes(uniqueCodes.slice(0, MAX_PINNED_REGIONS));
+    }, []);
+
     return {
         pinnedRegionCodes,
         isPinned,
         togglePinned,
+        replacePinned,
         maxPinnedRegions: MAX_PINNED_REGIONS,
     };
 }
