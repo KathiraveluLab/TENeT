@@ -209,17 +209,27 @@ class ResearchProfileService:
         if region.centroid_lat is None or region.centroid_lon is None:
             return None
 
+        region_lat = float(region.centroid_lat)
+        region_lon = float(region.centroid_lon)
+        lat_window = MAX_INCOME_MATCH_KM / 111.0
+        lon_window = MAX_INCOME_MATCH_KM / (
+            111.0 * max(math.cos(math.radians(region_lat)), 0.1)
+        )
+
         records = db.query(CensusIncome).filter(
             CensusIncome.median_income.isnot(None),
+            CensusIncome.median_income > 0,
             CensusIncome.centroid_lat.isnot(None),
             CensusIncome.centroid_lon.isnot(None),
+            CensusIncome.centroid_lat.between(region_lat - lat_window, region_lat + lat_window),
+            CensusIncome.centroid_lon.between(region_lon - lon_window, region_lon + lon_window),
         ).all()
         nearest = None
         nearest_distance = float("inf")
         for record in records:
             distance = _haversine_km(
-                region.centroid_lat,
-                region.centroid_lon,
+                region_lat,
+                region_lon,
                 record.centroid_lat,
                 record.centroid_lon,
             )
@@ -353,8 +363,8 @@ class ResearchProfileService:
         }
 
     @staticmethod
-    @staticmethod
     def _telehealth_payload(connectivity: dict, affordability: dict, healthcare: dict, season: str, access_modes: str = "") -> dict:
+        download = connectivity["ookla_download_mbps"]
         latency = connectivity["latency_ms"]
         coverage = connectivity["fcc_coverage_25mbps_pct"]
 
@@ -372,7 +382,6 @@ class ResearchProfileService:
                 or (download is None and coverage is not None and coverage >= 25)
             )
 
-        clinic_supported = None
         clinic_supported = None
         if healthcare["nearest_facility_distance_km"] is not None:
             threshold = 10 if "road" in (access_modes or "").lower() else 50

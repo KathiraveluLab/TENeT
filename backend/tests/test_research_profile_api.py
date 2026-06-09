@@ -7,6 +7,8 @@ from database.models import (
     HealthcareSite,
     OoklaPerformance,
 )
+import services.research_profile_service as research_profile_module
+from services.research_profile_service import ResearchProfileService
 
 
 @pytest.fixture()
@@ -147,3 +149,42 @@ def test_batch_research_profiles_preserve_order_and_missing_codes(client):
     ]
     assert payload["missing_codes"] == ["AK-NOT-REAL"]
     assert payload["season"] == "summer"
+
+
+def test_income_lookup_filters_distant_records_before_distance_loop(db_session, monkeypatch):
+    region = CATRegion(
+        region_code="AK-INCOME",
+        region_name="Income Village",
+        tier_level=3,
+        centroid_lat=61.2,
+        centroid_lon=-149.9,
+    )
+    nearby_income = CensusIncome(
+        zcta="99501",
+        median_income=90000,
+        acs_year=2022,
+        centroid_lat=61.21,
+        centroid_lon=-149.91,
+    )
+    distant_income = CensusIncome(
+        zcta="99999",
+        median_income=95000,
+        acs_year=2022,
+        centroid_lat=40.0,
+        centroid_lon=-75.0,
+    )
+    db_session.add_all([region, nearby_income, distant_income])
+    db_session.commit()
+
+    distance_calls = []
+
+    def fake_haversine(*args):
+        distance_calls.append(args)
+        return 1.0
+
+    monkeypatch.setattr(research_profile_module, "_haversine_km", fake_haversine)
+
+    nearest = ResearchProfileService._nearest_income_record(db_session, region)
+
+    assert nearest.zcta == "99501"
+    assert len(distance_calls) == 1
