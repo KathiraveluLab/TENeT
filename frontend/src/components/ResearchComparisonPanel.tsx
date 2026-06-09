@@ -62,6 +62,7 @@ function badgeFor(value: number | null, values: Array<number | null>, higherIsBe
     if (numeric.length < 2) return null;
     const best = higherIsBetter ? Math.max(...numeric) : Math.min(...numeric);
     const worst = higherIsBetter ? Math.min(...numeric) : Math.max(...numeric);
+    if (best === worst) return null;
     if (value === best) return 'Best';
     if (value === worst) return 'Worst';
     return null;
