@@ -18,6 +18,7 @@ export function useResearchProfile(regionCode: string | null, season: Season) {
 
         let active = true;
         setLoading(true);
+        setProfile(null);
         setError(null);
 
         fetchResearchProfile(regionCode, season)
