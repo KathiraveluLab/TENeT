@@ -144,11 +144,13 @@ class ResearchProfileService:
             desert_score,
         )
         connectivity = ResearchProfileService._connectivity_payload(broadband, ookla)
+        access_modes = (region.properties or {}).get("primary_access_modes", "")
         telehealth = ResearchProfileService._telehealth_payload(
             connectivity,
             affordability,
             healthcare,
             season,
+            access_modes,
         )
 
         sources = ["CAT region boundaries"]
