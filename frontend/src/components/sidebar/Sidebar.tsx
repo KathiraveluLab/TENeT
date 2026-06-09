@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { RegionSummary } from '../../api/catApi';
 import { Season } from '../../api/catApi';
-import { usePinnedRegions } from '../../hooks/usePinnedRegions';
 import FilterControls from './FilterControls';
 import RegionList from './RegionList';
 import SearchBar from './SearchBar';

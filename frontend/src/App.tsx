@@ -258,6 +258,16 @@ function App() {
   }, [pinnedRegionCodes, regionSummaries, replacePinned, selectedRegionCode, summaryLoading]);
 
   useEffect(() => {
+    if (!urlNotice) return;
+
+    const timer = window.setTimeout(() => {
+      setUrlNotice(null);
+    }, 5000);
+
+    return () => window.clearTimeout(timer);
+  }, [urlNotice]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const params = new URLSearchParams();
@@ -444,9 +454,30 @@ function App() {
           borderRadius: '8px',
           fontSize: '13px',
           fontWeight: '600',
-          border: '1px solid #f59e0b'
+          border: '1px solid #f59e0b',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
         }}>
-          {urlNotice}
+          <span>{urlNotice}</span>
+          <button
+            type="button"
+            aria-label="Dismiss notice"
+            onClick={() => setUrlNotice(null)}
+            style={{
+              appearance: 'none',
+              border: 0,
+              background: 'transparent',
+              color: '#92400e',
+              cursor: 'pointer',
+              fontSize: '16px',
+              fontWeight: 700,
+              lineHeight: 1,
+              padding: 0
+            }}
+          >
+            ×
+          </button>
         </div>
       )}
 
