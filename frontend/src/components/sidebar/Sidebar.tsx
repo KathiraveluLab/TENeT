@@ -61,11 +61,10 @@ export default function Sidebar({
     const [sortMode, setSortMode] = useState<RegionSortMode>('name');
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [sidebarWidth, setSidebarWidth] = useState(360);
-    const localPinned = usePinnedRegions();
-    const activePinnedRegionCodes = pinnedRegionCodes ?? localPinned.pinnedRegionCodes;
-    const activeMaxPinnedRegions = maxPinnedRegions ?? localPinned.maxPinnedRegions;
-    const activeTogglePin = onTogglePin ?? localPinned.togglePinned;
-    const activeIsPinned = isPinned ?? localPinned.isPinned;
+    const activePinnedRegionCodes = pinnedRegionCodes ?? [];
+    const activeMaxPinnedRegions = maxPinnedRegions ?? 3;
+    const activeTogglePin = onTogglePin ?? (() => {});
+    const activeIsPinned = isPinned ?? (() => false);
     const showCatTools = activeLayer === 'cat';
 
     const selectedRegion = useMemo(
