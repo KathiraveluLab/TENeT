@@ -11,6 +11,7 @@ from database.config import SessionLocal
 from database.handlers import CATDataHandler
 from services.data_importer import CATDataImporter
 from services.healthcare_desert_calculator import HealthcareDesertCalculator
+from services.research_profile_service import ResearchProfileService
 from services.season_constants import (
     SEASON_SUMMER, SEASON_WINTER, SEASON_YEAR_ROUND, VALID_SEASONS, 
     ROAD_QUALITY_LOCAL, VALID_ROAD_QUALITIES,
@@ -562,6 +563,72 @@ def get_regions_summary():
         return jsonify({
             'regions': summaries,
             'count': len(summaries)
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+    finally:
+        db.close()
+
+
+@cat_bp.route('/regions/<region_code>/research-profile', methods=['GET'])
+def get_research_profile(region_code):
+    """Return the shared research profile for one community."""
+    db = SessionLocal()
+    try:
+        profile = ResearchProfileService.get_profile(
+            db,
+            region_code,
+            request.args.get('season', SEASON_YEAR_ROUND),
+        )
+        if profile is None:
+            return jsonify({
+                'error': 'Community not found',
+                'region_code': region_code,
+            }), 404
+
+        return jsonify(profile), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+    finally:
+        db.close()
+
+
+@cat_bp.route('/regions/research-profiles', methods=['GET'])
+def get_research_profiles():
+    """Return shared research profiles for 2-3 pinned communities."""
+    raw_codes = request.args.get('codes', '')
+    codes = []
+    for code in raw_codes.split(','):
+        normalized = code.strip()
+        if normalized and normalized not in codes:
+            codes.append(normalized)
+
+    if not codes:
+        return jsonify({
+            'error': 'codes query parameter is required',
+            'profiles': [],
+            'count': 0,
+            'missing_codes': [],
+        }), 400
+
+    db = SessionLocal()
+    try:
+        profiles, missing_codes = ResearchProfileService.get_profiles(
+            db,
+            codes[:3],
+            request.args.get('season', SEASON_YEAR_ROUND),
+        )
+        return jsonify({
+            'profiles': profiles,
+            'count': len(profiles),
+            'missing_codes': missing_codes,
+            'season': ResearchProfileService.normalize_season(
+                request.args.get('season', SEASON_YEAR_ROUND)
+            ),
         }), 200
 
     except Exception as e:
