@@ -371,8 +371,7 @@ export async function exportResearchProfileReport(
         { label: 'Facility Count', value: formatResearchValue(profile.healthcare.facility_count) },
         { label: 'Classification Reason', value: interpretation(profile) },
     ], MARGIN, y, CONTENT_WIDTH);
-
-    addFindings(pdf, profile, MARGIN, y, CONTENT_WIDTH);
+    addFooter(pdf, 1);
     addFooter(pdf, 1);
 
     pdf.addPage();
