@@ -1,0 +1,235 @@
+.research-comparison-panel {
+    position: absolute;
+    left: 24px;
+    right: 24px;
+    bottom: 16px;
+    z-index: 650;
+    max-height: min(34vh, 340px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #c7d0da;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.18);
+    color: #172033;
+}
+
+.research-comparison-panel.collapsed {
+    left: auto;
+    width: min(420px, calc(100% - 48px));
+}
+
+.research-comparison-reopen {
+    position: absolute;
+    right: 24px;
+    bottom: 16px;
+    z-index: 650;
+    border: 1px solid #c7d0da;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+    color: #334155;
+    padding: 10px 12px;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.research-comparison-header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.research-comparison-header h2 {
+    margin: 0;
+    color: #111827;
+    font-size: 16px;
+    line-height: 1.2;
+}
+
+.research-comparison-header p {
+    margin: 3px 0 0;
+    color: #64748b;
+    font-size: 12px;
+}
+
+.research-comparison-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.research-comparison-actions button {
+    border: 1px solid #c7d0da;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #334155;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.research-comparison-actions button:hover,
+.research-comparison-reopen:hover {
+    background: #f8fbff;
+    border-color: #93c5fd;
+}
+
+.research-comparison-body {
+    min-height: 0;
+    overflow: auto;
+}
+
+.comparison-muted,
+.comparison-error {
+    margin: 12px 14px;
+    border-radius: 6px;
+    padding: 9px 10px;
+    font-size: 12px;
+}
+
+.comparison-muted {
+    border: 1px solid #dbe3ea;
+    background: #f8fafc;
+    color: #64748b;
+}
+
+.comparison-error {
+    border: 1px solid #fecaca;
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+.comparison-table {
+    min-width: 560px;
+}
+
+.comparison-grid {
+    display: grid;
+    grid-template-columns: 116px repeat(3, minmax(132px, 1fr));
+    gap: 8px;
+    align-items: stretch;
+    padding: 9px 14px;
+    border-bottom: 1px solid #edf2f7;
+}
+
+.comparison-grid:last-child {
+    border-bottom: 0;
+}
+
+.comparison-grid-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f8fafc;
+    color: #536176;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.comparison-grid-header button {
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: #2563eb;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    text-transform: none;
+}
+
+.comparison-metric-label {
+    align-self: center;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.comparison-cell {
+    min-width: 0;
+}
+
+.comparison-value-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.comparison-value-line strong {
+    min-width: 0;
+    color: #111827;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+.comparison-badge {
+    flex-shrink: 0;
+    border-radius: 999px;
+    padding: 2px 6px;
+    color: #ffffff;
+    font-size: 9px;
+    font-style: normal;
+    font-weight: 800;
+}
+
+.comparison-badge.best {
+    background: #0f766e;
+}
+
+.comparison-badge.worst {
+    background: #b91c1c;
+}
+
+.comparison-bar-track {
+    height: 6px;
+    margin-top: 5px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e2e8f0;
+}
+
+.comparison-bar-track span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: #2563eb;
+}
+
+.comparison-cell small {
+    display: block;
+    margin-top: 4px;
+    color: #64748b;
+    font-size: 10px;
+    line-height: 1.3;
+}
+
+@media (max-width: 900px) {
+    .research-comparison-panel {
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        width: auto;
+        max-height: 32vh;
+    }
+
+    .research-comparison-panel.collapsed {
+        left: 10px;
+        width: auto;
+    }
+
+    .research-comparison-reopen {
+        left: 10px;
+        right: 10px;
+        width: auto;
+    }
+}

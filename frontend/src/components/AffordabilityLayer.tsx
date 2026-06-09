@@ -10,6 +10,7 @@ interface AffordabilityLayerProps {
     visible: boolean;
     selectedRegionCode?: string | null;
     onSelect?: (regionCode: string) => void;
+    onViewDetails?: (regionCode: string) => void;
     onMarkerReady?: (regionCode: string, marker: L.CircleMarker | null) => void;
     onDataLoad?: (summary: AllTelehealthStatusResponse['summary']) => void;
 }
@@ -27,6 +28,7 @@ export default function AffordabilityLayer({
     visible,
     selectedRegionCode,
     onSelect,
+    onViewDetails,
     onMarkerReady,
     onDataLoad
 }: AffordabilityLayerProps) {
@@ -114,111 +116,79 @@ export default function AffordabilityLayer({
                     <Popup
                         autoPan
                         keepInView
-                        maxWidth={380}
-                        minWidth={280}
+                        maxWidth={260}
+                        minWidth={220}
                         autoPanPaddingTopLeft={[64, 120]}
-                        autoPanPaddingBottomRight={[64, 80]}
+                        autoPanPaddingBottomRight={[64, 210]}
                     >
                         <div style={{
-                            minWidth: '260px',
-                            maxWidth: '350px',
-                            maxHeight: 'min(64vh, 560px)',
-                            overflowY: 'auto',
-                            paddingRight: '4px'
+                            minWidth: '210px',
+                            maxWidth: '236px',
+                            color: '#172033',
+                            fontSize: '12px'
                         }}>
-                            <h4 style={{ margin: '0 0 8px 0', color: '#1e40af', fontSize: '16px' }}>
+                            <h4 style={{
+                                margin: '0 0 2px 0',
+                                color: '#111827',
+                                fontSize: '15px',
+                                lineHeight: 1.2
+                            }}>
                                 {region.region_name}
                             </h4>
+                            <div style={{
+                                marginBottom: '9px',
+                                color: '#64748b',
+                                fontSize: '11px',
+                                fontWeight: 700
+                            }}>
+                                {region.region_code}
+                            </div>
 
                             <div style={{
-                                display: 'inline-block',
-                                padding: '4px 12px',
-                                borderRadius: '12px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                minHeight: '22px',
+                                padding: '3px 8px',
+                                borderRadius: '999px',
                                 backgroundColor: region.color,
                                 color: 'white',
-                                fontSize: '12px',
-                                fontWeight: '600',
-                                marginBottom: '12px'
+                                fontSize: '11px',
+                                fontWeight: 800,
+                                marginBottom: '10px'
                             }}>
                                 {region.status.replace(/_/g, ' ')}
                             </div>
 
-                            {/* Affordability Section */}
-                            <div style={{
-                                backgroundColor: '#f8fafc',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '6px',
-                                padding: '10px',
-                                marginBottom: '10px',
-                                fontSize: '12px'
-                            }}>
-                                <div style={{ fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
-                                    Affordability
-                                </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', color: '#374151' }}>
-                                    <span>Internet:</span>
-                                    <strong>${region.internet_cost}/mo ({region.isp_name || 'N/A'})</strong>
-
-                                    {region.median_income && (
-                                        <>
-                                            <span>Median Income:</span>
-                                            <strong>${(region.median_income).toLocaleString()}/yr</strong>
-                                        </>
-                                    )}
-
-                                    <span>Burden:</span>
-                                    <strong style={{ color: region.burden_pct && region.burden_pct < 2 ? '#16a34a' : '#dc2626' }}>
-                                        {region.burden_pct ? `${region.burden_pct}%` : 'N/A'}
-                                        {region.burden_pct && (region.burden_pct < 2 ? ' ✓' : ' (>2%)')}
-                                    </strong>
-                                </div>
-                            </div>
-
-                            {/* Healthcare Section */}
-                            <div style={{
-                                backgroundColor: '#f8fafc',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '6px',
-                                padding: '10px',
-                                marginBottom: '10px',
-                                fontSize: '12px'
-                            }}>
-                                <div style={{ fontWeight: '600', color: '#475569', marginBottom: '6px' }}>
-                                    Healthcare Safety Net
-                                </div>
-                                <div style={{ color: '#374151' }}>
-                                    {region.nearest_clinic_name ? (
-                                        <div>
-                                            <strong>Nearest:</strong> {region.nearest_clinic_name.substring(0, 30)}
-                                            {region.nearest_clinic_name.length > 30 ? '...' : ''}
-                                            ({region.nearest_clinic_km}km)
-                                        </div>
-                                    ) : (
-                                        <div style={{ color: '#dc2626' }}>No clinic data available</div>
-                                    )}
-                                    <div style={{ marginTop: '4px' }}>
-                                        <strong>Access:</strong> {region.access_mode || 'Unknown'}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Recommendation */}
-                            <div style={{
-                                backgroundColor: region.status === 'CRITICAL_GAP' ? '#fef2f2' :
-                                    region.status === 'TELEHEALTH_READY' ? '#f0fdf4' : '#fffbeb',
-                                border: `1px solid ${region.status === 'CRITICAL_GAP' ? '#fecaca' :
-                                    region.status === 'TELEHEALTH_READY' ? '#86efac' : '#fde68a'}`,
-                                borderRadius: '6px',
-                                padding: '10px',
-                                fontSize: '11px'
-                            }}>
-                                <div style={{ fontWeight: '600', color: '#475569', marginBottom: '4px' }}>
-                                    Recommendation
-                                </div>
-                                <div style={{ color: '#374151' }}>
-                                    {region.recommendation || 'No recommendation available'}
-                                </div>
-                            </div>
+                            <button
+                                type="button"
+                                onMouseDown={event => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                }}
+                                onClick={event => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    if (onViewDetails) {
+                                        onViewDetails(region.region_code);
+                                    } else {
+                                        onSelect?.(region.region_code);
+                                        markerRefs.current[region.region_code]?.closePopup();
+                                    }
+                                }}
+                                style={{
+                                    width: '100%',
+                                    border: '1px solid #c7d0da',
+                                    borderRadius: '6px',
+                                    background: '#ffffff',
+                                    color: '#334155',
+                                    padding: '6px 8px',
+                                    fontSize: '11px',
+                                    fontWeight: 800,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                View details
+                            </button>
                         </div>
                     </Popup>
                 </CircleMarker>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { RegionSummary } from '../../api/catApi';
-import { usePinnedRegions } from '../../hooks/usePinnedRegions';
+import { Season } from '../../api/catApi';
 import FilterControls from './FilterControls';
 import RegionList from './RegionList';
 import SearchBar from './SearchBar';
@@ -19,8 +19,14 @@ interface SidebarProps {
     loading: boolean;
     error: string | null;
     selectedRegionCode: string | null;
+    detailsFocusKey?: number;
+    season?: Season;
     activeLayer?: 'cat' | 'affordability' | 'gap';
+    pinnedRegionCodes?: string[];
+    maxPinnedRegions?: number;
     onSelectRegion: (regionCode: string) => void;
+    onTogglePin?: (regionCode: string) => void;
+    isPinned?: (regionCode: string) => boolean;
     onVisibleRegionsChange?: (regionCodes: string[]) => void;
 }
 
@@ -39,8 +45,14 @@ export default function Sidebar({
     loading,
     error,
     selectedRegionCode,
+    detailsFocusKey = 0,
+    season = 'year_round',
     activeLayer = 'cat',
+    pinnedRegionCodes,
+    maxPinnedRegions,
     onSelectRegion,
+    onTogglePin,
+    isPinned,
     onVisibleRegionsChange,
 }: SidebarProps) {
     const [query, setQuery] = useState('');
@@ -48,12 +60,10 @@ export default function Sidebar({
     const [sortMode, setSortMode] = useState<RegionSortMode>('name');
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [sidebarWidth, setSidebarWidth] = useState(360);
-    const {
-        pinnedRegionCodes,
-        isPinned,
-        togglePinned,
-        maxPinnedRegions,
-    } = usePinnedRegions();
+    const activePinnedRegionCodes = pinnedRegionCodes ?? [];
+    const activeMaxPinnedRegions = maxPinnedRegions ?? 3;
+    const activeTogglePin = onTogglePin ?? (() => {});
+    const activeIsPinned = isPinned ?? (() => false);
     const showCatTools = activeLayer === 'cat';
 
     const selectedRegion = useMemo(
@@ -62,10 +72,10 @@ export default function Sidebar({
     );
 
     const pinnedRegions = useMemo(
-        () => pinnedRegionCodes
+        () => activePinnedRegionCodes
             .map(code => regions.find(region => region.region_code === code))
             .filter((region): region is RegionSummary => Boolean(region)),
-        [pinnedRegionCodes, regions],
+        [activePinnedRegionCodes, regions],
     );
 
     const visibleRegions = useMemo(() => {
@@ -173,29 +183,29 @@ export default function Sidebar({
             {showCatTools && pinnedRegions.length > 0 && (
                 <section className="pinned-section">
                     <div className="sidebar-section-title">
-                        Pinned {pinnedRegions.length}/{maxPinnedRegions}
+                        Pinned {pinnedRegions.length}/{activeMaxPinnedRegions}
                     </div>
                     <RegionList
                         regions={pinnedRegions}
                         selectedRegionCode={selectedRegionCode}
-                        pinnedRegionCodes={pinnedRegionCodes}
-                        maxPinnedRegions={maxPinnedRegions}
+                        pinnedRegionCodes={activePinnedRegionCodes}
+                        maxPinnedRegions={activeMaxPinnedRegions}
                         showCatDetails={showCatTools}
                         showPin={showCatTools}
                         onSelectRegion={onSelectRegion}
-                        onTogglePin={togglePinned}
+                        onTogglePin={activeTogglePin}
                     />
                 </section>
             )}
 
-            {showCatTools && (
-                <SelectedRegionPanel
-                    region={selectedRegion}
-                    pinned={selectedRegion ? isPinned(selectedRegion.region_code) : false}
-                    pinDisabled={pinnedRegionCodes.length >= maxPinnedRegions}
-                    onTogglePin={togglePinned}
-                />
-            )}
+            <SelectedRegionPanel
+                region={selectedRegion}
+                season={season}
+                focusKey={detailsFocusKey}
+                pinned={selectedRegion ? activeIsPinned(selectedRegion.region_code) : false}
+                pinDisabled={activePinnedRegionCodes.length >= activeMaxPinnedRegions}
+                onTogglePin={activeTogglePin}
+            />
 
             <section className="sidebar-results">
                 <div className="sidebar-section-title">Results</div>
@@ -205,12 +215,12 @@ export default function Sidebar({
                     <RegionList
                         regions={visibleRegions}
                         selectedRegionCode={selectedRegionCode}
-                        pinnedRegionCodes={pinnedRegionCodes}
-                        maxPinnedRegions={maxPinnedRegions}
+                        pinnedRegionCodes={activePinnedRegionCodes}
+                        maxPinnedRegions={activeMaxPinnedRegions}
                         showCatDetails={showCatTools}
                         showPin={showCatTools}
                         onSelectRegion={onSelectRegion}
-                        onTogglePin={togglePinned}
+                        onTogglePin={activeTogglePin}
                     />
                 )}
             </section>
