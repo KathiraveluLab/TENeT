@@ -372,7 +372,6 @@ export async function exportResearchProfileReport(
         { label: 'Classification Reason', value: interpretation(profile) },
     ], MARGIN, y, CONTENT_WIDTH);
     addFooter(pdf, 1);
-    addFooter(pdf, 1);
 
     pdf.addPage();
     addPageBase(pdf);
@@ -430,10 +429,13 @@ export async function exportResearchProfileReport(
         { label: 'Season Note', value: formatResearchValue(profile.telehealth.season_note) },
     ], rightX, rightY, colWidth, true);
 
-    addReportTable(pdf, 'Data Sources', [
+    rightY = addReportTable(pdf, 'Data Sources', [
         { label: 'Sources', value: safeJoin(profile.methodology.sources) },
         { label: 'Generated At', value: new Date(profile.methodology.generated_at).toLocaleString() },
     ], rightX, rightY, colWidth, true);
+
+    const finalY = Math.max(leftY, rightY);
+    addFindings(pdf, profile, MARGIN, finalY + 4, CONTENT_WIDTH);
 
     addFooter(pdf, 2);
     pdf.save(`tenet-community-report-${fileSafe(profile.region.name)}.pdf`);

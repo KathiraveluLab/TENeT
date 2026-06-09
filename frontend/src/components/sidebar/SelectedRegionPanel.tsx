@@ -98,9 +98,9 @@ export default function SelectedRegionPanel({
             </div>
 
             {error && <div className="selected-region-note error">{error}</div>}
-            {profile?.region.has_data_gap && (
+            {profile?.region?.has_data_gap && (
                 <div className="selected-region-note">
-                    {profile.region.data_confidence} confidence · {profile.region.missing_fields.length} data gaps
+                    {profile.region?.data_confidence ?? DATA_UNAVAILABLE} confidence · {profile.region?.missing_fields?.length ?? 0} data gaps
                 </div>
             )}
 
