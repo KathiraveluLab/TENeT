@@ -353,8 +353,8 @@ class ResearchProfileService:
         }
 
     @staticmethod
-    def _telehealth_payload(connectivity: dict, affordability: dict, healthcare: dict, season: str) -> dict:
-        download = connectivity["ookla_download_mbps"]
+    @staticmethod
+    def _telehealth_payload(connectivity: dict, affordability: dict, healthcare: dict, season: str, access_modes: str = "") -> dict:
         latency = connectivity["latency_ms"]
         coverage = connectivity["fcc_coverage_25mbps_pct"]
 
