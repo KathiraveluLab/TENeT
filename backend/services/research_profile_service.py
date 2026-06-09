@@ -377,7 +377,7 @@ class ResearchProfileService:
         if healthcare["nearest_facility_distance_km"] is not None:
             threshold = 10 if "road" in (access_modes or "").lower() else 50
             clinic_supported = healthcare["nearest_facility_distance_km"] <= threshold
-        if video_feasible and affordability["status"] != "unaffordable":
+        if video_feasible and affordability["status"] == "affordable":
             status = "TELEHEALTH_READY"
             label = "Telehealth ready"
         elif clinic_supported:
