@@ -122,10 +122,10 @@ class ScenarioInputCache:
         return built
 
     @staticmethod
-    @staticmethod
     def _cache_key(db: Session, season: str) -> Tuple[str, str]:
         bind = db.get_bind()
         return bind.url.render_as_string(hide_password=True), season
+
     @classmethod
     def _build(cls, db: Session, season: str) -> List[Dict[str, Any]]:
         regions = db.query(CATRegion).order_by(CATRegion.region_name).all()
@@ -142,7 +142,12 @@ class ScenarioInputCache:
         ]
 
         broadband_lookup = cls._broadband_lookup(db, region_codes)
-        census_records = cls._census_records(db)
+        census_buckets: Dict[Tuple[int, int], List[CensusIncome]] = defaultdict(list)
+        for record in cls._census_records(db):
+            census_buckets[
+                _bucket_key(float(record.centroid_lat), float(record.centroid_lon))
+            ].append(record)
+
         ookla_buckets = cls._latest_ookla_buckets(db)
         data_points_by_region, first_data_point_by_region = cls._data_points(db, region_codes)
         site_counts, specialist_regions = cls._healthcare_site_stats(facilities)
@@ -158,7 +163,7 @@ class ScenarioInputCache:
                 facilities=facilities,
                 status_clinics=status_clinics,
                 broadband=broadband_lookup.get(region.region_code),
-                census_records=census_records,
+                census_buckets=census_buckets,
                 ookla_buckets=ookla_buckets,
                 data_points=data_points_by_region.get(region.region_code, []),
                 first_data_point=first_data_point_by_region.get(region.region_code),
@@ -257,7 +262,7 @@ class ScenarioInputCache:
         facilities: List[HealthcareSite],
         status_clinics: List[HealthcareSite],
         broadband: Optional[BroadbandCoverage],
-        census_records: List[CensusIncome],
+        census_buckets: Dict[Tuple[int, int], List[CensusIncome]],
         ookla_buckets: Dict[Tuple[int, int], List[Any]],
         data_points: List[CATDataPoint],
         first_data_point: Optional[CATDataPoint],
@@ -277,7 +282,7 @@ class ScenarioInputCache:
         distance_threshold_km = 10 if "road" in access_modes.lower() else 50
 
         income = (
-            cls._nearest_income(census_records, display_lat, display_lon)
+            cls._nearest_income(census_buckets, display_lat, display_lon)
             if display_lat is not None and display_lon is not None
             else None
         )
@@ -417,25 +422,24 @@ class ScenarioInputCache:
 
     @staticmethod
     def _nearest_income(
-        census_records: List[CensusIncome],
+        census_buckets: Dict[Tuple[int, int], List[CensusIncome]],
         lat: float,
         lon: float,
         max_km: float = 55.0,
     ) -> Optional[CensusIncome]:
         best = None
         min_dist = float("inf")
-        lat_window = max_km / 111.0
-        lon_window = max_km / (111.0 * max(math.cos(math.radians(float(lat))), 0.1))
-        for record in census_records:
-            if not (
-                float(lat) - lat_window <= record.centroid_lat <= float(lat) + lat_window
-                and float(lon) - lon_window <= record.centroid_lon <= float(lon) + lon_window
-            ):
-                continue
-            dist = _haversine_km(float(lat), float(lon), record.centroid_lat, record.centroid_lon)
-            if dist < min_dist and dist <= max_km:
-                min_dist = dist
-                best = record
+        for key in _candidate_buckets(float(lat), float(lon), max_km):
+            for record in census_buckets.get(key, []):
+                dist = _haversine_km(
+                    float(lat),
+                    float(lon),
+                    record.centroid_lat,
+                    record.centroid_lon,
+                )
+                if dist < min_dist and dist <= max_km:
+                    min_dist = dist
+                    best = record
         return best
 
     @staticmethod
