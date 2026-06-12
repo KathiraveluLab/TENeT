@@ -122,10 +122,10 @@ class ScenarioInputCache:
         return built
 
     @staticmethod
+    @staticmethod
     def _cache_key(db: Session, season: str) -> Tuple[str, str]:
         bind = db.get_bind()
-        return str(bind.url), season
-
+        return bind.url.render_as_string(hide_password=True), season
     @classmethod
     def _build(cls, db: Session, season: str) -> List[Dict[str, Any]]:
         regions = db.query(CATRegion).order_by(CATRegion.region_name).all()
