@@ -2473,3 +2473,84 @@ def get_healthcare_summary():
         return jsonify({'error': str(e)}), 500
     finally:
         db.close()
+
+
+# =============================================================================
+# SCENARIO ANALYSIS
+# =============================================================================
+
+@cat_bp.route('/scenarios/preview', methods=['POST'])
+def scenario_preview():
+    """
+    What-if scenario analysis.
+
+    Accepts user-defined thresholds and returns modeled telehealth readiness
+    for all (or selected) communities.  Does NOT modify baseline data.
+
+    Request body:
+        mode: "preview"
+        season: "year_round" | "summer" | "winter"
+        thresholds:
+            min_download_mbps: number
+            min_upload_mbps: number
+            max_latency_ms: number | null
+            clinic_proximity_km: number | null
+            affordability_burden_pct: number
+        region_codes: list[str] | null
+
+    Returns scenario summary, per-region status, and deltas vs baseline.
+    """
+    from services.scenario_engine import ScenarioEngine
+
+    db = SessionLocal()
+    try:
+        body = request.get_json(silent=True) or {}
+        season = body.get('season', SEASON_YEAR_ROUND)
+        thresholds_raw = body.get('thresholds', {})
+        region_codes = body.get('region_codes')
+        if not isinstance(thresholds_raw, dict):
+            return jsonify({'error': 'thresholds must be an object'}), 400
+        if region_codes is not None:
+            if not isinstance(region_codes, list) or not all(isinstance(code, str) for code in region_codes):
+                return jsonify({'error': 'region_codes must be a list of strings or null'}), 400
+
+        # Coerce provided threshold values to proper types. Omitted keys should
+        # remain omitted so ScenarioEngine can apply baseline defaults.
+        thresholds = {}
+        for key in ('min_download_mbps', 'min_upload_mbps', 'max_latency_ms',
+                     'clinic_proximity_km', 'affordability_burden_pct'):
+            if key not in thresholds_raw:
+                continue
+            value = thresholds_raw.get(key)
+            if value is not None:
+                try:
+                    thresholds[key] = float(value)
+                except (TypeError, ValueError):
+                    return jsonify({
+                        'error': f'Invalid value for {key}: {value!r}'
+                    }), 400
+            elif key not in ('max_latency_ms', 'clinic_proximity_km'):
+                return jsonify({
+                    'error': f'{key} cannot be null'
+                }), 400
+            else:
+                thresholds[key] = None
+
+        # Validate
+        error = ScenarioEngine.validate_thresholds(thresholds)
+        if error:
+            return jsonify({'error': error}), 400
+
+        result = ScenarioEngine.preview(
+            db,
+            thresholds=thresholds,
+            season=season,
+            region_codes=region_codes,
+        )
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        db.close()
