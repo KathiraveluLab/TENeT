@@ -1,7 +1,7 @@
 /**
  * useScenarioState – manages scenario thresholds, presets, and URL state
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Season } from '../api/catApi';
 import {
     BASELINE_THRESHOLDS,
@@ -10,6 +10,8 @@ import {
     type ScenarioPreset,
     type ScenarioThresholds,
 } from '../types/scenario';
+
+const URL_SYNC_DEBOUNCE_MS = 300;
 
 function thresholdsEqual(a: ScenarioThresholds, b: ScenarioThresholds): boolean {
     return (
@@ -40,6 +42,14 @@ function parseScenarioUrlParams(): {
     if (bd !== null && !isNaN(Number(bd))) partial.min_download_mbps = Number(bd);
     const up = params.get('up');
     if (up !== null && !isNaN(Number(up))) partial.min_upload_mbps = Number(up);
+    const latency = params.get('latency');
+    if (latency !== null) {
+        if (latency === 'baseline') {
+            partial.max_latency_ms = null;
+        } else if (!isNaN(Number(latency))) {
+            partial.max_latency_ms = Number(latency);
+        }
+    }
     const aff = params.get('aff');
     if (aff !== null && !isNaN(Number(aff))) partial.affordability_burden_pct = Number(aff);
     const clinic = params.get('clinic');
@@ -83,6 +93,7 @@ export function useScenarioState(season: Season): ScenarioState {
         ...initialUrl.thresholds,
     }));
     const [activePreset, setActivePreset] = useState<string | null>(initialUrl.preset);
+    const urlSyncTimerRef = useRef<number | null>(null);
 
     const isBaselineEquivalent = useMemo(
         () => thresholdsEqual(thresholds, BASELINE_THRESHOLDS),
@@ -93,31 +104,51 @@ export function useScenarioState(season: Season): ScenarioState {
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
-        const params = new URLSearchParams(window.location.search);
-
-        // Remove all scenario params first
-        params.delete('scenario');
-        params.delete('bd');
-        params.delete('up');
-        params.delete('aff');
-        params.delete('clinic');
-        params.delete('preset');
-
-        if (mode !== 'off') {
-            params.set('scenario', '1');
-            params.set('bd', String(thresholds.min_download_mbps));
-            params.set('up', String(thresholds.min_upload_mbps));
-            params.set('aff', String(thresholds.affordability_burden_pct));
-            if (thresholds.clinic_proximity_km !== null) {
-                params.set('clinic', String(thresholds.clinic_proximity_km));
-            } else {
-                params.set('clinic', 'baseline');
-            }
-            if (activePreset) params.set('preset', activePreset);
+        if (urlSyncTimerRef.current) {
+            window.clearTimeout(urlSyncTimerRef.current);
         }
 
-        const nextUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
-        window.history.replaceState(null, '', nextUrl);
+        urlSyncTimerRef.current = window.setTimeout(() => {
+            const params = new URLSearchParams(window.location.search);
+
+            // Remove all scenario params first
+            params.delete('scenario');
+            params.delete('bd');
+            params.delete('up');
+            params.delete('latency');
+            params.delete('aff');
+            params.delete('clinic');
+            params.delete('preset');
+
+            if (mode !== 'off') {
+                params.set('scenario', '1');
+                params.set('bd', String(thresholds.min_download_mbps));
+                params.set('up', String(thresholds.min_upload_mbps));
+                if (thresholds.max_latency_ms !== null) {
+                    params.set('latency', String(thresholds.max_latency_ms));
+                } else {
+                    params.set('latency', 'baseline');
+                }
+                params.set('aff', String(thresholds.affordability_burden_pct));
+                if (thresholds.clinic_proximity_km !== null) {
+                    params.set('clinic', String(thresholds.clinic_proximity_km));
+                } else {
+                    params.set('clinic', 'baseline');
+                }
+                if (activePreset) params.set('preset', activePreset);
+            }
+
+            const nextUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
+            window.history.replaceState(null, '', nextUrl);
+            urlSyncTimerRef.current = null;
+        }, URL_SYNC_DEBOUNCE_MS);
+
+        return () => {
+            if (urlSyncTimerRef.current) {
+                window.clearTimeout(urlSyncTimerRef.current);
+                urlSyncTimerRef.current = null;
+            }
+        };
     }, [mode, thresholds, activePreset]);
 
     // ── Actions ────────────────────────────────────────────────────────
