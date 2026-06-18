@@ -5,6 +5,7 @@ import './Legend.css';
 
 interface LegendProps {
     totalRegions?: number;
+    position?: 'bottom-right' | 'bottom-left';
 }
 
 const getNeedCapability = (score: number): string => {
@@ -14,11 +15,11 @@ const getNeedCapability = (score: number): string => {
     return 'Good access to nearby healthcare facilities';
 };
 
-export default function Legend({ totalRegions }: LegendProps) {
+export default function Legend({ totalRegions, position = 'bottom-right' }: LegendProps) {
     const needLevels = [87, 62, 37, 12];
 
     return (
-        <div className="legend-hover-shell">
+        <div className={`legend-hover-shell ${position === 'bottom-left' ? 'legend-hover-shell-left' : ''}`}>
             <button type="button" className="legend-trigger" aria-label="Show discovery legend">
                 Legend
             </button>

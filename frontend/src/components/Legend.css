@@ -5,6 +5,11 @@
     z-index: 1000;
 }
 
+.legend-hover-shell-left {
+    right: auto;
+    left: 20px;
+}
+
 .legend-trigger {
     border: 1px solid rgba(148, 163, 184, 0.75);
     border-radius: 8px;
@@ -36,6 +41,11 @@
     border: 1px solid rgba(203, 213, 225, 0.9);
     box-shadow: 0 12px 34px rgba(15, 23, 42, 0.18);
     font-size: 12px;
+}
+
+.legend-hover-shell-left .legend-panel {
+    right: auto;
+    left: 0;
 }
 
 .legend-hover-shell:hover .legend-panel,
@@ -192,6 +202,11 @@
     .legend-hover-shell {
         right: 12px;
         bottom: 14px;
+    }
+
+    .legend-hover-shell-left {
+        right: auto;
+        left: 12px;
     }
 
     .legend-panel {
