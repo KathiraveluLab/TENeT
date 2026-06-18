@@ -46,9 +46,12 @@ export function useScenarioPreview(
         currentSeason: Season,
         currentRegionCodes: string[] | null,
     ) => {
+        abortRef.current?.abort();
+        abortRef.current = null;
+
         const key = cacheKey(currentSeason, currentThresholds, currentRegionCodes);
 
-        // Check cache
+        // Check cache after cancelling any stale in-flight request, so older responses cannot win.
         const cached = cacheRef.current.get(key);
         if (cached) {
             setData(cached);
@@ -58,8 +61,6 @@ export function useScenarioPreview(
             return;
         }
 
-        // Abort previous
-        abortRef.current?.abort();
         const controller = new AbortController();
         abortRef.current = controller;
 
@@ -78,26 +79,30 @@ export function useScenarioPreview(
                 controller.signal,
             );
 
-            if (!controller.signal.aborted) {
-                cacheRef.current.set(key, result);
-                // Keep cache bounded
-                if (cacheRef.current.size > 20) {
-                    const firstKey = cacheRef.current.keys().next().value;
-                    if (firstKey !== undefined) {
-                        cacheRef.current.delete(firstKey);
-                    }
-                }
-                setData(result);
-                setLoading(false);
-                setError(null);
-                setMode?.('active');
+            if (controller.signal.aborted || abortRef.current !== controller) {
+                return;
             }
+
+            cacheRef.current.set(key, result);
+            // Keep cache bounded
+            if (cacheRef.current.size > 20) {
+                const firstKey = cacheRef.current.keys().next().value;
+                if (firstKey !== undefined) {
+                    cacheRef.current.delete(firstKey);
+                }
+            }
+            setData(result);
+            setLoading(false);
+            setError(null);
+            setMode?.('active');
+            abortRef.current = null;
         } catch (err: any) {
             if (err?.name === 'AbortError') return;
-            if (!controller.signal.aborted) {
+            if (!controller.signal.aborted && abortRef.current === controller) {
                 setError(err?.message || 'Scenario preview failed');
                 setLoading(false);
                 setMode?.('active');
+                abortRef.current = null;
             }
         }
     }, [setMode]);
@@ -109,6 +114,7 @@ export function useScenarioPreview(
             setError(null);
             setLoading(false);
             abortRef.current?.abort();
+            abortRef.current = null;
             if (timerRef.current) {
                 window.clearTimeout(timerRef.current);
                 timerRef.current = null;
