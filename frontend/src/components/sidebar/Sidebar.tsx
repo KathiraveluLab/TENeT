@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { RegionSummary } from '../../api/catApi';
 import { Season } from '../../api/catApi';
+import type { ScenarioRegion } from '../../types/scenario';
 import FilterControls from './FilterControls';
 import RegionList from './RegionList';
 import SearchBar from './SearchBar';
@@ -24,6 +25,7 @@ interface SidebarProps {
     activeLayer?: 'cat' | 'affordability' | 'gap';
     pinnedRegionCodes?: string[];
     maxPinnedRegions?: number;
+    scenarioRegion?: ScenarioRegion;
     onSelectRegion: (regionCode: string) => void;
     onTogglePin?: (regionCode: string) => void;
     isPinned?: (regionCode: string) => boolean;
@@ -50,6 +52,7 @@ export default function Sidebar({
     activeLayer = 'cat',
     pinnedRegionCodes,
     maxPinnedRegions,
+    scenarioRegion,
     onSelectRegion,
     onTogglePin,
     isPinned,
@@ -205,6 +208,7 @@ export default function Sidebar({
                 pinned={selectedRegion ? activeIsPinned(selectedRegion.region_code) : false}
                 pinDisabled={activePinnedRegionCodes.length >= activeMaxPinnedRegions}
                 onTogglePin={activeTogglePin}
+                scenarioRegion={scenarioRegion}
             />
 
             <section className="sidebar-results">
