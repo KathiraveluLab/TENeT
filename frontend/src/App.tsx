@@ -334,6 +334,9 @@ function App() {
 
   const toggleScenarioMode = () => {
     if (scenarioState.mode === 'off') {
+      setGapModeActive(false);
+      setPerformanceLayerVisible(false);
+      setAffordabilityLayerVisible(false);
       scenarioState.activate();
     } else {
       scenarioState.deactivate();
