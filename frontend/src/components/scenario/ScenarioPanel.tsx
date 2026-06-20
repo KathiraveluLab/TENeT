@@ -255,13 +255,22 @@ export default function ScenarioPanel({
             )}
 
             {/* Preset */}
-            <div style={SECTION_TITLE}>Preset</div>
+            <label
+                style={{ ...SECTION_TITLE, display: 'block' }}
+                htmlFor="scenario-preset-select"
+            >
+                Preset
+            </label>
             <select
                 style={SELECT_STYLE}
                 value={activePreset ?? ''}
                 onChange={e => {
                     const value = e.target.value;
-                    if (value) applyPreset(value);
+                    if (value === 'baseline') {
+                        resetToBaseline();
+                    } else if (value) {
+                        applyPreset(value);
+                    }
                 }}
                 id="scenario-preset-select"
             >
@@ -430,14 +439,6 @@ export default function ScenarioPanel({
                 type="button"
                 style={RESET_BTN}
                 onClick={resetToBaseline}
-                onMouseEnter={e => {
-                    (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.1)';
-                    (e.currentTarget as HTMLButtonElement).style.color = '#e2e8f0';
-                }}
-                onMouseLeave={e => {
-                    (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.05)';
-                    (e.currentTarget as HTMLButtonElement).style.color = '#94a3b8';
-                }}
                 id="scenario-reset-button"
             >
                 Reset to Baseline
@@ -478,6 +479,10 @@ export default function ScenarioPanel({
                 }
                 #scenario-panel input[type="range"]::-webkit-slider-thumb:hover {
                     transform: scale(1.15);
+                }
+                #scenario-reset-button:hover {
+                    background: rgba(255,255,255,0.1) !important;
+                    color: #e2e8f0 !important;
                 }
             `}</style>
         </div>
