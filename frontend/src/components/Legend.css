@@ -51,6 +51,7 @@
 .legend-hover-shell:hover .legend-panel,
 .legend-hover-shell:focus-within .legend-panel {
     opacity: 1;
+    visibility: visible;
     pointer-events: auto;
     transform: translateY(0);
 }
