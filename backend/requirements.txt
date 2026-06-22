@@ -8,5 +8,6 @@ geopandas==0.14.2
 shapely==2.0.2
 reverse_geocoder==1.5.1
 pytest==8.3.4
+flake8==7.1.1
 # Note: psycopg2-binary and geoalchemy2 removed for SQLite
 # Will be added back when migrating to PostgreSQL
