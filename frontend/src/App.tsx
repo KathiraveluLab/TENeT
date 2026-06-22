@@ -11,8 +11,12 @@ import PerformanceLayer from './components/PerformanceLayer';
 import AffordabilityLayer, { AffordabilityLegend } from './components/AffordabilityLayer';
 import Sidebar from './components/sidebar/Sidebar';
 import ResearchComparisonPanel from './components/ResearchComparisonPanel';
+import ScenarioPanel from './components/scenario/ScenarioPanel';
+import ScenarioLayer, { ScenarioSidebarCard, ScenarioLegend } from './components/scenario/ScenarioLayer';
 import { usePinnedRegions } from './hooks/usePinnedRegions';
 import { useRegionSummary } from './hooks/useRegionSummary';
+import { useScenarioState } from './hooks/useScenarioState';
+import { useScenarioPreview } from './hooks/useScenarioPreview';
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -175,6 +179,17 @@ function App() {
   const [mapZoom, setMapZoom] = useState(initialUrlState.zoom);
   const [urlNotice, setUrlNotice] = useState<string | null>(null);
   const markerRefs = useRef<Record<string, L.Marker | L.CircleMarker>>({});
+
+  // ── Scenario Mode ──────────────────────────────────────────────────
+  const scenarioState = useScenarioState(season);
+  const scenarioPreview = useScenarioPreview(
+    scenarioState.mode,
+    scenarioState.thresholds,
+    season,
+    null,
+    scenarioState.setMode,
+  );
+  const scenarioActive = scenarioState.mode !== 'off';
   const {
     pinnedRegionCodes,
     isPinned,
@@ -197,6 +212,14 @@ function App() {
   }, []);
 
   const registerAffordabilityMarker = useCallback((regionCode: string, marker: L.CircleMarker | null) => {
+    if (marker) {
+      markerRefs.current[regionCode] = marker;
+    } else {
+      delete markerRefs.current[regionCode];
+    }
+  }, []);
+
+  const registerScenarioMarker = useCallback((regionCode: string, marker: L.Marker | null) => {
     if (marker) {
       markerRefs.current[regionCode] = marker;
     } else {
@@ -270,7 +293,15 @@ function App() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(window.location.search);
+    params.delete('region');
+    params.delete('layer');
+    params.delete('season');
+    params.delete('pins');
+    params.delete('lat');
+    params.delete('lng');
+    params.delete('zoom');
+
     if (selectedRegionCode) params.set('region', selectedRegionCode);
     if (activeSidebarLayer !== 'cat') params.set('layer', activeSidebarLayer);
     if (season !== 'year_round') params.set('season', season);
@@ -300,6 +331,23 @@ function App() {
     }
     setGapModeActive(!gapModeActive);
   };
+
+  const toggleScenarioMode = () => {
+    if (scenarioState.mode === 'off') {
+      setGapModeActive(false);
+      setPerformanceLayerVisible(false);
+      setAffordabilityLayerVisible(false);
+      scenarioState.activate();
+    } else {
+      scenarioState.deactivate();
+    }
+  };
+
+  // Find selected region in scenario data for sidebar card
+  const selectedScenarioRegion = useMemo(() => {
+    if (!scenarioActive || !scenarioPreview.data || !selectedRegionCode) return undefined;
+    return scenarioPreview.data.regions.find(r => r.region_code === selectedRegionCode);
+  }, [scenarioActive, scenarioPreview.data, selectedRegionCode]);
 
   useEffect(() => {
     async function loadData() {
@@ -337,6 +385,7 @@ function App() {
         activeLayer={activeSidebarLayer}
         pinnedRegionCodes={pinnedRegionCodes}
         maxPinnedRegions={maxPinnedRegions}
+        scenarioRegion={selectedScenarioRegion}
         onSelectRegion={handleSelectRegion}
         detailsFocusKey={detailsFocusKey}
         onTogglePin={togglePinned}
@@ -369,7 +418,7 @@ function App() {
 
           <ComparisonMapController active={pinnedRegionCodes.length >= 2} />
 
-          {!gapModeActive && !affordabilityLayerVisible && mapRegions.map(region => (
+          {!gapModeActive && !affordabilityLayerVisible && !scenarioActive && mapRegions.map(region => (
             <RegionMarker
               key={region.region_code}
               region={region}
@@ -386,13 +435,24 @@ function App() {
             onModeChange={setGapModeActive}
           />
 
-          <AffordabilityLayer
-            visible={affordabilityLayerVisible}
+          {!scenarioActive && (
+            <AffordabilityLayer
+              visible={affordabilityLayerVisible}
+              selectedRegionCode={selectedRegionCode}
+              onSelect={handleSelectRegion}
+              onViewDetails={handleViewRegionDetails}
+              onMarkerReady={registerAffordabilityMarker}
+              onDataLoad={setAffordabilitySummary}
+            />
+          )}
+
+          <ScenarioLayer
+            data={scenarioPreview.data}
+            active={scenarioActive && !gapModeActive}
             selectedRegionCode={selectedRegionCode}
             onSelect={handleSelectRegion}
             onViewDetails={handleViewRegionDetails}
-            onMarkerReady={registerAffordabilityMarker}
-            onDataLoad={setAffordabilitySummary}
+            onMarkerReady={registerScenarioMarker}
           />
         </MapContainer>
 
@@ -481,7 +541,7 @@ function App() {
         </div>
       )}
 
-      {!loading && !performanceLayerVisible && !affordabilityLayerVisible && (
+      {!loading && !scenarioActive && (
         <div style={{
           position: 'absolute',
           top: '20px',
@@ -492,6 +552,8 @@ function App() {
         }}>
           <button
             onClick={toggleGapMode}
+            type="button"
+            aria-label="Open Gap Hunter layer"
             style={{
               background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
               color: 'white',
@@ -516,6 +578,8 @@ function App() {
 
           <button
             onClick={toggleAffordabilityLayer}
+            type="button"
+            aria-label="Open affordability layer"
             style={{
               background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
               color: 'white',
@@ -545,7 +609,7 @@ function App() {
         position: 'absolute',
         top: '20px',
         right: '20px',
-        zIndex: 1000,
+        zIndex: 1001,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'flex-end',
@@ -584,10 +648,63 @@ function App() {
           <SeasonSelector season={season} onChange={setSeason} />
         </div>
 
+        {/* Scenario Mode Toggle */}
+        {!loading && (
+          <button
+            onClick={toggleScenarioMode}
+            id="scenario-toggle-button"
+            data-testid="scenario-button"
+            type="button"
+            aria-label={scenarioActive ? 'Exit scenario mode' : 'Open what-if scenario mode'}
+            style={{
+              background: scenarioActive
+                ? 'linear-gradient(135deg, #6D28D9 0%, #5B21B6 100%)'
+                : 'rgba(255, 255, 255, 0.92)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              color: scenarioActive ? 'white' : '#6D28D9',
+              border: scenarioActive ? 'none' : '1px solid rgba(124, 58, 237, 0.25)',
+              borderRadius: '10px',
+              padding: '10px 18px',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              boxShadow: scenarioActive
+                ? '0 4px 16px rgba(124, 58, 237, 0.35)'
+                : '0 4px 16px rgba(31, 38, 135, 0.1)',
+              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              alignSelf: 'flex-end',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <span style={{ fontSize: '14px' }}>🔬</span>
+            {scenarioActive ? '✕ Exit Scenarios' : 'What-If Scenarios'}
+          </button>
+        )}
+
+        {/* Scenario Panel */}
+        {scenarioActive && (
+          <ScenarioPanel
+            scenario={scenarioState}
+            preview={scenarioPreview}
+            gapModeActive={gapModeActive}
+          />
+        )}
+
         {/* Close Affordability button */}
         {affordabilityLayerVisible && (
           <button
             onClick={() => setAffordabilityLayerVisible(false)}
+            type="button"
+            aria-label="Close affordability layer"
             style={{
               background: 'rgba(55, 65, 81, 0.9)',
               backdropFilter: 'blur(10px)',
@@ -607,17 +724,22 @@ function App() {
       </div>
 
       {/* BOTTOM RIGHT: Legend */}
-      {!loading && !gapModeActive && !affordabilityLayerVisible && (
+      {!loading && !gapModeActive && !affordabilityLayerVisible && !scenarioActive && (
         <Legend totalRegions={regions.length} />
       )}
 
       {/* Affordability Legend */}
-      {!loading && affordabilityLayerVisible && (
+      {!loading && affordabilityLayerVisible && !scenarioActive && (
         <AffordabilityLegend summary={affordabilitySummary} />
       )}
 
+      {/* Scenario Legend */}
+      {!loading && scenarioActive && !gapModeActive && (
+        <ScenarioLegend />
+      )}
+
       {/* Data Coverage Panel - bottom left */}
-      {!loading && !gapModeActive && !affordabilityLayerVisible && (
+      {!loading && !gapModeActive && !affordabilityLayerVisible && !scenarioActive && (
         <DataCoveragePanel />
       )}
       </div>
