@@ -7,7 +7,8 @@ from routes.cat_routes import cat_bp
 from routes.performance_routes import performance_bp
 
 app = Flask(__name__)
-CORS(app)
+cors_origins = os.getenv("CORS_ALLOWED_ORIGINS", "*")
+CORS(app, origins=cors_origins.split(",") if cors_origins != "*" else "*")
 
 # Initialize database on startup
 with app.app_context():
@@ -28,7 +29,7 @@ app.register_blueprint(performance_bp)
 
 @app.route('/api/health', methods=['GET'])
 def health():
-    return jsonify({"status": "ok", "message": "TENeT Backend is running"})
+    return jsonify({"status": "ok", "service": "tenet-api"})
 
 if __name__ == '__main__':
     os.makedirs(os.path.join('data', 'uploads'), exist_ok=True)

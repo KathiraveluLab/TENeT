@@ -34,6 +34,7 @@ export default function SearchBar({ value, onChange, onSelectRegion }: SearchBar
         <div className="sidebar-search">
             <input
                 aria-label="Search communities"
+                data-testid="community-search"
                 value={value}
                 onChange={(event) => {
                     onChange(event.target.value);
@@ -50,6 +51,7 @@ export default function SearchBar({ value, onChange, onSelectRegion }: SearchBar
                         <button
                             key={region.region_code}
                             className="sidebar-autocomplete-row"
+                            data-testid="sidebar-search-result"
                             onClick={() => selectRegion(region)}
                             type="button"
                         >

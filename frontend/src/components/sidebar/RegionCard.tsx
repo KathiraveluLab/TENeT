@@ -29,7 +29,7 @@ export default function RegionCard({
     return (
         <article
             className={`region-card ${selected ? 'selected' : ''}`}
-            data-testid="region-card"
+            data-testid="sidebar-result"
             data-region-code={region.region_code}
         >
             <button
