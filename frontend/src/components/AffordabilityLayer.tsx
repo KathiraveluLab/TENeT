@@ -80,7 +80,7 @@ export default function AffordabilityLayer({
     }, [visible, data, onDataLoad]);
 
     if (!visible) return null;
-    if (loading) return null;  // Could add a loading spinner
+    if (loading) return null;
     if (error) {
         console.error('AffordabilityLayer error:', error);
         return null;

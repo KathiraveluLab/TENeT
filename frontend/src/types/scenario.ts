@@ -71,13 +71,6 @@ export interface ScenarioPreset {
     thresholds: Partial<ScenarioThresholds>;
 }
 
-/** Cache key for scenario results */
-export interface ScenarioCacheKey {
-    season: Season;
-    thresholds: ScenarioThresholds;
-    region_codes: string[] | null;
-}
-
 /** Preset options */
 export const SCENARIO_PRESETS: ScenarioPreset[] = [
     {
