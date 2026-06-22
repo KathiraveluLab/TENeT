@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RegionSummary } from '../../api/catApi';
+import { usePinnedRegions } from '../../hooks/usePinnedRegions';
 import Sidebar from './Sidebar';
 
 const regions: RegionSummary[] = [
@@ -63,20 +64,37 @@ const regions: RegionSummary[] = [
 ];
 
 function renderSidebar(onSelectRegion = vi.fn()) {
+    function SidebarHarness() {
+        const {
+            pinnedRegionCodes,
+            isPinned,
+            togglePinned,
+            maxPinnedRegions,
+        } = usePinnedRegions();
+
+        return (
+            <Sidebar
+                regions={regions}
+                loading={false}
+                error={null}
+                selectedRegionCode={null}
+                pinnedRegionCodes={pinnedRegionCodes}
+                maxPinnedRegions={maxPinnedRegions}
+                onSelectRegion={onSelectRegion}
+                onTogglePin={togglePinned}
+                isPinned={isPinned}
+            />
+        );
+    }
+
     render(
-        <Sidebar
-            regions={regions}
-            loading={false}
-            error={null}
-            selectedRegionCode={null}
-            onSelectRegion={onSelectRegion}
-        />,
+        <SidebarHarness />,
     );
     return onSelectRegion;
 }
 
 function resultCards() {
-    return screen.getAllByTestId('region-card').filter(card => (
+    return screen.getAllByTestId('sidebar-result').filter(card => (
         card.closest('.pinned-section') === null
     ));
 }

@@ -22,6 +22,8 @@ export default function SeasonSelector({ season, onChange }: SeasonSelectorProps
 
     return (
         <select
+            aria-label="Season scenario"
+            data-testid="season-selector"
             value={season}
             onChange={(e) => onChange(e.target.value as Season)}
             style={{
