@@ -2,7 +2,7 @@ import os
 
 from flask import Flask, jsonify, g
 from flask_cors import CORS
-from database.config import init_db, get_db
+from database.config import init_db
 from routes.cat_routes import cat_bp
 from routes.performance_routes import performance_bp
 

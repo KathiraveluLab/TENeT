@@ -55,17 +55,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # Base class for models
 Base = declarative_base()
 
-def get_db():
-    """
-    Dependency function to get database session.
-    Use with Flask's @app.teardown_appcontext to automatically close sessions.
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
 def init_db():
     """
     Initialize database tables
