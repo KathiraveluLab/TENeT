@@ -4,16 +4,12 @@ import L from 'leaflet';
 import { ChoroplethLayer } from './ChoroplethLayer';
 import {
     PerformanceTile,
-    PerformanceSummary,
-    TopGap,
     AffordabilityZone,
-    PerformanceFilterType, // Import the new type
+    PerformanceFilterType,
     fetchPerformance,
-    fetchPerformanceSummary,
-    fetchTopGaps,
-    fetchAffordability,
-    getSpeedColor
+    fetchAffordability
 } from '../api/catApi';
+import { getScenarioCost, getTrafficLightStatus, AFFORDABILITY_BURDEN_THRESHOLD } from '../utils/trafficLight';
 
 interface PerformanceLayerProps {
     visible: boolean;
@@ -22,12 +18,9 @@ interface PerformanceLayerProps {
 }
 
 const DETAIL_ZOOM_THRESHOLD = 8;
-const TELEHEALTH_THRESHOLD_MBPS = 25;
 
 export default function PerformanceLayer({ visible, onToggle, onModeChange }: PerformanceLayerProps) {
     const [tiles, setTiles] = useState<PerformanceTile[]>([]);
-    const [summary, setSummary] = useState<PerformanceSummary | null>(null);
-    const [topGaps, setTopGaps] = useState<TopGap[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [zoomLevel, setZoomLevel] = useState(5);
@@ -67,23 +60,9 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
         }
     }, [visible, onModeChange]);
 
-    // Thresholds
-    const CRITICAL_SPEED_MBPS = 5;
-    const CRITICAL_LATENCY_MS = 150; // "Traffic Light" Red Zone
-    const WARNING_LATENCY_MS = 100;  // "Traffic Light" Yellow Zone
-    const AFFORDABILITY_BURDEN_THRESHOLD = 2.0;
-
-    // --- Helper Functions ---
-
-    const getScenarioCost = (afford: AffordabilityZone | undefined, lat: number): number => {
-        if (useStarlink) return 120;
-        if (lat > 63) return 450;
-        return 125;
-    };
-
     const getScenarioBurden = (afford: AffordabilityZone | undefined, lat: number): number | null => {
         if (!afford || !afford.monthly_income || afford.monthly_income <= 0) return null;
-        const cost = getScenarioCost(afford, lat);
+        const cost = getScenarioCost(lat, useStarlink);
         return (cost / afford.monthly_income) * 100;
     };
 
@@ -107,41 +86,12 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
 
     // --- Traffic Light Logic ---
 
-    const getTrafficLightStatus = (
+    const getTrafficLightStatusForTile = (
         tile: PerformanceTile,
         burden: number | null,
         scenarioCost: number
     ): 'RED' | 'ORANGE' | 'YELLOW' | 'GREEN' | 'GRAY' => {
-        const latency = tile.avg_lat_ms || 0;
-        const speed = tile.avg_d_mbps || 0;
-        const isRuralTier = scenarioCost >= 400; // $450/mo rural pricing
-
-        // RED ZONE: High Latency OR Rural + Unaffordable OR Unusable Speed
-        if (latency > CRITICAL_LATENCY_MS || speed < CRITICAL_SPEED_MBPS) {
-            return 'RED';
-        }
-
-        // RED for high burden (urban or rural)
-        if (burden !== null && burden > AFFORDABILITY_BURDEN_THRESHOLD) {
-            return 'RED';
-        }
-
-        // ORANGE ZONE: Rural areas with expensive infrastructure (even if fast)
-        if (isRuralTier) {
-            return 'ORANGE'; // Expensive infrastructure regardless of speed/latency
-        }
-
-        // YELLOW ZONE: Medium Latency (urban areas only reach here)
-        if (latency > 50 && latency <= CRITICAL_LATENCY_MS) {
-            return 'YELLOW';
-        }
-
-        // GREEN ZONE: Low Latency AND Affordable AND Good Speed AND Urban
-        if (latency <= 50 && (burden === null || burden <= AFFORDABILITY_BURDEN_THRESHOLD) && speed >= 25) {
-            return 'GREEN';
-        }
-
-        return 'GRAY';
+        return getTrafficLightStatus(tile.avg_d_mbps || 0, tile.avg_lat_ms || 0, burden, scenarioCost);
     };
 
 
@@ -165,25 +115,17 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
         try {
             setLoading(true);
             setError(null);
-            const [perfData, summaryData, gapsData, affordData] = await Promise.all([
+            const [perfData, affordData] = await Promise.all([
                 fetchPerformance(),
-                fetchPerformanceSummary(),
-                fetchTopGaps(10),
                 fetchAffordability().catch(() => ({ zones: [] }))
             ]);
             setTiles(perfData.tiles);
-            setSummary(summaryData);
-            setTopGaps(gapsData.gaps);
             setAffordabilityData(affordData.zones);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load data');
         } finally {
             setLoading(false);
         }
-    }
-
-    function handleGapClick(lat: number, lon: number) {
-        map.flyTo([lat, lon], 13, { duration: 1.5 });
     }
 
     function renderCanvasMarkers(tilesToRender: PerformanceTile[]) {
@@ -200,7 +142,7 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
             if (!tile.lat || !tile.lon) return;
 
             const afford = getAffordabilityForTile(tile.lat, tile.lon);
-            const scenarioCost = getScenarioCost(afford, tile.lat);
+            const scenarioCost = getScenarioCost(tile.lat, useStarlink);
             const burdenPct = getScenarioBurden(afford, tile.lat);
 
             let markerColor = '#ccc';
@@ -250,7 +192,7 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
 
             } else {
                 // 'combined' - Traffic Light Logic
-                const status = getTrafficLightStatus(tile, burdenPct, scenarioCost);
+                const status = getTrafficLightStatusForTile(tile, burdenPct, scenarioCost);
                 switch (status) {
                     case 'RED':
                         markerColor = '#EF4444';  // Rose
@@ -288,7 +230,7 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
             // Build Popup
             const latencyDisplay = tile.avg_lat_ms ? `${tile.avg_lat_ms.toFixed(0)} ms` : 'N/A';
             const costDisplay = burdenPct ? `${burdenPct.toFixed(1)}%` : 'N/A';
-            const status = getTrafficLightStatus(tile, burdenPct, scenarioCost);
+            const status = getTrafficLightStatusForTile(tile, burdenPct, scenarioCost);
 
             let capabilityLabel = "";
             if (status === 'RED') capabilityLabel = "Async / Text Only";
