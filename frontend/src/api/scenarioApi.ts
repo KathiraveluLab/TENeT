@@ -3,9 +3,8 @@
  */
 
 import type { Season } from './catApi';
+import { API_BASE } from './catApi';
 import type { ScenarioPreviewResponse, ScenarioThresholds } from '../types/scenario';
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/cat';
 
 export interface ScenarioPreviewRequest {
     mode: 'preview';

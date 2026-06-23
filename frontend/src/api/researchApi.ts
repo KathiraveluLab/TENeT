@@ -1,7 +1,5 @@
-import { Season } from './catApi';
+import { Season, API_BASE } from './catApi';
 import { ResearchProfile, ResearchProfilesResponse } from '../types/research';
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/cat';
 
 export async function fetchResearchProfile(
     regionCode: string,
