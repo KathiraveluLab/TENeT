@@ -17,9 +17,9 @@ export function formatMissing(value: string | number | null | undefined, fallbac
     return value;
 }
 
-export function formatStatus(status: string | null | undefined) {
+export function formatStatus(status: string | null | undefined, fallback = 'Unknown') {
     if (!status) {
-        return 'Unknown';
+        return fallback;
     }
     return status
         .toLowerCase()
@@ -34,6 +34,16 @@ export function statusClassName(status: string | null | undefined) {
     if (normalized.includes('anchor')) return 'status-anchor';
     if (normalized.includes('critical')) return 'status-critical';
     return 'status-unknown';
+}
+
+export function telehealthNeedLabel(score: number | null | undefined): string {
+    if (score === null || score === undefined || !Number.isFinite(score)) {
+        return 'Data unavailable';
+    }
+    if (score <= 30) return `Low Need (${score.toFixed(1)})`;
+    if (score <= 60) return `Moderate Need (${score.toFixed(1)})`;
+    if (score <= 80) return `High Need (${score.toFixed(1)})`;
+    return `Critical Need (${score.toFixed(1)})`;
 }
 
 export function sortRegions(regions: RegionSummary[], sortMode: RegionSortMode) {

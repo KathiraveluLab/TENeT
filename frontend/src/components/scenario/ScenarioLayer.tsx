@@ -10,6 +10,8 @@ import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import type { ScenarioPreviewResponse, ScenarioRegion } from '../../types/scenario';
 import { getScenarioStatusColor, getScenarioDeltaColor } from '../../types/scenario';
+import { formatStatus } from '../sidebar/sidebarUtils';
+import { createMarkerIcon } from '../../utils/markerUtils';
 
 interface ScenarioLayerProps {
     data: ScenarioPreviewResponse | null;
@@ -18,44 +20,6 @@ interface ScenarioLayerProps {
     onSelect: (regionCode: string) => void;
     onViewDetails: (regionCode: string) => void;
     onMarkerReady?: (regionCode: string, marker: L.Marker | null) => void;
-}
-
-const markerIconCache = new Map<string, L.DivIcon>();
-
-function createMarkerIcon(color: string, selected = false): L.DivIcon {
-    const cacheKey = `${color}:${selected ? 'selected' : 'default'}`;
-    const cached = markerIconCache.get(cacheKey);
-    if (cached) return cached;
-
-    const size = selected ? 16 : 10;
-    const anchor = size / 2;
-    const icon = L.divIcon({
-        className: 'custom-marker scenario-marker',
-        html: `
-            <div style="
-                width: ${size}px;
-                height: ${size}px;
-                background-color: ${color};
-                opacity: ${selected ? 1 : 0.8};
-                border: ${selected ? 3 : 1.5}px solid rgba(255, 255, 255, 0.95);
-                border-radius: 50%;
-                box-shadow: 0 ${selected ? 2 : 1}px ${selected ? 8 : 3}px rgba(0,0,0,0.25);
-            "></div>
-        `,
-        iconSize: [size, size],
-        iconAnchor: [anchor, anchor],
-        popupAnchor: [0, -anchor],
-    });
-    markerIconCache.set(cacheKey, icon);
-    return icon;
-}
-
-function statusLabel(status: string): string {
-    return status
-        .toLowerCase()
-        .split('_')
-        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ');
 }
 
 function deltaSymbol(delta: string): string {
@@ -118,12 +82,12 @@ const ScenarioMarker = memo(function ScenarioMarker({
                     }}>
                         <span style={{ color: '#64748b' }}>Baseline Status</span>
                         <strong style={{ color: getScenarioStatusColor(region.baseline_status) }}>
-                            {statusLabel(region.baseline_status)}
+                            {formatStatus(region.baseline_status)}
                         </strong>
 
                         <span style={{ color: '#64748b' }}>Scenario Status</span>
                         <strong style={{ color: getScenarioStatusColor(region.scenario_status) }}>
-                            {statusLabel(region.scenario_status)}
+                            {formatStatus(region.scenario_status)}
                         </strong>
 
                         {region.changed && (
@@ -255,12 +219,12 @@ export function ScenarioSidebarCard({ region }: ScenarioSidebarCardProps) {
             }}>
                 <span style={{ color: '#64748b' }}>Baseline Status</span>
                 <strong style={{ color: getScenarioStatusColor(region.baseline_status) }}>
-                    {statusLabel(region.baseline_status)}
+                    {formatStatus(region.baseline_status)}
                 </strong>
 
                 <span style={{ color: '#64748b' }}>Scenario Status</span>
                 <strong style={{ color: getScenarioStatusColor(region.scenario_status) }}>
-                    {statusLabel(region.scenario_status)}
+                    {formatStatus(region.scenario_status)}
                 </strong>
 
                 <span style={{ color: '#64748b' }}>Need Score Delta</span>
