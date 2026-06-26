@@ -10,7 +10,8 @@ import json
 from database.config import SessionLocal
 from database.handlers import CATDataHandler
 from services.data_importer import CATDataImporter
-from services.healthcare_desert_calculator import HealthcareDesertCalculator
+from services.healthcare_desert_calculator import HealthcareDesertCalculator, haversine_km as _haversine_km
+from services.isp_config import ISP_CONFIG as _ISP_CONFIG, get_internet_cost as _get_regional_internet_cost
 from services.research_profile_service import ResearchProfileService
 from services.season_constants import (
     SEASON_SUMMER, SEASON_WINTER, SEASON_YEAR_ROUND, VALID_SEASONS, 
@@ -1026,9 +1027,6 @@ def get_boundaries():
         with open(BOUNDARIES_FILE, 'r') as f:
             geojson = json.load(f)
         
-        # Optionally simplify geometry for performance (client can request full detail)
-        simplify = request.args.get('simplify', 'false').lower() == 'true'
-        
         return jsonify(geojson), 200
         
     except Exception as e:
@@ -1697,72 +1695,6 @@ def get_data_gaps_summary():
 # =============================================================================
 # AFFORDABILITY & SAFETY NET ENDPOINTS
 # =============================================================================
-
-# Load ISP pricing config
-def _load_isp_config():
-    """Load ISP pricing from config file."""
-    config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'isp_pricing.json')
-    try:
-        with open(config_path, 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {
-            'isp_pricing': {'fastwyre': {'cost': 350}},
-            'zcta_mappings': {'gci_urban': [], 'extreme_rural': []},
-            'thresholds': {'affordability_burden_pct': 2.0}
-        }
-
-_ISP_CONFIG = _load_isp_config()
-
-
-def _get_regional_internet_cost(zcta: str) -> tuple:
-    """Get internet cost for a ZCTA based on regional ISP availability."""
-    try:
-        gmap = _ISP_CONFIG.get('zcta_mappings', {})
-        if not isinstance(gmap, dict):
-            gmap = {}
-        gu_list = gmap.get('gci_urban', [])
-        er_list = gmap.get('extreme_rural', [])
-        sl_list = gmap.get('starlink_satellite', [])
-        gci_urban = set(gu_list if isinstance(gu_list, list) else [])
-        extreme_rural = set(er_list if isinstance(er_list, list) else [])
-        starlink_satellite = set(sl_list if isinstance(sl_list, list) else [])
-    except Exception:
-        gci_urban = set()
-        extreme_rural = set()
-        starlink_satellite = set()
-        
-    pricing = _ISP_CONFIG.get('isp_pricing', {})
-    if not isinstance(pricing, dict):
-        pricing = {}
-        
-    if zcta in extreme_rural:
-        p = pricing.get('extreme_rural', {'cost': 450.0, 'name': 'Extreme Rural'})
-        if not isinstance(p, dict): p = {'cost': 450.0, 'name': 'Extreme Rural'}
-        return (float(p.get('cost', 450.0)), str(p.get('name', 'Extreme Rural')))
-    elif zcta in gci_urban:
-        p = pricing.get('gci', {'cost': 125.0, 'name': 'GCI'})
-        if not isinstance(p, dict): p = {'cost': 125.0, 'name': 'GCI'}
-        return (float(p.get('cost', 125.0)), str(p.get('name', 'GCI')))
-    elif zcta in starlink_satellite:
-        p = pricing.get('starlink', {'cost': 120.0, 'name': 'Starlink'})
-        if not isinstance(p, dict): p = {'cost': 120.0, 'name': 'Starlink'}
-        return (float(p.get('cost', 120.0)), str(p.get('name', 'Starlink')))
-    else:
-        p = pricing.get('fastwyre', {'cost': 350.0, 'name': 'FastWyre'})
-        if not isinstance(p, dict): p = {'cost': 350.0, 'name': 'FastWyre'}
-        return (float(p.get('cost', 350.0)), str(p.get('name', 'FastWyre')))
-
-
-def _haversine_km(lat1, lon1, lat2, lon2):
-    """Calculate distance between two points in kilometers."""
-    R = 6371  # Earth radius in km
-    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
-    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-    return R * 2 * math.asin(math.sqrt(a))
-
 
 @cat_bp.route('/regions/<region_code>/affordability', methods=['GET'])
 def get_region_affordability(region_code):
