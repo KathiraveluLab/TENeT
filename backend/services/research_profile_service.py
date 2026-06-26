@@ -23,7 +23,8 @@ from database.models import (
     OoklaPerformance,
 )
 from services.data_quality_service import DataQualityService
-from services.healthcare_desert_calculator import HealthcareDesertCalculator
+from services.healthcare_desert_calculator import HealthcareDesertCalculator, haversine_km as _haversine_km
+from services.isp_config import get_internet_cost, get_affordability_threshold
 from services.season_constants import SEASON_YEAR_ROUND, VALID_SEASONS, get_season_display_name
 
 
@@ -36,19 +37,6 @@ def _round(value, digits=2):
     return round(float(value), digits) if value is not None else None
 
 
-def _haversine_km(lat1, lon1, lat2, lon2):
-    radius_km = 6371.0
-    lat1_rad = math.radians(float(lat1))
-    lat2_rad = math.radians(float(lat2))
-    delta_lat = math.radians(float(lat2) - float(lat1))
-    delta_lon = math.radians(float(lon2) - float(lon1))
-    a = (
-        math.sin(delta_lat / 2) ** 2
-        + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon / 2) ** 2
-    )
-    return radius_km * (2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
-
-
 def _region_group(region: CATRegion) -> str | None:
     properties = region.properties or {}
     return (
@@ -56,51 +44,6 @@ def _region_group(region: CATRegion) -> str | None:
         or properties.get("economic_region")
         or properties.get("area")
     )
-
-
-def _load_isp_config() -> dict:
-    config_path = os.path.join(os.path.dirname(__file__), "..", "config", "isp_pricing.json")
-    try:
-        with open(config_path, "r") as file:
-            return json.load(file)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {
-            "isp_pricing": {
-                "gci": {"name": "GCI", "cost": 125},
-                "fastwyre": {"name": "FastWyre/Rural", "cost": 350},
-                "starlink": {"name": "Starlink", "cost": 120},
-                "extreme_rural": {"name": "Extreme Rural", "cost": 450},
-            },
-            "zcta_mappings": {"gci_urban": [], "extreme_rural": []},
-            "thresholds": {"affordability_burden_pct": AFFORDABILITY_DEFAULT_THRESHOLD},
-        }
-
-
-ISP_CONFIG = _load_isp_config()
-
-
-def _internet_cost_for_zcta(zcta: str | None) -> tuple[float | None, str | None]:
-    if not zcta:
-        return None, None
-
-    mappings = ISP_CONFIG.get("zcta_mappings", {})
-    pricing = ISP_CONFIG.get("isp_pricing", {})
-
-    if zcta in mappings.get("gci_urban", []):
-        key = "gci"
-    elif zcta in mappings.get("extreme_rural", []):
-        key = "extreme_rural"
-    else:
-        key = "fastwyre"
-
-    entry = pricing.get(key, {})
-    return entry.get("cost"), entry.get("name")
-
-
-def _affordability_threshold() -> float:
-    thresholds = ISP_CONFIG.get("thresholds", {})
-    value = thresholds.get("affordability_burden_pct", AFFORDABILITY_DEFAULT_THRESHOLD)
-    return float(value) if isinstance(value, (int, float)) else AFFORDABILITY_DEFAULT_THRESHOLD
 
 
 class ResearchProfileService:
@@ -329,8 +272,9 @@ class ResearchProfileService:
 
     @staticmethod
     def _affordability_payload(income) -> dict:
-        cost, isp_name = _internet_cost_for_zcta(getattr(income, "zcta", None))
-        threshold = _affordability_threshold()
+        zcta = getattr(income, "zcta", None)
+        cost, isp_name = get_internet_cost(str(zcta)) if zcta else (None, None)
+        threshold = get_affordability_threshold()
         median_income = income.median_income if income else None
         if cost is None or not median_income:
             burden_pct = None
