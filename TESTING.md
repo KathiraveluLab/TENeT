@@ -1,6 +1,6 @@
 # TENeT Testing Guide
 
-Phase 5 uses layered testing: unit tests for formulas, integration tests for API contracts, component tests for UI behavior, Playwright smoke tests for full journeys, and CI checks for repeatability.
+TENeT uses layered testing: unit tests for formulas, integration tests for API contracts, component tests for UI behavior, Playwright smoke tests for full journeys, and CI checks for repeatability.
 
 ## Test Coverage Audit
 
@@ -50,7 +50,7 @@ Backend tests should verify:
 - Scenario cache behavior is tested functionally, not with strict timing.
 - Season behavior uses fixed known communities instead of asserting every community changes.
 
-Avoid brittle timing assertions such as “must respond under 50ms.”
+Avoid brittle timing assertions such as "must respond under 50ms."
 
 ## Frontend Testing
 
@@ -88,7 +88,7 @@ Use stable selectors for E2E:
 
 ## Accessibility Smoke Checks
 
-Phase 5 does not claim full WCAG certification, but the final app should pass basic checks:
+TENeT does not claim full WCAG certification, but the final app should pass basic checks:
 
 - Important statuses are not color-only.
 - Buttons have accessible labels.
