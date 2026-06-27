@@ -1,7 +1,8 @@
 import { stat } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
-async function setRangeValue(page, label: string, value: string) {
+async function setRangeValue(page: Page, label: string, value: string) {
   await page.getByLabel(label).evaluate((element, nextValue) => {
     const input = element as HTMLInputElement;
     const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
