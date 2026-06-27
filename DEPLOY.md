@@ -117,4 +117,4 @@ If deployment fails:
 - SQLite public demo data is seeded/read-only.
 - Scenario Mode is modeled analysis, not observed field data.
 - Gap Hunter remains raw observed measurement data.
-- Weather API integration is not part of core Phase 5 deployment unless mentors approve it.
+- Weather API integration is not part of the core public demo deployment unless mentors approve it.
