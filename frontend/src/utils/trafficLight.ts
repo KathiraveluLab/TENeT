@@ -31,6 +31,9 @@ export function getTrafficLightStatus(
     if (latency > 50 && latency <= CRITICAL_LATENCY_MS) {
         return 'YELLOW';
     }
+    if (speed < 25) {
+        return 'YELLOW';
+    }
     if (latency <= 50 && (burden === null || burden <= AFFORDABILITY_BURDEN_THRESHOLD) && speed >= 25) {
         return 'GREEN';
     }
