@@ -1,6 +1,16 @@
 import { stat } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 
+async function setRangeValue(page, label: string, value: string) {
+  await page.getByLabel(label).evaluate((element, nextValue) => {
+    const input = element as HTMLInputElement;
+    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+    nativeSetter?.call(input, nextValue);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+}
+
 test.describe('Public dashboard smoke', () => {
   test('searches a community, selects it, and downloads a non-empty report', async ({ page }, testInfo) => {
     await page.goto('/');
@@ -29,12 +39,7 @@ test.describe('Public dashboard smoke', () => {
     await page.getByTestId('scenario-button').click();
     await expect(page.getByTestId('scenario-panel')).toBeVisible();
 
-    await page.getByLabel('Download threshold').evaluate(element => {
-      const input = element as HTMLInputElement;
-      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-      nativeSetter?.call(input, '75');
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    });
+    await setRangeValue(page, 'Download threshold', '75');
 
     await expect(page.getByTestId('scenario-summary')).toBeVisible();
     await expect(page).toHaveURL(/scenario=1/);
