@@ -37,9 +37,9 @@ test.describe('Phase 5 public dashboard smoke', () => {
 
     await page.getByLabel('Download threshold').evaluate(element => {
       const input = element as HTMLInputElement;
-      input.value = '75';
+      const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      nativeSetter?.call(input, '75');
       input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
     await expect(page.getByTestId('scenario-summary')).toBeVisible();
