@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { RegionSummary, Season } from '../../api/catApi';
+import type { ScenarioRegion } from '../../types/scenario';
 import { useResearchProfile } from '../../hooks/useResearchProfile';
 import { exportResearchProfileReport } from '../../utils/reportExport';
 import { DATA_UNAVAILABLE, formatResearchValue } from '../../utils/formatResearchValue';
+import { ScenarioSidebarCard } from '../scenario/ScenarioLayer';
 import MetricTooltip from '../MetricTooltip';
 import { formatMissing, formatStatus, statusClassName } from './sidebarUtils';
 
@@ -13,6 +15,7 @@ interface SelectedRegionPanelProps {
     pinned: boolean;
     pinDisabled: boolean;
     onTogglePin: (regionCode: string) => void;
+    scenarioRegion?: ScenarioRegion;
 }
 
 function telehealthNeedLabel(score: number | null | undefined): string {
@@ -32,6 +35,7 @@ export default function SelectedRegionPanel({
     pinned,
     pinDisabled,
     onTogglePin,
+    scenarioRegion,
 }: SelectedRegionPanelProps) {
     const { profile, loading, error } = useResearchProfile(region?.region_code ?? null, season);
     const panelRef = useRef<HTMLElement | null>(null);
@@ -51,7 +55,10 @@ export default function SelectedRegionPanel({
 
     const handleDownloadReport = async () => {
         if (!profile) return;
-        await exportResearchProfileReport(profile, document.querySelector('.leaflet-container'));
+        await exportResearchProfileReport(
+            profile,
+            document.querySelector<HTMLElement>('.leaflet-container'),
+        );
     };
 
     const handleCopyShareLink = async () => {
@@ -83,15 +90,19 @@ export default function SelectedRegionPanel({
                 <button
                     type="button"
                     className="sidebar-action-button"
+                    data-testid="download-report"
                     disabled={loading || !profile}
                     onClick={handleDownloadReport}
+                    aria-label={`Download report for ${region.name}`}
                 >
                     Download Report
                 </button>
                 <button
                     type="button"
                     className="sidebar-action-button"
+                    data-testid="copy-share-link"
                     onClick={handleCopyShareLink}
+                    aria-label={`Copy share link for ${region.name}`}
                 >
                     Copy Share Link
                 </button>
@@ -208,6 +219,9 @@ export default function SelectedRegionPanel({
                         : DATA_UNAVAILABLE}
                 </strong>
             </div>
+
+            {/* Scenario Sidebar Card */}
+            <ScenarioSidebarCard region={scenarioRegion} />
         </section>
     );
 }

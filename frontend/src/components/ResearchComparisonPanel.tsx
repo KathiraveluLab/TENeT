@@ -92,6 +92,7 @@ export default function ResearchComparisonPanel({
             <button
                 type="button"
                 className="research-comparison-reopen"
+                data-testid="comparison-panel"
                 onClick={() => {
                     setClosed(false);
                     setCollapsed(false);
@@ -105,6 +106,7 @@ export default function ResearchComparisonPanel({
     return (
         <section
             className={`research-comparison-panel ${collapsed ? 'collapsed' : ''}`}
+            data-testid="comparison-panel"
             aria-label="Pinned community comparison"
             aria-expanded={!collapsed}
         >
