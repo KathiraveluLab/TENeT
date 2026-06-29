@@ -1,7 +1,19 @@
+import { stat } from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
-test.describe('Phase 5 public dashboard smoke', () => {
-  test('searches a community, selects it, and downloads a non-empty report', async ({ page }) => {
+async function setRangeValue(page: Page, label: string, value: string) {
+  await page.getByLabel(label).evaluate((element, nextValue) => {
+    const input = element as HTMLInputElement;
+    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+    nativeSetter?.call(input, nextValue);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+}
+
+test.describe('Public dashboard smoke', () => {
+  test('searches a community, selects it, and downloads a non-empty report', async ({ page }, testInfo) => {
     await page.goto('/');
     await expect(page.getByTestId('community-search')).toBeVisible();
 
@@ -12,22 +24,15 @@ test.describe('Phase 5 public dashboard smoke', () => {
     const downloadPromise = page.waitForEvent('download');
     await page.getByTestId('download-report').click();
     const download = await downloadPromise;
-    const stream = await download.createReadStream();
+    const filename = download.suggestedFilename();
 
-    expect(download.suggestedFilename().toLowerCase()).toContain('anchorage');
-    if (!stream) {
-      throw new Error('Expected PDF download stream');
-    }
+    expect(filename.toLowerCase()).toContain('anchorage');
 
-    let bytes = 0;
-    await new Promise<void>((resolve, reject) => {
-      stream.on('data', chunk => {
-        bytes += chunk.length;
-      });
-      stream.on('end', resolve);
-      stream.on('error', reject);
-    });
-    expect(bytes).toBeGreaterThan(0);
+    const outputPath = testInfo.outputPath(filename);
+    await download.saveAs(outputPath);
+
+    const { size } = await stat(outputPath);
+    expect(size).toBeGreaterThan(0);
   });
 
   test('scenario controls update the modeled impact summary and shareable URL state', async ({ page }) => {
@@ -35,12 +40,7 @@ test.describe('Phase 5 public dashboard smoke', () => {
     await page.getByTestId('scenario-button').click();
     await expect(page.getByTestId('scenario-panel')).toBeVisible();
 
-    await page.getByLabel('Download threshold').evaluate(element => {
-      const input = element as HTMLInputElement;
-      input.value = '75';
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    await setRangeValue(page, 'Download threshold', '75');
 
     await expect(page.getByTestId('scenario-summary')).toBeVisible();
     await expect(page).toHaveURL(/scenario=1/);

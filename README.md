@@ -45,9 +45,14 @@ seeds local development data, and starts the backend plus frontend together.
 | `make build` | Rebuild containers without cache |
 | `make seed` | Seed the database with local CAT, healthcare, broadband, income, and performance data |
 | `make reset-db` | Delete and re-seed the database |
-| `make test` | Run backend pytest and frontend build check |
+| `make test` | Run backend pytest and frontend Vitest |
 | `make backend-test` | Run only backend pytest |
-| `make frontend-test` | Run only frontend build check |
+| `make frontend-test` | Run only frontend Vitest |
+| `make frontend-build` | Run the frontend production build |
+| `make frontend-typecheck` | Run TypeScript checks |
+| `make docker-build` | Build backend and frontend Docker images |
+| `make e2e` | Run Playwright smoke tests against a running app |
+| `make smoke` | Run lightweight deployment smoke checks |
 | `make logs` | Tail container logs |
 | `make clean` | Remove containers, volumes, and images |
 | `make help` | Show all available commands |
@@ -87,8 +92,10 @@ Common local variables:
 | `FRONTEND_PORT` | `5173` | Host port for Vite |
 | `FLASK_HOST` | `0.0.0.0` | Backend bind address inside Docker |
 | `FLASK_PORT` | `5001` | Backend container port |
+| `FLASK_DEBUG` | `1` | Flask debug mode for local Docker |
 | `DB_PATH` | `/app/data/tenet.db` | SQLite path inside the backend container |
 | `VITE_API_BASE_URL` | `/api/cat` | Frontend API base URL proxied by nginx in Docker |
+| `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated frontend origins allowed by the API |
 
 ### Troubleshooting
 
@@ -135,6 +142,11 @@ npm run dev
 | **Broadband Reality Check** | Side-by-side comparison of FCC-claimed speeds vs. Ookla-measured speeds - exposing the real connectivity gap |
 | **Internet Affordability** | Monthly broadband cost as a percentage of local household income - because 25 Mbps means nothing if no one can afford it |
 | **Seasonal Adjustment** | Toggle between summer and winter to see how access changes when roads freeze and rivers shut down |
+| **Sidebar Discovery** | Search, filter, sort, pin, and inspect communities without moving heavy map geometry |
+| **Research Reports** | Download community PDF summaries with safe missing-data labels |
+| **Region Comparison** | Compare 2–3 pinned communities side by side |
+| **Shareable URLs** | Restore selected region, layer, season, pins, map view, and scenario state |
+| **What-If Scenarios** | Model broadband, clinic proximity, and affordability thresholds without changing baseline data |
 
 ---
 
@@ -184,10 +196,15 @@ TENeT/
 | Endpoint | What it returns |
 |----------|-----------------|
 | `GET /api/cat/regions?season=summer` | All communities with tier levels, adjusted for season |
+| `GET /api/cat/regions/summary` | Lightweight sidebar community summaries without geometry |
+| `GET /api/cat/regions/search` | Search/filter community summaries |
+| `GET /api/cat/regions/<region_code>/research-profile` | Export-ready profile for one community |
+| `GET /api/cat/regions/research-profiles` | Batch profiles for pinned comparison |
+| `POST /api/cat/scenarios/preview` | Modeled scenario preview for selected thresholds |
 | `GET /api/cat/telehealth-priority` | Telehealth priority rankings per community |
 | `GET /api/cat/performance` | Measured broadband speeds (Ookla data) |
 | `GET /api/cat/affordability` | Internet cost burden per community |
-| `GET /api/health` | Backend health check |
+| `GET /api/health` | Backend health check: `{"status":"ok","service":"tenet-api"}` |
 
 ---
 
@@ -231,15 +248,18 @@ The transport tier feeds into the Telehealth Need Score alongside healthcare des
 
 ---
 
-## Upcoming Features
+## Quality, Deployment, and Contribution Docs
 
-- **Sidebar Search** - Find any community by name, fly-to on map
-- **PDF Reports** - One-click downloadable summaries for grant applications
-- **Region Comparison** - Compare 2–3 communities side by side
-- **What-If Sliders** - Model "what happens if broadband improves here?"
-- **Shareable URLs** - Bookmark and share specific map views
-- **CI/CD Pipeline** - Automated tests via GitHub Actions
-- **Cloud Deployment** - Public URL for direct stakeholder access
+- [Testing guide](./TESTING.md) - backend, frontend, E2E, smoke, accessibility, and performance checks
+- [Deployment guide](./DEPLOY.md) - public demo deployment with seeded SQLite data
+- [Contribution guide](./CONTRIBUTING.md) - local workflow and PR checklist
+
+## Known Limitations
+
+- Scenario Mode shows modeled estimates based on selected thresholds. It does not represent observed ground truth and does not modify baseline data.
+- Gap Hunter remains raw observed measurement data and is not recolored by Scenario Mode.
+- Public demo deployments use deterministic seeded SQLite data and should not depend on local untracked database files.
+- Dynamic Weather API integration is a stretch exploration item only unless mentors approve implementation.
 
 ---
 
