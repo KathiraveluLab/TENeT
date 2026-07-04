@@ -200,9 +200,9 @@ class HealthcareDesertCalculator:
         
         # Calculate weighted score
         necessity_score = float(
-            0.50 * distance_score +
-            0.15 * density_score +
-            0.15 * specialist_score +
+            0.40 * distance_score +
+            0.20 * density_score +
+            0.20 * specialist_score +
             0.20 * transport_score
         )
         
