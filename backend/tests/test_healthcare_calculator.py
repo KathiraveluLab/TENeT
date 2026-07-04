@@ -27,7 +27,7 @@ class TestHealthcareCalculator(unittest.TestCase):
         # (100 * 0.20) = 20.0
         db.query().filter().count.side_effect = [
             0,      # num_sites (density)
-            False,  # has_specialists
+            0,      # has_specialists
         ]
         
         # 3. Specialist: False => 100 points
