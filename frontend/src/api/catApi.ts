@@ -2,7 +2,7 @@
  * API client for CAT (Community Access Tier) data
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/cat';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/cat';
 
 // Season type for user-selected seasonal scenario
 export type Season = 'summer' | 'winter' | 'year_round';

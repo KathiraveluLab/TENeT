@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import { ResearchProfile } from '../types/research';
 import { DATA_UNAVAILABLE, formatResearchValue, formatStatusText } from './formatResearchValue';
+import { telehealthNeedLabel } from '../components/sidebar/sidebarUtils';
 
 const PAGE_WIDTH = 210;
 const PAGE_HEIGHT = 297;
@@ -158,14 +159,7 @@ function valueIndex(profile: ResearchProfile): string {
 }
 
 function telehealthNeed(profile: ResearchProfile): string {
-    const score = profile.healthcare.desert_score;
-    if (score === null || !Number.isFinite(score)) {
-        return DATA_UNAVAILABLE;
-    }
-    if (score <= 30) return `Low Need (${score.toFixed(1)})`;
-    if (score <= 60) return `Moderate Need (${score.toFixed(1)})`;
-    if (score <= 80) return `High Need (${score.toFixed(1)})`;
-    return `Critical Need (${score.toFixed(1)})`;
+    return telehealthNeedLabel(profile.healthcare.desert_score);
 }
 
 function telehealthNeedTone(profile: ResearchProfile): Tone {

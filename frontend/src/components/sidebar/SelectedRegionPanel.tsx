@@ -3,10 +3,10 @@ import { RegionSummary, Season } from '../../api/catApi';
 import type { ScenarioRegion } from '../../types/scenario';
 import { useResearchProfile } from '../../hooks/useResearchProfile';
 import { exportResearchProfileReport } from '../../utils/reportExport';
+import { formatMissing, formatStatus, statusClassName, telehealthNeedLabel } from './sidebarUtils';
 import { DATA_UNAVAILABLE, formatResearchValue } from '../../utils/formatResearchValue';
 import { ScenarioSidebarCard } from '../scenario/ScenarioLayer';
 import MetricTooltip from '../MetricTooltip';
-import { formatMissing, formatStatus, statusClassName } from './sidebarUtils';
 
 interface SelectedRegionPanelProps {
     region: RegionSummary | null;
@@ -16,16 +16,6 @@ interface SelectedRegionPanelProps {
     pinDisabled: boolean;
     onTogglePin: (regionCode: string) => void;
     scenarioRegion?: ScenarioRegion;
-}
-
-function telehealthNeedLabel(score: number | null | undefined): string {
-    if (score === null || score === undefined || !Number.isFinite(score)) {
-        return DATA_UNAVAILABLE;
-    }
-    if (score <= 30) return `Low Need (${score.toFixed(1)})`;
-    if (score <= 60) return `Moderate Need (${score.toFixed(1)})`;
-    if (score <= 80) return `High Need (${score.toFixed(1)})`;
-    return `Critical Need (${score.toFixed(1)})`;
 }
 
 export default function SelectedRegionPanel({

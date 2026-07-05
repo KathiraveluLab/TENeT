@@ -1,3 +1,5 @@
+import { formatStatus } from '../components/sidebar/sidebarUtils';
+
 export const DATA_UNAVAILABLE = 'Data unavailable';
 
 export function formatResearchValue(
@@ -33,9 +35,5 @@ export function formatResearchValue(
 }
 
 export function formatStatusText(value: string | null | undefined): string {
-    if (!value) return DATA_UNAVAILABLE;
-    return value
-        .replace(/_/g, ' ')
-        .toLowerCase()
-        .replace(/\b\w/g, char => char.toUpperCase());
+    return formatStatus(value, DATA_UNAVAILABLE);
 }

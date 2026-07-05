@@ -1,6 +1,4 @@
-import React from 'react';
-
-export type Season = 'summer' | 'winter' | 'year_round';
+import type { Season } from '../api/catApi';
 
 interface SeasonSelectorProps {
     season: Season;

@@ -318,3 +318,9 @@ class HealthcareDesertCalculator:
         results.sort(key=lambda x: x['necessity_score'], reverse=True)
         
         return results
+
+
+# Module-level convenience wrapper so callers don't need to import the class.
+def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Haversine distance in km. Delegates to HealthcareDesertCalculator.calculate_distance."""
+    return HealthcareDesertCalculator.calculate_distance(lat1, lon1, lat2, lon2)

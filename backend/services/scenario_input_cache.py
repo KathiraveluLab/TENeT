@@ -25,54 +25,14 @@ from database.models import (
     OoklaPerformance,
 )
 from services.data_quality_service import normalize_confidence, split_gap_flags
-from services.healthcare_desert_calculator import HealthcareDesertCalculator
+from services.healthcare_desert_calculator import HealthcareDesertCalculator, haversine_km as _haversine_km
+from services.isp_config import get_internet_cost, get_affordability_threshold
 from services.season_constants import (
     ROAD_QUALITY_LOCAL,
     SEASON_YEAR_ROUND,
     VALID_ROAD_QUALITIES,
     VALID_SEASONS,
 )
-
-
-def _load_isp_config() -> dict:
-    config_path = os.path.join(os.path.dirname(__file__), "..", "config", "isp_pricing.json")
-    try:
-        with open(config_path, "r") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {
-            "isp_pricing": {"fastwyre": {"cost": 350}},
-            "zcta_mappings": {"gci_urban": [], "extreme_rural": []},
-            "thresholds": {"affordability_burden_pct": 2.0},
-        }
-
-
-_ISP_CONFIG = _load_isp_config()
-
-
-def _get_regional_internet_cost(zcta: str) -> Tuple[float, str]:
-    gmap = _ISP_CONFIG.get("zcta_mappings", {})
-    gci_urban = set(gmap.get("gci_urban", []))
-    extreme_rural = set(gmap.get("extreme_rural", []))
-    starlink_satellite = set(gmap.get("starlink_satellite", []))
-    pricing = _ISP_CONFIG.get("isp_pricing", {})
-
-    if zcta in extreme_rural:
-        p = pricing.get("extreme_rural", {"cost": 450.0, "name": "Extreme Rural"})
-        return float(p.get("cost", 450.0)), str(p.get("name", "Extreme Rural"))
-    if zcta in gci_urban:
-        p = pricing.get("gci", {"cost": 125.0, "name": "GCI"})
-        return float(p.get("cost", 125.0)), str(p.get("name", "GCI"))
-    if zcta in starlink_satellite:
-        p = pricing.get("starlink", {"cost": 120.0, "name": "Starlink"})
-        return float(p.get("cost", 120.0)), str(p.get("name", "Starlink"))
-
-    p = pricing.get("fastwyre", {"cost": 350.0, "name": "FastWyre"})
-    return float(p.get("cost", 350.0)), str(p.get("name", "FastWyre"))
-
-
-def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    return HealthcareDesertCalculator.calculate_distance(lat1, lon1, lat2, lon2)
 
 
 def _bucket_key(lat: float, lon: float) -> Tuple[int, int]:
@@ -152,9 +112,7 @@ class ScenarioInputCache:
         data_points_by_region, first_data_point_by_region = cls._data_points(db, region_codes)
         site_counts, specialist_regions = cls._healthcare_site_stats(facilities)
 
-        baseline_threshold = float(
-            _ISP_CONFIG.get("thresholds", {}).get("affordability_burden_pct", 2.0)
-        )
+        baseline_threshold = get_affordability_threshold()
 
         return [
             cls._region_input(
@@ -293,7 +251,7 @@ class ScenarioInputCache:
 
         if income is not None:
             median_income = float(income.median_income)
-            monthly_internet_cost, _ = _get_regional_internet_cost(str(income.zcta))
+            monthly_internet_cost, _ = get_internet_cost(str(income.zcta))
             monthly_income = median_income / 12.0
             burden_pct = (
                 float((monthly_internet_cost / monthly_income) * 100.0)

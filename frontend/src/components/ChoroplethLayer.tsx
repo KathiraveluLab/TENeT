@@ -5,9 +5,10 @@
  * with aggregated performance data and context-rich tooltips.
  */
 import { useEffect, useState, useMemo } from 'react';
-import { useMap, GeoJSON, Popup } from 'react-leaflet';
+import { useMap, GeoJSON } from 'react-leaflet';
 import L from 'leaflet';
 import type { PerformanceTile, AffordabilityZone } from '../api/catApi';
+import { getScenarioCost, getTrafficLightStatus } from '../utils/trafficLight';
 
 // GeoJSON Feature type
 interface BoundaryFeature {
@@ -42,18 +43,7 @@ interface ChoroplethLayerProps {
     useStarlink: boolean;
 }
 
-// Thresholds (matching PerformanceLayer.tsx)
-const CRITICAL_LATENCY_MS = 150;
-const CRITICAL_SPEED_MBPS = 5;
-const AFFORDABILITY_BURDEN_THRESHOLD = 2.0;
-
-// Get scenario cost based on latitude
-const getScenarioCost = (lat: number, useStarlink: boolean): number => {
-    if (useStarlink) return 120;
-    return lat > 63 ? 450 : 125;
-};
-
-// Calculate burden percentage
+// Get burden percentage for a tile location
 const getBurden = (
     lat: number,
     lon: number,
@@ -70,34 +60,7 @@ const getBurden = (
     return (cost / monthlyIncome) * 100;
 };
 
-// Traffic light status logic
-const getTrafficLightStatus = (
-    avgSpeed: number,
-    avgLatency: number,
-    avgBurden: number | null,
-    scenarioCost: number
-): 'GREEN' | 'YELLOW' | 'ORANGE' | 'RED' | 'GRAY' => {
-    const isRuralTier = scenarioCost >= 400;
-
-    if (avgLatency > CRITICAL_LATENCY_MS || avgSpeed < CRITICAL_SPEED_MBPS) {
-        return 'RED';
-    }
-    if (avgBurden !== null && avgBurden > AFFORDABILITY_BURDEN_THRESHOLD) {
-        return 'RED';
-    }
-    if (isRuralTier) {
-        return 'ORANGE';
-    }
-    if (avgLatency > 50 && avgLatency <= CRITICAL_LATENCY_MS) {
-        return 'YELLOW';
-    }
-    if (avgLatency <= 50 && (avgBurden === null || avgBurden <= AFFORDABILITY_BURDEN_THRESHOLD) && avgSpeed >= 25) {
-        return 'GREEN';
-    }
-    return 'GRAY';
-};
-
-// Status colors - Vibrant palette (Flaw 4 fix)
+// Traffic light status colours and metadata
 const STATUS_COLORS: Record<string, string> = {
     GREEN: '#10b981',   // Emerald - crisp and sharp
     YELLOW: '#f59e0b',  // Amber - pops against gray
@@ -125,11 +88,6 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
     const map = useMap();
     const [boundaries, setBoundaries] = useState<BoundaryCollection | null>(null);
     const [loading, setLoading] = useState(false);
-    const [selectedFeature, setSelectedFeature] = useState<{
-        feature: BoundaryFeature;
-        stats: RegionStats;
-        position: L.LatLng;
-    } | null>(null);
 
     // Fetch boundaries GeoJSON
     useEffect(() => {
@@ -220,7 +178,6 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
         return stats;
     }, [boundaries, tiles, affordabilityData, useStarlink]);
 
-    // Style function for GeoJSON - "Ghost" regions (Flaw 2 fix)
     const styleFeature = (feature: any) => {
         const name = feature.properties?.CommunityName;
         const stats = regionStats.get(name);
@@ -228,9 +185,9 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
 
         return {
             fillColor: color,
-            fillOpacity: 0.2,           // Ghost: whisper of color, not wall
-            color: 'rgba(255,255,255,0.6)', // Very thin white border
-            weight: 0.5,                // Almost invisible border
+            fillOpacity: 0.2,
+            color: 'rgba(255,255,255,0.6)',
+            weight: 0.5,
             opacity: 0.8
         };
     };
@@ -302,22 +259,6 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
                 bubblingMouseEvents={false}
             />
 
-            {/* Context-Rich Tooltip Popup */}
-            {selectedFeature && (
-                <Popup
-                    position={selectedFeature.position}
-                    eventHandlers={{
-                        remove: () => setSelectedFeature(null)
-                    }}
-                >
-                    <RichTooltipCard
-                        name={selectedFeature.feature.properties.CommunityName}
-                        region={selectedFeature.feature.properties.EconomicRegion}
-                        stats={selectedFeature.stats}
-                    />
-                </Popup>
-            )}
-
             {/* Loading indicator */}
             {loading && (
                 <div style={{
@@ -334,135 +275,6 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
                 </div>
             )}
         </>
-    );
-};
-
-// Rich Tooltip Card Component
-interface RichTooltipCardProps {
-    name: string;
-    region: string;
-    stats: RegionStats;
-}
-
-const RichTooltipCard: React.FC<RichTooltipCardProps> = ({ name, region, stats }) => {
-    const statusInfo = STATUS_INFO[stats.status];
-    const color = STATUS_COLORS[stats.status];
-
-    return (
-        <div style={{ minWidth: 280, fontFamily: 'system-ui, sans-serif' }}>
-            {/* Header */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: 12,
-                paddingBottom: 8,
-                borderBottom: `2px solid ${color}`
-            }}>
-                <div>
-                    <div style={{ fontWeight: 600, fontSize: 14 }}>📍 {name}</div>
-                    <div style={{ fontSize: 11, color: '#6b7280' }}>{region}</div>
-                </div>
-                <div style={{
-                    background: color,
-                    color: stats.status === 'YELLOW' ? '#1f2937' : 'white',
-                    padding: '4px 10px',
-                    borderRadius: 12,
-                    fontSize: 11,
-                    fontWeight: 600
-                }}>
-                    {statusInfo.icon} {statusInfo.label}
-                </div>
-            </div>
-
-            {/* Metrics Grid */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: 8,
-                marginBottom: 12
-            }}>
-                <MetricBox
-                    icon="⚡"
-                    label="Speed"
-                    value={`${stats.avgSpeed} Mbps`}
-                    status={stats.avgSpeed >= 25 ? 'good' : stats.avgSpeed >= 5 ? 'warn' : 'bad'}
-                />
-                <MetricBox
-                    icon="📡"
-                    label="Latency"
-                    value={`${stats.avgLatency} ms`}
-                    status={stats.avgLatency <= 50 ? 'good' : stats.avgLatency <= 150 ? 'warn' : 'bad'}
-                />
-                <MetricBox
-                    icon="💰"
-                    label="Cost Burden"
-                    value={stats.avgBurden !== null ? `${stats.avgBurden}%` : 'N/A'}
-                    status={stats.avgBurden === null ? 'neutral' :
-                        stats.avgBurden <= 1 ? 'good' :
-                            stats.avgBurden <= 2 ? 'warn' : 'bad'}
-                />
-                <MetricBox
-                    icon="📊"
-                    label="Data Points"
-                    value={`${stats.tileCount}`}
-                    status="neutral"
-                />
-            </div>
-
-            {/* Verdict */}
-            <div style={{
-                background: '#f3f4f6',
-                padding: 10,
-                borderRadius: 6,
-                textAlign: 'center'
-            }}>
-                <div style={{
-                    fontWeight: 600,
-                    fontSize: 13,
-                    color: color,
-                    marginBottom: 4
-                }}>
-                    {stats.status === 'GREEN' && '✓ HD Video Feasible'}
-                    {stats.status === 'YELLOW' && '⚠ Audio/Low-Res Recommended'}
-                    {stats.status === 'ORANGE' && '💸 Expensive Infrastructure Zone'}
-                    {stats.status === 'RED' && '🚫 Real-Time Video Infeasible'}
-                    {stats.status === 'GRAY' && '❓ Assessment Unavailable'}
-                </div>
-                <div style={{ fontSize: 11, color: '#6b7280' }}>
-                    {statusInfo.verdict}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// Metric Box Sub-component
-interface MetricBoxProps {
-    icon: string;
-    label: string;
-    value: string;
-    status: 'good' | 'warn' | 'bad' | 'neutral';
-}
-
-const MetricBox: React.FC<MetricBoxProps> = ({ icon, label, value, status }) => {
-    const bgColors = {
-        good: '#dcfce7',
-        warn: '#fef9c3',
-        bad: '#fee2e2',
-        neutral: '#f3f4f6'
-    };
-
-    return (
-        <div style={{
-            background: bgColors[status],
-            padding: 8,
-            borderRadius: 6,
-            textAlign: 'center'
-        }}>
-            <div style={{ fontSize: 11, color: '#6b7280' }}>{icon} {label}</div>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>{value}</div>
-        </div>
     );
 };
 
