@@ -706,20 +706,24 @@ def _calculate_seasonal_tier(base_tier: int, base_score: float, properties: dict
         
         # Water is mostly unavailable in winter
         if has_water and not has_air:
-            tier_penalty += 1
             score_penalty += 25
             restricted_modes.append('water (frozen)')
         elif has_water:
             score_penalty += 10
             restricted_modes.append('water (limited)')
         
-        # Seasonal roads are unavailable
+        # Seasonal roads are harder, and if water freezes and they have no air, they rely solely on roads (Tier 3 max)
         if has_road:
             score_penalty += 5  # Roads harder but not impossible
+            if not has_air:
+                tier_penalty = max(tier_penalty, 3 - base_tier)
         
-        # No air = significant penalty
-        if not has_air and base_tier < 4:
-            tier_penalty += 1
+        # If a community has no road and no air, they are completely isolated in winter (water freezes)
+        elif not has_air:
+            tier_penalty = max(tier_penalty, 4 - base_tier)
+            
+        # No air = significant penalty for all tiers
+        if not has_air:
             score_penalty += 20
         
         adjusted_tier = min(4, int(base_tier) + int(tier_penalty))
