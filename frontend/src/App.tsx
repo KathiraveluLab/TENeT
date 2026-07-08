@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { fetchRegions, CATRegion, RegionSummary, Season, AllTelehealthStatusResponse } from './api/catApi';
 import RegionMarker from './components/RegionMarker';
+import RegionClusters from './components/RegionClusters';
 import Legend from './components/Legend';
 import SeasonSelector from './components/SeasonSelector';
 import DataCoveragePanel from './components/DataCoveragePanel';
@@ -27,8 +28,8 @@ L.Icon.Default.mergeOptions({
 
 // Alaska-specific coordinates. This framing keeps Alaska in focus and avoids
 // opening with too much far-west Russia in the visible map area.
-const ALASKA_CENTER: [number, number] = [62.2, -120.0];
-const ALASKA_ZOOM = 4;
+const ALASKA_CENTER: [number, number] = [64.2, -152.0];
+const ALASKA_ZOOM = 5;
 const STALE_DEFAULT_CENTERS: Array<[number, number]> = [
   [62.9752, -154.95117],
   [62.35, -146.75],
@@ -39,7 +40,7 @@ const STALE_DEFAULT_CENTERS: Array<[number, number]> = [
 
 const ALASKA_BOUNDS: [[number, number], [number, number]] = [
   [51.0, -179.5],
-  [72.0, -95.0]
+  [72.0, -129.0]
 ];
 
 type ActiveLayer = 'cat' | 'affordability' | 'gap';
@@ -399,14 +400,27 @@ function App() {
           zoom={mapZoom}
           maxBounds={ALASKA_BOUNDS}
           maxBoundsViscosity={1.0}
-          minZoom={4}
+          minZoom={5}
           zoomControl={true}
           style={{ height: '100%', width: '100%' }}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            keepBuffer={12}
+            updateWhenZooming={false}
           />
+
+          {!gapModeActive && !affordabilityLayerVisible && !scenarioActive && (
+            <RegionClusters
+              regions={mapRegions}
+              season={season}
+              selectedRegionCode={selectedRegionCode}
+              onSelectRegion={handleSelectRegion}
+              onViewRegionDetails={handleViewRegionDetails}
+              onMarkerReady={registerMarker}
+            />
+          )}
 
           <SelectionController
             selectedRegionCode={selectedRegionCode}
@@ -418,16 +432,7 @@ function App() {
 
           <ComparisonMapController active={pinnedRegionCodes.length >= 2} />
 
-          {!gapModeActive && !affordabilityLayerVisible && !scenarioActive && mapRegions.map(region => (
-            <RegionMarker
-              key={region.region_code}
-              region={region}
-              selected={region.region_code === selectedRegionCode}
-              onSelect={handleSelectRegion}
-              onViewDetails={handleViewRegionDetails}
-              onMarkerReady={registerMarker}
-            />
-          ))}
+
 
           <PerformanceLayer
             visible={performanceLayerVisible}
@@ -469,15 +474,13 @@ function App() {
           left: '50%',
           transform: 'translate(-50%, -50%)',
           zIndex: 1000,
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(10px)',
+          background: '#ffffff',
           padding: '24px 48px',
-          borderRadius: '12px',
-          boxShadow: '0 8px 32px rgba(31, 38, 135, 0.15)',
-          fontSize: '15px',
+          borderRadius: '10px',
+          border: '1px solid #dddddd',
+          fontSize: '14px',
           fontWeight: '500',
-          color: '#475569',
-          border: '1px solid rgba(255, 255, 255, 0.3)'
+          color: '#181d26'
         }}>
           Loading community data...
         </div>
@@ -486,14 +489,15 @@ function App() {
       {error && (
         <div style={{
           position: 'absolute',
-          top: '80px',
+          top: '40px',
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 1000,
-          background: 'rgba(254, 226, 226, 0.95)',
-          color: '#dc2626',
+          background: '#ffffff',
+          color: '#aa2d00',
           padding: '12px 24px',
-          borderRadius: '8px',
+          borderRadius: '6px',
+          border: '1px solid #dddddd',
           fontSize: '14px',
           fontWeight: '500'
         }}>
@@ -550,27 +554,22 @@ function App() {
           display: 'flex',
           gap: '10px'
         }}>
+          {/* Airtable Secondary Button Style */}
           <button
             onClick={toggleGapMode}
             type="button"
             aria-label="Open Gap Hunter layer"
             style={{
-              background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '10px',
-              padding: '12px 20px',
-              fontSize: '13px',
-              fontWeight: '600',
+              backgroundColor: '#ffffff',
+              color: '#181d26',
+              border: '1px solid #dddddd',
+              borderRadius: '12px',
+              padding: '10px 16px',
+              fontSize: '14px',
+              fontWeight: '500',
+              fontFamily: 'inherit',
               cursor: 'pointer',
-              boxShadow: '0 4px 16px rgba(239, 68, 68, 0.3)',
-              transition: 'transform 0.2s, box-shadow 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
+              transition: 'all 0.15s ease'
             }}
           >
             Gap Hunter
@@ -581,22 +580,16 @@ function App() {
             type="button"
             aria-label="Open affordability layer"
             style={{
-              background: 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '10px',
-              padding: '12px 20px',
-              fontSize: '13px',
-              fontWeight: '600',
+              backgroundColor: '#ffffff',
+              color: '#181d26',
+              border: '1px solid #dddddd',
+              borderRadius: '12px',
+              padding: '10px 16px',
+              fontSize: '14px',
+              fontWeight: '500',
+              fontFamily: 'inherit',
               cursor: 'pointer',
-              boxShadow: '0 4px 16px rgba(245, 158, 11, 0.3)',
-              transition: 'transform 0.2s, box-shadow 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
+              transition: 'all 0.15s ease'
             }}
           >
             Affordability
@@ -615,37 +608,41 @@ function App() {
         alignItems: 'flex-end',
         gap: '12px'
       }}>
-        {/* Title Card with Dropdown */}
+        {/* Title Card with Dropdown (Airtable flat card style) */}
         <div style={{
-          background: 'rgba(255, 255, 255, 0.92)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
+          background: '#ffffff',
           padding: '12px 16px',
           borderRadius: '10px',
-          boxShadow: '0 4px 16px rgba(31, 38, 135, 0.1)',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
+          border: '1px solid #dddddd',
           display: 'flex',
           alignItems: 'center',
           gap: '16px'
         }}>
           <div>
             <div style={{
-              fontSize: '15px',
-              fontWeight: '700',
-              color: '#0f172a',
-              letterSpacing: '-0.02em'
+              fontSize: '16px',
+              fontWeight: '500',
+              color: '#181d26',
+              letterSpacing: '0'
             }}>
               TENeT
             </div>
             <div style={{
-              fontSize: '10px',
-              color: '#64748b'
+              fontSize: '12px',
+              color: '#41454d'
             }}>
               Telehealth Network Tracker
             </div>
           </div>
-          {/* Season Dropdown integrated in title card */}
-          <SeasonSelector season={season} onChange={setSeason} />
+          <div style={{
+            width: '1px',
+            height: '32px',
+            backgroundColor: '#dddddd',
+            margin: '0 4px'
+          }}></div>
+          <div>
+            <SeasonSelector season={season} onChange={setSeason} />
+          </div>
         </div>
 
         {/* Scenario Mode Toggle */}
@@ -723,7 +720,12 @@ function App() {
         )}
       </div>
 
-      {/* BOTTOM RIGHT: Legend */}
+      {/* BOTTOM LEFT: Data Coverage Panel */}
+      {!loading && !gapModeActive && !affordabilityLayerVisible && !scenarioActive && (
+        <DataCoveragePanel totalRegions={regions.length} />
+      )}
+
+      {/* BOTTOM RIGHT: Legend Panel */}
       {!loading && !gapModeActive && !affordabilityLayerVisible && !scenarioActive && (
         <Legend totalRegions={regions.length} />
       )}
@@ -736,11 +738,6 @@ function App() {
       {/* Scenario Legend */}
       {!loading && scenarioActive && !gapModeActive && (
         <ScenarioLegend />
-      )}
-
-      {/* Data Coverage Panel - bottom left */}
-      {!loading && !gapModeActive && !affordabilityLayerVisible && !scenarioActive && (
-        <DataCoveragePanel />
       )}
       </div>
     </div>

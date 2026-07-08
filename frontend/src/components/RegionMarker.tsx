@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useMemo } from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import {
@@ -6,6 +6,7 @@ import {
     getNeedColor,
     getNeedLabel,
     getTierColor,
+    Season
 } from '../api/catApi';
 import { createMarkerIcon } from '../utils/markerUtils';
 
@@ -15,6 +16,9 @@ interface RegionMarkerProps {
     onSelect?: (regionCode: string) => void;
     onViewDetails?: (regionCode: string) => void;
     onMarkerReady?: (regionCode: string, marker: L.Marker | null) => void;
+    activeSeason?: Season;
+    onClick?: () => void;
+    needScore?: number;
 }
 
 function badgeStyle(backgroundColor: string) {
@@ -39,13 +43,20 @@ export default function RegionMarker({
     onSelect,
     onViewDetails,
     onMarkerReady,
+    onClick,
+    needScore
 }: RegionMarkerProps) {
     const markerRef = useRef<L.Marker | null>(null);
 
     const markerRefCallback = useCallback((marker: L.Marker | null) => {
         markerRef.current = marker;
+        if (marker) {
+            // Attach score directly to leaflet marker options so the clustering
+            // algorithm in RegionClusters can read it to calculate average color
+            (marker.options as any).needScore = needScore ?? region.necessity_score;
+        }
         onMarkerReady?.(region.region_code, marker);
-    }, [onMarkerReady, region.region_code]);
+    }, [onMarkerReady, region.region_code, needScore, region.necessity_score]);
 
     if (region.centroid_lat === null || region.centroid_lon === null) {
         return null;
@@ -55,13 +66,18 @@ export default function RegionMarker({
     const needLabel = getNeedLabel(region.necessity_score);
     const tierColor = getTierColor(region.tier_level);
 
+    const markerIcon = useMemo(() => createMarkerIcon(needColor, selected), [needColor, selected]);
+
     return (
         <Marker
             ref={markerRefCallback}
             position={[region.centroid_lat, region.centroid_lon]}
-            icon={createMarkerIcon(needColor, selected)}
+            icon={markerIcon}
             eventHandlers={{
-                click: () => onSelect?.(region.region_code),
+                click: () => {
+                    onSelect?.(region.region_code);
+                    onClick?.();
+                }
             }}
         >
             <Popup

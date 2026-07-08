@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { getNeedColor, getNeedLabel } from '../api/catApi';
 import MetricTooltip from './MetricTooltip';
 import './Legend.css';
