@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useMemo } from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import {
@@ -6,6 +6,7 @@ import {
     getNeedColor,
     getNeedLabel,
     getTierColor,
+    Season
 } from '../api/catApi';
 import { createMarkerIcon } from '../utils/markerUtils';
 
@@ -15,6 +16,9 @@ interface RegionMarkerProps {
     onSelect?: (regionCode: string) => void;
     onViewDetails?: (regionCode: string) => void;
     onMarkerReady?: (regionCode: string, marker: L.Marker | null) => void;
+    activeSeason?: Season;
+    onClick?: () => void;
+    needScore?: number;
 }
 
 function badgeStyle(backgroundColor: string) {
@@ -39,6 +43,8 @@ export default function RegionMarker({
     onSelect,
     onViewDetails,
     onMarkerReady,
+    onClick,
+    needScore
 }: RegionMarkerProps) {
     const markerRef = useRef<L.Marker | null>(null);
 
@@ -54,15 +60,22 @@ export default function RegionMarker({
     const needColor = getNeedColor(region.necessity_score);
     const needLabel = getNeedLabel(region.necessity_score);
     const tierColor = getTierColor(region.tier_level);
+    
+    const markerIcon = useMemo(() => createMarkerIcon(needColor, selected), [needColor, selected]);
 
     return (
         <Marker
             ref={markerRefCallback}
             position={[region.centroid_lat, region.centroid_lon]}
-            icon={createMarkerIcon(needColor, selected)}
+            icon={markerIcon}
             eventHandlers={{
-                click: () => onSelect?.(region.region_code),
+                click: () => {
+                    onSelect?.(region.region_code);
+                    onClick?.();
+                }
             }}
+            // @ts-ignore
+            needScore={needScore}
         >
             <Popup
                 autoPan

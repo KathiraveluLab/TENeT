@@ -12,6 +12,7 @@ import type { ScenarioPreviewResponse, ScenarioRegion } from '../../types/scenar
 import { getScenarioStatusColor, getScenarioDeltaColor } from '../../types/scenario';
 import { formatStatus } from '../sidebar/sidebarUtils';
 import { createMarkerIcon } from '../../utils/markerUtils';
+import MarkerClusterGroup from 'react-leaflet-cluster';
 
 interface ScenarioLayerProps {
     data: ScenarioPreviewResponse | null;
@@ -58,6 +59,8 @@ const ScenarioMarker = memo(function ScenarioMarker({
             ref={(marker) => {
                 onMarkerReady?.(region.region_code, marker);
             }}
+            // @ts-ignore
+            scenarioStatus={region.scenario_status}
         >
             <Popup maxWidth={280}>
                 <div style={{
@@ -139,6 +142,38 @@ const ScenarioMarker = memo(function ScenarioMarker({
     );
 });
 
+// Custom cluster icon for Scenario mode
+const createScenarioClusterIcon = function (cluster: any) {
+  const pointCount = cluster.getChildCount();
+  const markers = cluster.getAllChildMarkers();
+
+  // Find the most frequent scenario status in the cluster
+  const statusCounts: Record<string, number> = {};
+  markers.forEach((marker: any) => {
+    const status = marker.options.scenarioStatus || 'DATA_UNAVAILABLE';
+    statusCounts[status] = (statusCounts[status] || 0) + 1;
+  });
+
+  let dominantStatus = 'DATA_UNAVAILABLE';
+  let maxCount = 0;
+  Object.entries(statusCounts).forEach(([status, count]) => {
+    if (count > maxCount) {
+      dominantStatus = status;
+      maxCount = count;
+    }
+  });
+
+  const clusterColor = getScenarioStatusColor(dominantStatus as any);
+
+  let scale = 1.0;
+  if (pointCount >= 200) scale = 1.5;
+  else if (pointCount >= 50) scale = 1.35;
+  else if (pointCount >= 10) scale = 1.2;
+
+  const size = 24 * scale;
+  return createMarkerIcon(clusterColor, false, size, pointCount.toString());
+};
+
 export default function ScenarioLayer({
     data,
     active,
@@ -149,8 +184,16 @@ export default function ScenarioLayer({
 }: ScenarioLayerProps) {
     if (!active || !data) return null;
 
+    const polygonOptions = React.useMemo(() => ({ opacity: 0, fillOpacity: 0 }), []);
+
     return (
-        <>
+        <MarkerClusterGroup
+            maxClusterRadius={80}
+            spiderfyOnMaxZoom={true}
+            polygonOptions={polygonOptions}
+            showCoverageOnHover={false}
+            iconCreateFunction={createScenarioClusterIcon}
+        >
             {data.regions.map(region => (
                 <ScenarioMarker
                     key={region.region_code}
@@ -161,7 +204,7 @@ export default function ScenarioLayer({
                     onMarkerReady={onMarkerReady}
                 />
             ))}
-        </>
+        </MarkerClusterGroup>
     );
 }
 
