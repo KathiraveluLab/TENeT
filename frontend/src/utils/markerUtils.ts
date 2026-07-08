@@ -2,6 +2,13 @@ import L from 'leaflet';
 
 const markerIconCache = new Map<string, L.DivIcon>();
 
+/**
+ * Shared Leaflet marker icon factory.
+ *
+ * Reverting to the exact architecture of the original dots as requested:
+ * simple circular dots centered precisely on the coordinate.
+ * Clusters will just be slightly larger dots with the number centered inside.
+ */
 export function createMarkerIcon(color: string, selected = false, size = 24, text?: string): L.DivIcon {
     const cacheKey = `${color}:${selected}:${size}:${text || ''}`;
     const cached = markerIconCache.get(cacheKey);

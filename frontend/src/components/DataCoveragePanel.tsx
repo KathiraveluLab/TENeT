@@ -83,15 +83,15 @@ export default function DataCoveragePanel({ isExpanded = false, onToggle, totalR
         <>
             {/* Header */}
             <div
-                style={{ 
-                    padding: '24px 24px 8px 24px', 
-                    fontSize: '16px', 
-                    fontWeight: '500', 
-                    color: '#181d26', 
-                    display: 'flex', 
-                    alignItems: 'center', 
+                style={{
+                    padding: '24px 24px 8px 24px',
+                    fontSize: '16px',
+                    fontWeight: '500',
+                    color: '#181d26',
+                    display: 'flex',
+                    alignItems: 'center',
                     justifyContent: 'space-between',
-                    cursor: onToggle ? 'pointer' : 'default' 
+                    cursor: onToggle ? 'pointer' : 'default'
                 }}
                 onClick={onToggle}
             >

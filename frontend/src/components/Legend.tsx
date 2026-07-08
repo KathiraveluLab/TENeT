@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getNeedColor, getNeedLabel, DataGapsSummary, fetchDataGapsSummary } from '../api/catApi';
+import { getNeedColor, getNeedLabel } from '../api/catApi';
 import MetricTooltip from './MetricTooltip';
 import './Legend.css';
 
@@ -17,19 +17,6 @@ const getNeedCapability = (score: number): string => {
 
 export default function Legend({ totalRegions, position = 'bottom-right' }: LegendProps) {
     const needLevels = [87, 62, 37, 12];
-    const [summary, setSummary] = useState<DataGapsSummary | null>(null);
-
-    useEffect(() => {
-        async function loadData() {
-            try {
-                const data = await fetchDataGapsSummary();
-                setSummary(data);
-            } catch (err) {
-                console.error('Error loading data gaps:', err);
-            }
-        }
-        loadData();
-    }, []);
 
     return (
         <div className={`legend-hover-shell ${position === 'bottom-left' ? 'legend-hover-shell-left' : ''}`}>

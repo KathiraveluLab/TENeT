@@ -50,8 +50,13 @@ export default function RegionMarker({
 
     const markerRefCallback = useCallback((marker: L.Marker | null) => {
         markerRef.current = marker;
+        if (marker) {
+            // Attach score directly to leaflet marker options so the clustering
+            // algorithm in RegionClusters can read it to calculate average color
+            (marker.options as any).needScore = needScore ?? region.necessity_score;
+        }
         onMarkerReady?.(region.region_code, marker);
-    }, [onMarkerReady, region.region_code]);
+    }, [onMarkerReady, region.region_code, needScore, region.necessity_score]);
 
     if (region.centroid_lat === null || region.centroid_lon === null) {
         return null;
@@ -60,7 +65,7 @@ export default function RegionMarker({
     const needColor = getNeedColor(region.necessity_score);
     const needLabel = getNeedLabel(region.necessity_score);
     const tierColor = getTierColor(region.tier_level);
-    
+
     const markerIcon = useMemo(() => createMarkerIcon(needColor, selected), [needColor, selected]);
 
     return (

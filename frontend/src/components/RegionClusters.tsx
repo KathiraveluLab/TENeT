@@ -7,15 +7,19 @@ import RegionMarker from './RegionMarker';
 interface RegionClustersProps {
   regions: CATRegion[];
   season: Season;
+  selectedRegionCode?: string | null;
+  onSelectRegion?: (regionCode: string) => void;
+  onViewRegionDetails?: (regionCode: string) => void;
+  onMarkerReady?: (regionCode: string, marker: L.Marker | null) => void;
 }
 
-// Minimal CSS for hover states (no SVGs, pure CSS for crash-proof performance)
+// Minimal CSS for hover states
 const customCSS = `
   .healthsites-cluster-wrapper {
     transition: transform 0.15s ease-out;
   }
   .healthsites-cluster-wrapper:hover {
-    transform: rotate(45deg) scale(1.15) !important;
+    transform: scale(1.15) !important;
     z-index: 1000 !important;
   }
   .custom-css-marker {
@@ -59,14 +63,22 @@ const createClusterCustomIcon = function (cluster: any) {
   return createMarkerIcon(clusterColor, false, size, pointCount.toString());
 };
 
-const RegionClusters: React.FC<RegionClustersProps> = ({ regions, season }) => {
+const RegionClusters: React.FC<RegionClustersProps> = ({
+  regions,
+  season,
+  selectedRegionCode,
+  onSelectRegion,
+  onViewRegionDetails,
+  onMarkerReady
+}) => {
   // Use stable references for MarkerClusterGroup to prevent OOM loop in React StrictMode
   const polygonOptions = useMemo(() => ({ opacity: 0, fillOpacity: 0 }), []);
-  
+
   return (
     <MarkerClusterGroup
-      maxClusterRadius={80}
+      maxClusterRadius={25}
       spiderfyOnMaxZoom={true}
+      disableClusteringAtZoom={8}
       polygonOptions={polygonOptions}
       showCoverageOnHover={false}
       iconCreateFunction={createClusterCustomIcon}
@@ -79,6 +91,10 @@ const RegionClusters: React.FC<RegionClustersProps> = ({ regions, season }) => {
             region={region}
             activeSeason={season}
             needScore={region.necessity_score}
+            selected={selectedRegionCode === region.region_code}
+            onSelect={onSelectRegion}
+            onViewDetails={onViewRegionDetails}
+            onMarkerReady={onMarkerReady}
           />
         ))}
     </MarkerClusterGroup>

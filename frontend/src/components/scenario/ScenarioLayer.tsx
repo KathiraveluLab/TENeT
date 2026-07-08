@@ -57,10 +57,11 @@ const ScenarioMarker = memo(function ScenarioMarker({
                 click: () => onSelect(region.region_code),
             }}
             ref={(marker) => {
+                if (marker) {
+                    (marker.options as any).scenarioStatus = region.scenario_status;
+                }
                 onMarkerReady?.(region.region_code, marker);
             }}
-            // @ts-ignore
-            scenarioStatus={region.scenario_status}
         >
             <Popup maxWidth={280}>
                 <div style={{
@@ -188,10 +189,9 @@ export default function ScenarioLayer({
 
     return (
         <MarkerClusterGroup
-            maxClusterRadius={80}
-            spiderfyOnMaxZoom={true}
+            maxClusterRadius={25}
+            disableClusteringAtZoom={8}
             polygonOptions={polygonOptions}
-            showCoverageOnHover={false}
             iconCreateFunction={createScenarioClusterIcon}
         >
             {data.regions.map(region => (

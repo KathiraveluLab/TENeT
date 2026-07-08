@@ -412,9 +412,13 @@ function App() {
           />
 
           {!gapModeActive && !affordabilityLayerVisible && !scenarioActive && (
-            <RegionClusters 
-              regions={mapRegions} 
-              season={season} 
+            <RegionClusters
+              regions={mapRegions}
+              season={season}
+              selectedRegionCode={selectedRegionCode}
+              onSelectRegion={handleSelectRegion}
+              onViewRegionDetails={handleViewRegionDetails}
+              onMarkerReady={registerMarker}
             />
           )}
 
