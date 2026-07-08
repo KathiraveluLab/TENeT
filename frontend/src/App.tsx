@@ -29,7 +29,7 @@ L.Icon.Default.mergeOptions({
 // Alaska-specific coordinates. This framing keeps Alaska in focus and avoids
 // opening with too much far-west Russia in the visible map area.
 const ALASKA_CENTER: [number, number] = [64.2, -152.0];
-const ALASKA_ZOOM = 5;
+const ALASKA_ZOOM = 4;
 const STALE_DEFAULT_CENTERS: Array<[number, number]> = [
   [62.9752, -154.95117],
   [62.35, -146.75],
@@ -400,7 +400,7 @@ function App() {
           zoom={mapZoom}
           maxBounds={ALASKA_BOUNDS}
           maxBoundsViscosity={1.0}
-          minZoom={5}
+          minZoom={4}
           zoomControl={true}
           style={{ height: '100%', width: '100%' }}
         >
