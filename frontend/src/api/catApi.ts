@@ -220,10 +220,10 @@ export function getTierColor(tier: number): string {
  * Get map color based on Telehealth Necessity Score (0-100)
  */
 export function getNeedColor(score: number): string {
-    if (score >= 75) return '#ef4444';      // Red - Critical Need
-    if (score >= 50) return '#f97316';      // Orange - High Need
-    if (score >= 25) return '#eab308';      // Yellow - Moderate Need
-    return '#22c55e';                       // Green - Low Need
+    if (score >= 75) return '#f43f5e';      // Vibrant Rose (Professional Critical)
+    if (score >= 50) return '#fb923c';      // Warm Orange (High)
+    if (score >= 25) return '#fbbf24';      // Rich Amber (Moderate)
+    return '#34d399';                       // Fresh Emerald (Adequate)
 }
 
 /**
