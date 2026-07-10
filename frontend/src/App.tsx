@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { initSmoothWheelZoom } from './utils/SmoothWheelZoom';
 import { fetchRegions, CATRegion, RegionSummary, Season, AllTelehealthStatusResponse } from './api/catApi';
 import RegionMarker from './components/RegionMarker';
 import RegionClusters from './components/RegionClusters';
@@ -18,6 +19,8 @@ import { usePinnedRegions } from './hooks/usePinnedRegions';
 import { useRegionSummary } from './hooks/useRegionSummary';
 import { useScenarioState } from './hooks/useScenarioState';
 import { useScenarioPreview } from './hooks/useScenarioPreview';
+
+initSmoothWheelZoom();
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -402,6 +405,10 @@ function App() {
           maxBoundsViscosity={1.0}
           minZoom={4}
           zoomControl={true}
+          scrollWheelZoom={false}
+          smoothWheelZoom={true}
+          smoothSensitivity={10}
+          zoomSnap={0}
           style={{ height: '100%', width: '100%' }}
         >
           <TileLayer
