@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { Season } from '../api/catApi';
 import { useComparisonProfiles } from '../hooks/useComparisonProfiles';
 import { ResearchProfile } from '../types/research';
 import { DATA_UNAVAILABLE, formatResearchValue } from '../utils/formatResearchValue';
+import Button from './ui/Button';
 import './ResearchComparisonPanel.css';
 
 interface ResearchComparisonPanelProps {
@@ -76,6 +77,7 @@ export default function ResearchComparisonPanel({
     const { profiles, missingCodes, loading, error } = useComparisonProfiles(pinnedRegionCodes, season);
     const [collapsed, setCollapsed] = useState(false);
     const [closed, setClosed] = useState(false);
+    const bodyId = useId();
     const pinnedKey = useMemo(() => pinnedRegionCodes.join('|'), [pinnedRegionCodes]);
 
     useEffect(() => {
@@ -89,8 +91,9 @@ export default function ResearchComparisonPanel({
 
     if (closed) {
         return (
-            <button
-                type="button"
+            <Button
+                variant="secondary"
+                size="small"
                 className="research-comparison-reopen"
                 data-testid="comparison-panel"
                 onClick={() => {
@@ -99,7 +102,7 @@ export default function ResearchComparisonPanel({
                 }}
             >
                 Compare pinned communities
-            </button>
+            </Button>
         );
     }
 
@@ -108,7 +111,6 @@ export default function ResearchComparisonPanel({
             className={`research-comparison-panel ${collapsed ? 'collapsed' : ''}`}
             data-testid="comparison-panel"
             aria-label="Pinned community comparison"
-            aria-expanded={!collapsed}
         >
             <div className="research-comparison-header">
                 <div>
@@ -116,25 +118,29 @@ export default function ResearchComparisonPanel({
                     <p>{profiles.length} pinned communities</p>
                 </div>
                 <div className="research-comparison-actions">
-                    <button
-                        type="button"
+                    <Button
+                        variant="ghost"
+                        size="small"
                         onClick={() => setCollapsed(value => !value)}
                         aria-label={collapsed ? 'Expand comparison panel' : 'Collapse comparison panel'}
+                        aria-expanded={!collapsed}
+                        aria-controls={bodyId}
                     >
                         {collapsed ? 'Expand' : 'Collapse'}
-                    </button>
-                    <button
-                        type="button"
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="small"
                         onClick={() => setClosed(true)}
                         aria-label="Close comparison panel"
                     >
                         Close
-                    </button>
+                    </Button>
                 </div>
             </div>
 
             {!collapsed && (
-                <div className="research-comparison-body">
+                <div className="research-comparison-body" id={bodyId}>
                     {loading && <div className="comparison-muted">Loading comparison...</div>}
                     {error && <div className="comparison-error">{error}</div>}
                     {!loading && missingCodes.length > 0 && (
@@ -153,6 +159,7 @@ export default function ResearchComparisonPanel({
                                         type="button"
                                         key={profile.region.region_code}
                                         onClick={() => onSelectRegion(profile.region.region_code)}
+                                        aria-label={`Select ${profile.region.name}`}
                                     >
                                         {profile.region.name}
                                     </button>

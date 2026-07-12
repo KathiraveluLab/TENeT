@@ -7,10 +7,10 @@
 .metric-tooltip-trigger {
     width: 16px;
     height: 16px;
-    border: 1px solid #94a3b8;
-    border-radius: 50%;
-    background: #ffffff;
-    color: #475569;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-full);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
     font-size: 10px;
     font-weight: 800;
     line-height: 1;
@@ -19,13 +19,13 @@
 
 .metric-tooltip-panel {
     position: fixed;
-    z-index: 2500;
+    z-index: var(--z-tooltip);
     width: min(260px, calc(100vw - 24px));
-    border: 1px solid #cbd5e1;
-    border-radius: 8px;
-    background: #ffffff;
-    color: #334155;
-    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.18);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    box-shadow: var(--shadow-lg);
     padding: 10px;
     font-size: 11px;
     line-height: 1.45;
@@ -35,7 +35,7 @@
 .metric-tooltip-panel strong {
     display: block;
     margin-bottom: 3px;
-    color: #0f172a;
+    color: var(--color-text);
     font-size: 12px;
 }
 

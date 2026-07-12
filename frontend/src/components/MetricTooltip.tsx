@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import './MetricTooltip.css';
 
@@ -9,6 +9,7 @@ interface MetricTooltipProps {
 
 export default function MetricTooltip({ term, children }: MetricTooltipProps) {
     const triggerRef = useRef<HTMLButtonElement | null>(null);
+    const tooltipId = useId();
     const [open, setOpen] = useState(false);
     const [placement, setPlacement] = useState<'above' | 'below'>('above');
     const [position, setPosition] = useState({ top: 0, left: 0 });
@@ -52,6 +53,7 @@ export default function MetricTooltip({ term, children }: MetricTooltipProps) {
     const tooltipPanel = open
         ? createPortal(
             <span
+                id={tooltipId}
                 className={`metric-tooltip-panel ${placement}`}
                 role="tooltip"
                 style={position}
@@ -74,8 +76,12 @@ export default function MetricTooltip({ term, children }: MetricTooltipProps) {
                 type="button"
                 className="metric-tooltip-trigger"
                 aria-label={`${term}: ${children}`}
+                aria-describedby={open ? tooltipId : undefined}
                 onFocus={showTooltip}
                 onBlur={() => setOpen(false)}
+                onKeyDown={event => {
+                    if (event.key === 'Escape') setOpen(false);
+                }}
             >
                 i
             </button>
