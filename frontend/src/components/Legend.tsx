@@ -1,6 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { getNeedColor, getNeedLabel } from '../api/catApi';
+import { useEffect, useId, useRef, useState } from 'react';
+import {
+    CAT_TIERS,
+    CAT_TIER_PRESENTATION,
+    getDesertScorePresentation,
+} from '../domain/metrics';
 import MetricTooltip from './MetricTooltip';
+import Button from './ui/Button';
+import IconButton from './ui/IconButton';
 import './Legend.css';
 
 interface LegendProps {
@@ -8,26 +14,71 @@ interface LegendProps {
     position?: 'bottom-right' | 'bottom-left';
 }
 
-const getNeedCapability = (score: number): string => {
-    if (score >= 75) return 'Severe lack of nearby healthcare facilities';
-    if (score >= 50) return 'Limited access to clinics or hospitals';
-    if (score >= 25) return 'Adequate access with some travel distance';
-    return 'Good access to nearby healthcare facilities';
-};
-
 export default function Legend({ totalRegions, position = 'bottom-right' }: LegendProps) {
     const needLevels = [87, 62, 37, 12];
+    const [open, setOpen] = useState(false);
+    const shellRef = useRef<HTMLDivElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const panelId = useId();
+
+    useEffect(() => {
+        if (!open) return;
+
+        const handlePointerDown = (event: PointerEvent) => {
+            if (!shellRef.current?.contains(event.target as Node)) setOpen(false);
+        };
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            setOpen(false);
+            triggerRef.current?.focus();
+        };
+
+        document.addEventListener('pointerdown', handlePointerDown);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('pointerdown', handlePointerDown);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [open]);
 
     return (
-        <div className={`legend-hover-shell ${position === 'bottom-left' ? 'legend-hover-shell-left' : ''}`}>
-            <button type="button" className="legend-trigger" aria-label="Show discovery legend">
+        <div
+            ref={shellRef}
+            className={`legend-popover ${position === 'bottom-left' ? 'legend-popover--left' : ''}`}
+        >
+            <Button
+                ref={triggerRef}
+                size="small"
+                className="legend-trigger"
+                aria-label={open ? 'Close discovery legend' : 'Open discovery legend'}
+                aria-expanded={open}
+                aria-controls={panelId}
+                onClick={() => setOpen(value => !value)}
+            >
                 Legend
-            </button>
+            </Button>
 
-            <div className="legend-panel">
+            <div
+                id={panelId}
+                className="legend-panel"
+                role="region"
+                aria-label="Discovery legend"
+                hidden={!open}
+            >
                 <div className="legend-header">
-                    <h4>Discovery Legend</h4>
-                    <span>Plain-language guide</span>
+                    <div>
+                        <h4>Discovery Legend</h4>
+                        <span>Plain-language guide</span>
+                    </div>
+                    <IconButton
+                        icon="×"
+                        size="small"
+                        aria-label="Close discovery legend"
+                        onClick={() => {
+                            setOpen(false);
+                            triggerRef.current?.focus();
+                        }}
+                    />
                 </div>
 
                 <div className="legend-section-title">
@@ -37,19 +88,22 @@ export default function Legend({ totalRegions, position = 'bottom-right' }: Lege
                     </MetricTooltip>
                 </div>
 
-                {needLevels.map(score => (
-                    <div key={score} className="legend-row">
-                        <span
-                            className="legend-dot"
-                            style={{ backgroundColor: getNeedColor(score) }}
-                            aria-hidden="true"
-                        />
-                        <div>
-                            <div className="legend-row-label">{getNeedLabel(score)}</div>
-                            <div className="legend-row-note">{getNeedCapability(score)}</div>
+                {needLevels.map(score => {
+                    const presentation = getDesertScorePresentation(score);
+                    return (
+                        <div key={score} className="legend-row">
+                            <span
+                                className="legend-dot"
+                                style={{ backgroundColor: presentation.color }}
+                                aria-hidden="true"
+                            />
+                            <div>
+                                <div className="legend-row-label">{presentation.label}</div>
+                                <div className="legend-row-note">{presentation.description}</div>
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
 
                 <div className="legend-section">
                     <div className="legend-section-title">
@@ -59,10 +113,11 @@ export default function Legend({ totalRegions, position = 'bottom-right' }: Lege
                         </MetricTooltip>
                     </div>
                     <div className="legend-tier-list">
-                        <div><strong>Tier 1:</strong> strongest access; road-connected or easier service reach.</div>
-                        <div><strong>Tier 2:</strong> moderate access; some travel or logistics constraints.</div>
-                        <div><strong>Tier 3:</strong> limited access; remote travel makes care harder to reach.</div>
-                        <div><strong>Tier 4:</strong> most isolated; highest transport and service-access barriers.</div>
+                        {CAT_TIERS.map(tier => (
+                            <div key={tier}>
+                                <strong>Tier {tier}:</strong> {CAT_TIER_PRESENTATION[tier].shortDescription}
+                            </div>
+                        ))}
                     </div>
                 </div>
 
@@ -77,7 +132,7 @@ export default function Legend({ totalRegions, position = 'bottom-right' }: Lege
                     <div
                         className="legend-gradient"
                         style={{
-                            background: `linear-gradient(to right, ${getNeedColor(12)}, ${getNeedColor(37)}, ${getNeedColor(62)}, ${getNeedColor(87)})`,
+                            background: `linear-gradient(to right, ${needLevels.slice().reverse().map(score => getDesertScorePresentation(score).color).join(', ')})`,
                         }}
                     />
                     <div className="legend-scale-labels">

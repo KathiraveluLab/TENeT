@@ -1,12 +1,18 @@
-import { RegionSummary } from '../../api/catApi';
+import type { RegionSummary, TelehealthStatusName } from '../../api/catApi';
+import {
+    getDesertScorePresentation,
+    matchesDesertScoreFilter,
+    type CatTier,
+    type DesertScoreFilter,
+} from '../../domain/metrics';
 
 export type RegionSortMode = 'name' | 'tier' | 'desert';
 export type DataGapFilter = 'all' | 'missing' | 'complete';
 
 export interface SidebarFilters {
-    tier: string;
-    status: string;
-    desert: string;
+    tier: '' | `${CatTier}`;
+    status: '' | TelehealthStatusName;
+    desert: DesertScoreFilter;
     dataGap: DataGapFilter;
 }
 
@@ -28,22 +34,11 @@ export function formatStatus(status: string | null | undefined, fallback = 'Unkn
         .join(' ');
 }
 
-export function statusClassName(status: string | null | undefined) {
-    const normalized = (status || '').toLowerCase();
-    if (normalized.includes('ready')) return 'status-ready';
-    if (normalized.includes('anchor')) return 'status-anchor';
-    if (normalized.includes('critical')) return 'status-critical';
-    return 'status-unknown';
-}
-
 export function telehealthNeedLabel(score: number | null | undefined): string {
     if (score === null || score === undefined || !Number.isFinite(score)) {
         return 'Data unavailable';
     }
-    if (score <= 30) return `Low Need (${score.toFixed(1)})`;
-    if (score <= 60) return `Moderate Need (${score.toFixed(1)})`;
-    if (score <= 80) return `High Need (${score.toFixed(1)})`;
-    return `Critical Need (${score.toFixed(1)})`;
+    return `${getDesertScorePresentation(score).label} (${score.toFixed(1)})`;
 }
 
 export function sortRegions(regions: RegionSummary[], sortMode: RegionSortMode) {
@@ -85,19 +80,7 @@ export function filterRegions(
             return false;
         }
 
-        if (filters.desert === '70-plus' && (region.desert_score ?? -1) < 70) {
-            return false;
-        }
-
-        if (filters.desert === '50-plus' && (region.desert_score ?? -1) < 50) {
-            return false;
-        }
-
-        if (filters.desert === 'below-50' && (region.desert_score === null || region.desert_score === undefined || region.desert_score >= 50)) {
-            return false;
-        }
-
-        if (filters.desert === 'unknown' && region.desert_score !== null && region.desert_score !== undefined) {
+        if (!matchesDesertScoreFilter(region.desert_score, filters.desert)) {
             return false;
         }
 

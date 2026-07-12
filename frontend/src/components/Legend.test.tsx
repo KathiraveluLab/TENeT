@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import Legend from './Legend';
 
@@ -25,5 +25,21 @@ describe('Legend', () => {
 
         expect(screen.getByLabelText(/Healthcare Desert Score: A 0-100 need score/i)).toBeInTheDocument();
         expect(screen.getByLabelText(/CAT Tier: Community Access Tier summarizes/i)).toBeInTheDocument();
+    });
+
+    it('opens on click and closes with Escape', () => {
+        render(<Legend />);
+
+        const trigger = screen.getByRole('button', { name: 'Open discovery legend' });
+        const panel = document.querySelector('[role="region"][aria-label="Discovery legend"]') as HTMLElement;
+        expect(panel).not.toBeVisible();
+
+        fireEvent.click(trigger);
+        expect(panel).toBeVisible();
+        expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+        fireEvent.keyDown(document, { key: 'Escape' });
+        expect(panel).not.toBeVisible();
+        expect(trigger).toHaveFocus();
     });
 });

@@ -43,7 +43,7 @@ export interface RegionSummary {
     lat: number | null;
     lon: number | null;
     cat_tier: number | null;
-    telehealth_status: TelehealthStatusName | string;
+    telehealth_status: TelehealthStatusName;
     desert_score: number | null;
     affordability_status: AffordabilityStatusName | string;
     data_confidence: 'high' | 'medium' | 'low' | 'missing' | 'unknown' | string;
@@ -354,8 +354,8 @@ export async function fetchBroadbandCoverage(filters?: {
 /**
  * Fetch data gaps summary for dashboard display
  */
-export async function fetchDataGapsSummary(): Promise<DataGapsSummary> {
-    const response = await fetch(`${API_BASE}/data-gaps`);
+export async function fetchDataGapsSummary(signal?: AbortSignal): Promise<DataGapsSummary> {
+    const response = await fetch(`${API_BASE}/data-gaps`, { signal });
     if (!response.ok) {
         throw new Error(`Failed to fetch data gaps: ${response.statusText}`);
     }

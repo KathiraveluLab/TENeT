@@ -1,12 +1,22 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+    type KeyboardEvent as ReactKeyboardEvent,
+    type MouseEvent as ReactMouseEvent,
+} from 'react';
 import { RegionSummary } from '../../api/catApi';
 import { Season } from '../../api/catApi';
+import type { BaseMapLayer } from '../../domain/mapMode';
 import type { ScenarioRegion } from '../../types/scenario';
 import FilterControls from './FilterControls';
 import RegionList from './RegionList';
 import SearchBar from './SearchBar';
 import SelectedRegionPanel from './SelectedRegionPanel';
 import SortControls from './SortControls';
+import QuickFilterChips from './QuickFilterChips';
+import Button from '../ui/Button';
 import {
     filterRegions,
     RegionSortMode,
@@ -22,7 +32,7 @@ interface SidebarProps {
     selectedRegionCode: string | null;
     detailsFocusKey?: number;
     season?: Season;
-    activeLayer?: 'cat' | 'affordability' | 'gap';
+    activeLayer?: BaseMapLayer;
     pinnedRegionCodes?: string[];
     maxPinnedRegions?: number;
     scenarioRegion?: ScenarioRegion;
@@ -61,6 +71,7 @@ export default function Sidebar({
     const [query, setQuery] = useState('');
     const [filters, setFilters] = useState<SidebarFilters>(DEFAULT_FILTERS);
     const [sortMode, setSortMode] = useState<RegionSortMode>('name');
+    const [filtersOpen, setFiltersOpen] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(false);
     const [sidebarWidth, setSidebarWidth] = useState(360);
     const activePinnedRegionCodes = pinnedRegionCodes ?? [];
@@ -68,6 +79,9 @@ export default function Sidebar({
     const activeTogglePin = onTogglePin ?? (() => {});
     const activeIsPinned = isPinned ?? (() => false);
     const showCatTools = activeLayer === 'cat';
+    const activeFilterCount = [filters.tier, filters.status, filters.desert]
+        .filter(Boolean).length + (filters.dataGap === 'all' ? 0 : 1);
+    const hasActiveControls = Boolean(query) || activeFilterCount > 0 || sortMode !== 'name';
 
     const selectedRegion = useMemo(
         () => regions.find(region => region.region_code === selectedRegionCode) ?? null,
@@ -118,6 +132,21 @@ export default function Sidebar({
         document.addEventListener('mouseup', handleUp);
     }, [sidebarWidth]);
 
+    const resizeWithKeyboard = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        if (event.key === 'Home') {
+            setSidebarWidth(MIN_SIDEBAR_WIDTH);
+            return;
+        }
+        if (event.key === 'End') {
+            setSidebarWidth(MAX_SIDEBAR_WIDTH);
+            return;
+        }
+        const delta = event.key === 'ArrowRight' ? 16 : -16;
+        setSidebarWidth(width => Math.min(Math.max(width + delta, MIN_SIDEBAR_WIDTH), MAX_SIDEBAR_WIDTH));
+    }, []);
+
     if (isCollapsed) {
         return (
             <aside
@@ -125,14 +154,13 @@ export default function Sidebar({
                 style={{ width: 56, minWidth: 56 }}
                 aria-label="Collapsed community sidebar"
             >
-                <button
-                    type="button"
-                    className="sidebar-collapse-button"
+                <Button
+                    size="small"
                     onClick={() => setIsCollapsed(false)}
                     aria-label="Expand community sidebar"
                 >
                     Open
-                </button>
+                </Button>
                 <div className="sidebar-collapsed-label">Communities</div>
             </aside>
         );
@@ -149,22 +177,14 @@ export default function Sidebar({
                     <p>{loading ? 'Loading...' : `${visibleRegions.length} of ${regions.length}`}</p>
                 </div>
                 <div className="sidebar-header-actions">
-                    <button
-                        type="button"
-                        className="sidebar-action-button"
-                        onClick={resetSidebarControls}
-                        aria-label="Reset sidebar filters"
-                    >
-                        Reset
-                    </button>
-                    <button
-                        type="button"
-                        className="sidebar-collapse-button"
+                    <Button
+                        variant="ghost"
+                        size="small"
                         onClick={() => setIsCollapsed(true)}
                         aria-label="Collapse community sidebar"
                     >
                         Hide
-                    </button>
+                    </Button>
                 </div>
             </header>
 
@@ -176,8 +196,40 @@ export default function Sidebar({
 
             {showCatTools && (
                 <>
-                    <FilterControls filters={filters} onChange={setFilters} />
-                    <SortControls value={sortMode} onChange={setSortMode} />
+                    <QuickFilterChips filters={filters} onChange={setFilters} />
+                    <section className="sidebar-control-panel" aria-label="Community controls">
+                        <div className="sidebar-control-panel__header">
+                            <button
+                                type="button"
+                                className="sidebar-control-panel__toggle"
+                                aria-expanded={filtersOpen}
+                                aria-controls="sidebar-filter-controls"
+                                onClick={() => setFiltersOpen(value => !value)}
+                            >
+                                Filters &amp; sort
+                                {activeFilterCount > 0 && (
+                                    <span>{activeFilterCount} active</span>
+                                )}
+                            </button>
+                            <Button
+                                variant="ghost"
+                                size="small"
+                                onClick={resetSidebarControls}
+                                disabled={!hasActiveControls}
+                                aria-label="Reset sidebar filters"
+                            >
+                                Reset
+                            </Button>
+                        </div>
+                        <div
+                            id="sidebar-filter-controls"
+                            className="sidebar-control-panel__body"
+                            hidden={!filtersOpen}
+                        >
+                            <FilterControls filters={filters} onChange={setFilters} />
+                            <SortControls value={sortMode} onChange={setSortMode} />
+                        </div>
+                    </section>
                 </>
             )}
 
@@ -205,6 +257,7 @@ export default function Sidebar({
                 region={selectedRegion}
                 season={season}
                 focusKey={detailsFocusKey}
+                activeLayer={activeLayer}
                 pinned={selectedRegion ? activeIsPinned(selectedRegion.region_code) : false}
                 pinDisabled={activePinnedRegionCodes.length >= activeMaxPinnedRegions}
                 onTogglePin={activeTogglePin}
@@ -231,9 +284,15 @@ export default function Sidebar({
             <div
                 className="sidebar-resize-handle"
                 role="separator"
+                tabIndex={0}
                 aria-orientation="vertical"
                 aria-label="Resize community sidebar"
+                aria-valuemin={MIN_SIDEBAR_WIDTH}
+                aria-valuemax={MAX_SIDEBAR_WIDTH}
+                aria-valuenow={sidebarWidth}
+                aria-valuetext={`${sidebarWidth} pixels`}
                 onMouseDown={startResize}
+                onKeyDown={resizeWithKeyboard}
             />
         </aside>
     );

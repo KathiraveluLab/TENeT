@@ -1,7 +1,8 @@
 /**
  * Scenario Analysis types
  */
-import { Season, TelehealthStatusName } from '../api/catApi';
+import { Season } from '../api/catApi';
+import type { ScenarioTelehealthStatusName } from '../domain/statusPresentation';
 
 /** Scenario lifecycle states */
 export type ScenarioMode = 'off' | 'calculating' | 'active';
@@ -24,8 +25,8 @@ export interface ScenarioRegion {
     name: string;
     lat: number | null;
     lon: number | null;
-    baseline_status: string;
-    scenario_status: string;
+    baseline_status: ScenarioTelehealthStatusName;
+    scenario_status: ScenarioTelehealthStatusName;
     status_delta: StatusDelta;
     baseline_need_score: number;
     scenario_need_score: number;
@@ -75,7 +76,7 @@ export interface ScenarioPreset {
 export const SCENARIO_PRESETS: ScenarioPreset[] = [
     {
         id: 'fcc',
-        label: 'FCC Standard',
+        label: 'Baseline (25/3 Mbps)',
         thresholds: {
             min_download_mbps: 25,
             min_upload_mbps: 3,
@@ -108,22 +109,21 @@ export const BASELINE_THRESHOLDS: ScenarioThresholds = {
     affordability_burden_pct: 2,
 };
 
-/** Status color helper */
-export function getScenarioStatusColor(status: string): string {
-    switch (status) {
-        case 'TELEHEALTH_READY': return '#22c55e';
-        case 'LIMITED_TELEHEALTH': return '#eab308';
-        case 'COMMUNITY_ANCHOR': return '#f97316';
-        case 'CRITICAL_GAP': return '#ef4444';
-        case 'DATA_UNAVAILABLE': return '#6b7280';
-        default: return '#6b7280';
-    }
-}
-
 export function getScenarioDeltaColor(delta: StatusDelta): string {
     switch (delta) {
         case 'improved': return '#22c55e';
         case 'worsened': return '#ef4444';
         case 'unchanged': return '#94a3b8';
+    }
+}
+
+export function getScenarioStatusColor(status: ScenarioTelehealthStatusName | string): string {
+    switch (status) {
+        case 'TELEHEALTH_READY': return '#22c55e';
+        case 'COMMUNITY_ANCHOR': return '#f97316';
+        case 'LIMITED_TELEHEALTH': return '#eab308';
+        case 'CRITICAL_GAP': return '#ef4444';
+        case 'DATA_UNAVAILABLE': return '#6b7280';
+        default: return '#94a3b8';
     }
 }
