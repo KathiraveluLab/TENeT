@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { BASELINE_THRESHOLDS } from '../types/scenario';
 import { useScenarioState } from './useScenarioState';
 
-describe('useScenarioState restoration', () => {
-    it('restores scenario state supplied by URL ownership and resets when deactivated', () => {
+describe('useScenarioState', () => {
+    it('owns thresholds while accepting initial and restored URL state', () => {
         const { result } = renderHook(() => useScenarioState('year_round', {
             active: true,
             thresholds: {
@@ -25,7 +25,20 @@ describe('useScenarioState restoration', () => {
         expect(result.current.thresholds.clinic_proximity_km).toBe(30);
 
         act(() => {
-            result.current.deactivate();
+            result.current.setThreshold('min_download_mbps', 75);
+            result.current.setThreshold('max_latency_ms', 120);
+        });
+
+        expect(result.current.thresholds.min_download_mbps).toBe(75);
+        expect(result.current.thresholds.max_latency_ms).toBe(120);
+        expect(result.current.activePreset).toBeNull();
+
+        act(() => {
+            result.current.restoreFromUrl({
+                active: false,
+                thresholds: {},
+                preset: null,
+            });
         });
 
         expect(result.current.mode).toBe('off');

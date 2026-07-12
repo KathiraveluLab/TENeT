@@ -1,0 +1,111 @@
+.map-layer-state {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1000;
+    max-width: 280px;
+    padding: 8px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: rgb(255 255 255 / 94%);
+    box-shadow: 0 2px 4px rgb(0 0 0 / 20%);
+    color: #475569;
+    font-size: 12px;
+}
+
+.map-layer-state.is-error {
+    border-color: #fecaca;
+    color: #991b1b;
+}
+
+.region-marker-popup {
+    min-width: 210px;
+    max-width: 236px;
+    color: #172033;
+    font-size: 12px;
+}
+
+.region-marker-popup__title {
+    margin: 0 0 2px;
+    color: #111827;
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.region-marker-popup__code {
+    margin-bottom: 9px;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.region-marker-popup__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.region-marker-popup__button {
+    width: 100%;
+}
+
+.region-tooltip-content {
+    min-width: 200px;
+    font-family: system-ui, sans-serif;
+}
+
+.region-tooltip-title {
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid var(--tooltip-color);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.region-tooltip-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-bottom: 6px;
+    font-size: 11px;
+}
+
+.region-tooltip-status {
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: var(--tooltip-color);
+    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.region-tooltip-status.has-dark-text {
+    color: #1f2937;
+}
+
+.performance-popup {
+    min-width: 200px;
+    font-family: sans-serif;
+}
+
+.performance-popup__title {
+    margin-bottom: 8px;
+    color: var(--popup-color);
+    font-weight: 700;
+}
+
+.performance-popup__metrics {
+    margin-bottom: 8px;
+    padding: 6px;
+    border-radius: 4px;
+    background: #f3f4f6;
+    font-size: 11px;
+}
+
+.performance-popup__source {
+    color: #6b7280;
+    font-size: 10px;
+}

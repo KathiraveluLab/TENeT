@@ -1,0 +1,67 @@
+.custom-css-marker {
+    background: transparent;
+    border: 0;
+}
+
+.tenet-marker-shell {
+    width: var(--marker-shell-size);
+    height: var(--marker-shell-size);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.tenet-marker-pin {
+    width: var(--marker-size);
+    height: var(--marker-size);
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 50% 50% 0 50%;
+    box-shadow: 1px 1px 2px rgb(0 0 0 / 15%);
+    transform: rotate(45deg);
+    transition: transform 0.15s ease-out;
+}
+
+.tenet-marker-pin:hover {
+    transform: rotate(45deg) scale(1.15);
+    z-index: 1000;
+}
+
+.tenet-marker-pin.is-selected {
+    border: 2px solid #475569;
+    box-shadow: 2px 2px 4px rgb(0 0 0 / 30%);
+}
+
+.tenet-marker-content {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: rotate(-45deg);
+}
+
+.tenet-marker-dot {
+    width: var(--marker-dot-size);
+    height: var(--marker-dot-size);
+    border-radius: 50%;
+    background: var(--marker-color);
+}
+
+.tenet-marker-pin.is-selected .tenet-marker-dot {
+    box-shadow: 0 0 0 2px white;
+}
+
+.tenet-marker-count {
+    position: absolute;
+    top: -14px;
+    color: #1e293b;
+    font-size: var(--marker-count-size);
+    font-weight: 800;
+}

@@ -41,6 +41,7 @@ import {
 import { useMapSelection } from './hooks/useMapSelection';
 import { useMapUrlSync } from './hooks/useMapUrlSync';
 import './App.css';
+import './components/map/MapMarkers.css';
 
 delete (L.Icon.Default.prototype as L.Icon.Default & { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({

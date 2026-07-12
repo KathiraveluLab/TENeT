@@ -95,7 +95,7 @@ export function useScenarioState(
         }
         const preset = SCENARIO_PRESETS.find(p => p.id === presetId);
         if (preset) {
-            setThresholds(prev => ({ ...BASELINE_THRESHOLDS, ...preset.thresholds }));
+            setThresholds({ ...BASELINE_THRESHOLDS, ...preset.thresholds });
             setActivePreset(presetId);
         }
     }, []);
