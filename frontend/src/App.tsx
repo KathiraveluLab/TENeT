@@ -1,188 +1,87 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { fetchRegions, CATRegion, RegionSummary, Season, AllTelehealthStatusResponse } from './api/catApi';
-import RegionMarker from './components/RegionMarker';
+import { fetchRegions, CATRegion, Season, AllTelehealthStatusResponse } from './api/catApi';
+import { errorMessage, isAbortError } from './api/http';
 import RegionClusters from './components/RegionClusters';
 import Legend from './components/Legend';
-import SeasonSelector from './components/SeasonSelector';
 import DataCoveragePanel from './components/DataCoveragePanel';
 import PerformanceLayer from './components/PerformanceLayer';
 import AffordabilityLayer, { AffordabilityLegend } from './components/AffordabilityLayer';
 import Sidebar from './components/sidebar/Sidebar';
 import ResearchComparisonPanel from './components/ResearchComparisonPanel';
 import ScenarioPanel from './components/scenario/ScenarioPanel';
-import ScenarioLayer, { ScenarioSidebarCard, ScenarioLegend } from './components/scenario/ScenarioLayer';
+import ScenarioLayer, { ScenarioLegend } from './components/scenario/ScenarioLayer';
 import { usePinnedRegions } from './hooks/usePinnedRegions';
 import { useRegionSummary } from './hooks/useRegionSummary';
 import { useScenarioState } from './hooks/useScenarioState';
 import { useScenarioPreview } from './hooks/useScenarioPreview';
+import Dashboard, { type InsightsMapLayer } from './components/dashboard/Dashboard';
+import IconButton from './components/ui/IconButton';
+import MapToolbar from './components/layout/MapToolbar';
+import LayerSwitcher from './components/layout/LayerSwitcher';
+import {
+  ComparisonMapController,
+  MapViewportController,
+  SelectionController,
+} from './components/map/MapControllers';
+import {
+  baseLayerForMapMode,
+  CAT_MAP_MODE,
+  mapModeFromLayer,
+  type BaseMapLayer,
+  type MapMode,
+} from './domain/mapMode';
+import {
+  ALASKA_BOUNDS,
+  parseMapUrlState,
+  type ParsedMapUrlState,
+} from './domain/mapUrlState';
+import { useMapSelection } from './hooks/useMapSelection';
+import { useMapUrlSync } from './hooks/useMapUrlSync';
+import './App.css';
 
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as L.Icon.Default & { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Alaska-specific coordinates. This framing keeps Alaska in focus and avoids
-// opening with too much far-west Russia in the visible map area.
-const ALASKA_CENTER: [number, number] = [64.2, -152.0];
-const ALASKA_ZOOM = 4;
-const STALE_DEFAULT_CENTERS: Array<[number, number]> = [
-  [62.9752, -154.95117],
-  [62.35, -146.75],
-  [62.2, -141.8],
-  [62.2, -170.8],
-  [62.35, -136.5],
-];
-
-const ALASKA_BOUNDS: [[number, number], [number, number]] = [
-  [51.0, -179.5],
-  [72.0, -129.0]
-];
-
-type ActiveLayer = 'cat' | 'affordability' | 'gap';
-
-function parseInitialUrlState() {
-  if (typeof window === 'undefined') {
-    return {
-      region: null,
-      season: 'year_round' as Season,
-      layer: 'cat' as ActiveLayer,
-      pins: [] as string[],
-      center: ALASKA_CENTER,
-      zoom: ALASKA_ZOOM,
-    };
-  }
-
-  const params = new URLSearchParams(window.location.search);
-  const seasonParam = params.get('season') as Season | null;
-  const layerParam = params.get('layer') as ActiveLayer | null;
-  const latParam = params.get('lat');
-  const lngParam = params.get('lng');
-  const zoomParam = params.get('zoom');
-  const lat = latParam === null ? NaN : Number(latParam);
-  const lng = lngParam === null ? NaN : Number(lngParam);
-  const zoom = zoomParam === null ? NaN : Number(zoomParam);
-  const hasSafeCenter = (
-    Number.isFinite(lat)
-    && Number.isFinite(lng)
-    && lat >= ALASKA_BOUNDS[0][0]
-    && lat <= ALASKA_BOUNDS[1][0]
-    && lng >= ALASKA_BOUNDS[0][1]
-    && lng <= ALASKA_BOUNDS[1][1]
-  );
-  const hasSafeZoom = Number.isFinite(zoom) && zoom >= 4 && zoom <= 18;
-  const hasStaleDefaultViewport = (
-    hasSafeCenter
-    && hasSafeZoom
-    && STALE_DEFAULT_CENTERS.some(([staleLat, staleLng]) => (
-      Math.abs(lat - staleLat) < 0.0001
-      && Math.abs(lng - staleLng) < 0.0001
-    ))
-    && zoom === ALASKA_ZOOM
-  );
-
-  return {
-    region: params.get('region'),
-    season: seasonParam && ['summer', 'winter', 'year_round'].includes(seasonParam)
-      ? seasonParam
-      : 'year_round',
-    layer: layerParam && ['cat', 'affordability', 'gap'].includes(layerParam)
-      ? layerParam
-      : 'cat',
-    pins: (params.get('pins') || '').split(',').map(pin => pin.trim()).filter(Boolean).slice(0, 3),
-    center: hasSafeCenter && !hasStaleDefaultViewport ? [lat, lng] as [number, number] : ALASKA_CENTER,
-    zoom: hasSafeZoom && !hasStaleDefaultViewport ? zoom : ALASKA_ZOOM,
-  };
-}
-
-interface SelectionControllerProps {
-  selectedRegionCode: string | null;
-  regionSummaries: RegionSummary[];
-  markerRefs: React.MutableRefObject<Record<string, L.Marker | L.CircleMarker>>;
-}
-
-interface MapUrlControllerProps {
-  onViewportChange: (center: [number, number], zoom: number) => void;
-}
-
-interface ComparisonMapControllerProps {
-  active: boolean;
-}
-
-function MapUrlController({ onViewportChange }: MapUrlControllerProps) {
-  const map = useMapEvents({
-    moveend: () => {
-      const center = map.getCenter();
-      onViewportChange([Number(center.lat.toFixed(5)), Number(center.lng.toFixed(5))], map.getZoom());
-    },
-    zoomend: () => {
-      const center = map.getCenter();
-      onViewportChange([Number(center.lat.toFixed(5)), Number(center.lng.toFixed(5))], map.getZoom());
-    },
-  });
-
-  return null;
-}
-
-function ComparisonMapController({ active }: ComparisonMapControllerProps) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!active) return;
-    map.closePopup();
-    map.panBy([0, 96], { animate: true, duration: 0.25 });
-  }, [active, map]);
-
-  return null;
-}
-
-function SelectionController({
-  selectedRegionCode,
-  regionSummaries,
-  markerRefs,
-}: SelectionControllerProps) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!selectedRegionCode) return;
-
-    const selected = regionSummaries.find(region => region.region_code === selectedRegionCode);
-    if (!selected || selected.lat === null || selected.lon === null) return;
-
-    map.flyTo([selected.lat, selected.lon], Math.max(map.getZoom(), 8), { duration: 1.1 });
-
-    window.setTimeout(() => {
-      markerRefs.current[selectedRegionCode]?.openPopup();
-    }, 350);
-  }, [map, markerRefs, regionSummaries, selectedRegionCode]);
-
-  return null;
-}
+type ActiveView = 'map' | 'dashboard';
 
 function App() {
-  const initialUrlState = useMemo(() => parseInitialUrlState(), []);
+  const initialUrlState = useMemo(
+    () => parseMapUrlState(typeof window === 'undefined' ? '' : window.location.search),
+    [],
+  );
+  const [activeView, setActiveView] = useState<ActiveView>('map');
   const [regions, setRegions] = useState<CATRegion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [season, setSeason] = useState<Season>(initialUrlState.season);
-  const [performanceLayerVisible, setPerformanceLayerVisible] = useState(initialUrlState.layer === 'gap');
-  const [affordabilityLayerVisible, setAffordabilityLayerVisible] = useState(initialUrlState.layer === 'affordability');
-  const [gapModeActive, setGapModeActive] = useState(initialUrlState.layer === 'gap');
+  const [mapMode, setMapMode] = useState<MapMode>(initialUrlState.mapMode);
   const [affordabilitySummary, setAffordabilitySummary] = useState<AllTelehealthStatusResponse['summary'] | undefined>(undefined);
-  const [selectedRegionCode, setSelectedRegionCode] = useState<string | null>(initialUrlState.region);
-  const [detailsFocusKey, setDetailsFocusKey] = useState(0);
   const [visibleRegionCodes, setVisibleRegionCodes] = useState<string[] | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>(initialUrlState.center);
   const [mapZoom, setMapZoom] = useState(initialUrlState.zoom);
   const [urlNotice, setUrlNotice] = useState<string | null>(null);
-  const markerRefs = useRef<Record<string, L.Marker | L.CircleMarker>>({});
+  const {
+    selectedRegionCode,
+    setSelectedRegionCode,
+    detailsFocusKey,
+    markerRefs,
+    registerMarker,
+    selectRegion: handleSelectRegion,
+    viewRegionDetails: handleViewRegionDetails,
+  } = useMapSelection(initialUrlState.selectedRegionCode);
 
   // ── Scenario Mode ──────────────────────────────────────────────────
-  const scenarioState = useScenarioState(season);
+  const scenarioState = useScenarioState(season, {
+    active: initialUrlState.mapMode.type === 'scenario',
+    ...initialUrlState.scenario,
+  });
   const scenarioPreview = useScenarioPreview(
     scenarioState.mode,
     scenarioState.thresholds,
@@ -190,53 +89,20 @@ function App() {
     null,
     scenarioState.setMode,
   );
-  const scenarioActive = scenarioState.mode !== 'off';
+  const scenarioActive = mapMode.type === 'scenario';
   const {
     pinnedRegionCodes,
     isPinned,
     togglePinned,
     replacePinned,
     maxPinnedRegions,
-  } = usePinnedRegions(initialUrlState.pins);
+  } = usePinnedRegions(initialUrlState.pinnedRegionCodes);
   const {
     regions: regionSummaries,
     loading: summaryLoading,
     error: summaryError,
   } = useRegionSummary();
-
-  const registerMarker = useCallback((regionCode: string, marker: L.Marker | null) => {
-    if (marker) {
-      markerRefs.current[regionCode] = marker;
-    } else {
-      delete markerRefs.current[regionCode];
-    }
-  }, []);
-
-  const registerAffordabilityMarker = useCallback((regionCode: string, marker: L.CircleMarker | null) => {
-    if (marker) {
-      markerRefs.current[regionCode] = marker;
-    } else {
-      delete markerRefs.current[regionCode];
-    }
-  }, []);
-
-  const registerScenarioMarker = useCallback((regionCode: string, marker: L.Marker | null) => {
-    if (marker) {
-      markerRefs.current[regionCode] = marker;
-    } else {
-      delete markerRefs.current[regionCode];
-    }
-  }, []);
-
-  const handleSelectRegion = useCallback((regionCode: string) => {
-    setSelectedRegionCode(regionCode);
-  }, []);
-
-  const handleViewRegionDetails = useCallback((regionCode: string) => {
-    setSelectedRegionCode(regionCode);
-    setDetailsFocusKey(key => key + 1);
-    markerRefs.current[regionCode]?.closePopup();
-  }, []);
+  const restoreScenarioFromUrl = scenarioState.restoreFromUrl;
 
   const handleVisibleRegionsChange = useCallback((regionCodes: string[]) => {
     setVisibleRegionCodes(regionCodes);
@@ -256,11 +122,7 @@ function App() {
     if (!visibleRegionCodeSet) return regions;
     return regions.filter(region => visibleRegionCodeSet.has(region.region_code));
   }, [regions, visibleRegionCodeSet]);
-  const activeSidebarLayer = gapModeActive
-    ? 'gap'
-    : affordabilityLayerVisible
-      ? 'affordability'
-      : 'cat';
+  const activeSidebarLayer = baseLayerForMapMode(mapMode);
 
   useEffect(() => {
     if (summaryLoading || regionSummaries.length === 0) return;
@@ -291,55 +153,53 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [urlNotice]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
+  const restoreUrlState = useCallback((state: ParsedMapUrlState) => {
+    setSelectedRegionCode(state.selectedRegionCode);
+    setSeason(state.season);
+    setMapMode(state.mapMode);
+    replacePinned(state.pinnedRegionCodes);
+    setMapCenter(state.center);
+    setMapZoom(state.zoom);
+    restoreScenarioFromUrl({
+      active: state.mapMode.type === 'scenario',
+      ...state.scenario,
+    });
+  }, [replacePinned, restoreScenarioFromUrl, setSelectedRegionCode]);
 
-    const params = new URLSearchParams(window.location.search);
-    params.delete('region');
-    params.delete('layer');
-    params.delete('season');
-    params.delete('pins');
-    params.delete('lat');
-    params.delete('lng');
-    params.delete('zoom');
+  const serializedUrlState = useMemo(() => ({
+    selectedRegionCode,
+    season,
+    mapMode,
+    pinnedRegionCodes,
+    center: mapCenter,
+    zoom: mapZoom,
+    scenario: {
+      thresholds: scenarioState.thresholds,
+      preset: scenarioState.activePreset,
+    },
+  }), [
+    mapCenter,
+    mapMode,
+    mapZoom,
+    pinnedRegionCodes,
+    scenarioState.activePreset,
+    scenarioState.thresholds,
+    season,
+    selectedRegionCode,
+  ]);
+  useMapUrlSync(serializedUrlState, restoreUrlState);
 
-    if (selectedRegionCode) params.set('region', selectedRegionCode);
-    if (activeSidebarLayer !== 'cat') params.set('layer', activeSidebarLayer);
-    if (season !== 'year_round') params.set('season', season);
-    if (pinnedRegionCodes.length) params.set('pins', pinnedRegionCodes.join(','));
-    if (mapCenter[0] !== ALASKA_CENTER[0]) params.set('lat', mapCenter[0].toFixed(5));
-    if (mapCenter[1] !== ALASKA_CENTER[1]) params.set('lng', mapCenter[1].toFixed(5));
-    if (mapZoom !== ALASKA_ZOOM) params.set('zoom', String(mapZoom));
-
-    const nextUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
-    window.history.replaceState(null, '', nextUrl);
-  }, [activeSidebarLayer, mapCenter, mapZoom, pinnedRegionCodes, season, selectedRegionCode]);
-
-  const toggleAffordabilityLayer = () => {
-    if (!affordabilityLayerVisible) {
-      setGapModeActive(false);
-      setPerformanceLayerVisible(false);
-    }
-    setAffordabilityLayerVisible(!affordabilityLayerVisible);
-  };
-
-  const toggleGapMode = () => {
-    if (!gapModeActive) {
-      setAffordabilityLayerVisible(false);
-      setPerformanceLayerVisible(true);
-    } else {
-      setPerformanceLayerVisible(false);
-    }
-    setGapModeActive(!gapModeActive);
+  const handleLayerChange = (layer: BaseMapLayer) => {
+    if (scenarioActive) scenarioState.deactivate();
+    setMapMode(mapModeFromLayer(layer));
   };
 
   const toggleScenarioMode = () => {
-    if (scenarioState.mode === 'off') {
-      setGapModeActive(false);
-      setPerformanceLayerVisible(false);
-      setAffordabilityLayerVisible(false);
+    if (!scenarioActive) {
+      setMapMode({ type: 'scenario' });
       scenarioState.activate();
     } else {
+      setMapMode(CAT_MAP_MODE);
       scenarioState.deactivate();
     }
   };
@@ -351,32 +211,60 @@ function App() {
   }, [scenarioActive, scenarioPreview.data, selectedRegionCode]);
 
   useEffect(() => {
+    const controller = new AbortController();
+
     async function loadData() {
       try {
         setLoading(true);
-        const data = await fetchRegions(season);
-        setRegions(data);
         setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load data');
-        console.error('Error loading regions:', err);
+        setRegions([]);
+        const data = await fetchRegions(season, undefined, controller.signal);
+        if (controller.signal.aborted) return;
+        setRegions(data);
+      } catch (caught: unknown) {
+        if (isAbortError(caught)) return;
+        setError(errorMessage(caught, 'Failed to load data'));
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
     loadData();
+
+    return () => {
+      controller.abort();
+    };
   }, [season]);
 
-  const getSeasonInfo = () => {
-    switch (season) {
-      case 'summer': return { label: 'Summer', note: 'All transport modes' };
-      case 'winter': return { label: 'Winter', note: 'Limited routes' };
-      case 'year_round': return { label: 'Year-Round', note: 'Average' };
-    }
+  const handleInsightsViewMap = (layer: InsightsMapLayer) => {
+    handleLayerChange(layer);
+    setActiveView('map');
   };
 
+  const handleInsightsViewRegion = (regionCode: string) => {
+    handleLayerChange('cat');
+    handleViewRegionDetails(regionCode);
+    setActiveView('map');
+  };
+
+  const closeInsights = () => {
+    setActiveView('map');
+    window.requestAnimationFrame(() => {
+      document.getElementById('insights-toolbar-button')?.focus();
+    });
+  };
+
+  if (activeView === 'dashboard') {
+    return (
+      <Dashboard
+        onClose={closeInsights}
+        onViewMap={handleInsightsViewMap}
+        onViewRegion={handleInsightsViewRegion}
+      />
+    );
+  }
+
   return (
-    <div style={{ height: '100vh', width: '100%', margin: 0, padding: 0, display: 'flex', overflow: 'hidden' }}>
+    <div className="tenet-app">
       <Sidebar
         regions={regionSummaries}
         loading={summaryLoading}
@@ -394,7 +282,7 @@ function App() {
         onVisibleRegionsChange={handleVisibleRegionsChange}
       />
 
-      <div style={{ position: 'relative', flex: 1, minWidth: 0, height: '100vh' }}>
+      <main className="map-workspace">
         <MapContainer
           center={mapCenter}
           zoom={mapZoom}
@@ -411,7 +299,7 @@ function App() {
             updateWhenZooming={false}
           />
 
-          {!gapModeActive && !affordabilityLayerVisible && !scenarioActive && (
+          {mapMode.type === 'cat' && (
             <RegionClusters
               regions={mapRegions}
               season={season}
@@ -428,318 +316,118 @@ function App() {
             markerRefs={markerRefs}
           />
 
-          <MapUrlController onViewportChange={handleViewportChange} />
+          <MapViewportController
+            center={mapCenter}
+            zoom={mapZoom}
+            onViewportChange={handleViewportChange}
+          />
 
           <ComparisonMapController active={pinnedRegionCodes.length >= 2} />
 
 
 
           <PerformanceLayer
-            visible={performanceLayerVisible}
-            onToggle={() => setPerformanceLayerVisible(false)}
-            onModeChange={setGapModeActive}
+            visible={mapMode.type === 'gapHunter'}
+            onToggle={() => setMapMode(CAT_MAP_MODE)}
           />
 
-          {!scenarioActive && (
-            <AffordabilityLayer
-              visible={affordabilityLayerVisible}
-              selectedRegionCode={selectedRegionCode}
-              onSelect={handleSelectRegion}
-              onViewDetails={handleViewRegionDetails}
-              onMarkerReady={registerAffordabilityMarker}
-              onDataLoad={setAffordabilitySummary}
-            />
-          )}
-
-          <ScenarioLayer
-            data={scenarioPreview.data}
-            active={scenarioActive && !gapModeActive}
+          <AffordabilityLayer
+            visible={mapMode.type === 'telehealthAccess'}
             selectedRegionCode={selectedRegionCode}
             onSelect={handleSelectRegion}
             onViewDetails={handleViewRegionDetails}
-            onMarkerReady={registerScenarioMarker}
+            onMarkerReady={registerMarker}
+            onDataLoad={setAffordabilitySummary}
+          />
+
+          <ScenarioLayer
+            data={scenarioPreview.data}
+            active={scenarioActive}
+            selectedRegionCode={selectedRegionCode}
+            onSelect={handleSelectRegion}
+            onViewDetails={handleViewRegionDetails}
+            onMarkerReady={registerMarker}
           />
         </MapContainer>
 
-      <ResearchComparisonPanel
-        pinnedRegionCodes={pinnedRegionCodes}
-        season={season}
-        onSelectRegion={handleSelectRegion}
-      />
+        <ResearchComparisonPanel
+          pinnedRegionCodes={pinnedRegionCodes}
+          season={season}
+          onSelectRegion={handleSelectRegion}
+        />
 
       {loading && (
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 1000,
-          background: '#ffffff',
-          padding: '24px 48px',
-          borderRadius: '10px',
-          border: '1px solid #dddddd',
-          fontSize: '14px',
-          fontWeight: '500',
-          color: '#181d26'
-        }}>
+        <div className="map-state-message map-state-message--loading" role="status">
           Loading community data...
         </div>
       )}
 
       {error && (
-        <div style={{
-          position: 'absolute',
-          top: '40px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 1000,
-          background: '#ffffff',
-          color: '#aa2d00',
-          padding: '12px 24px',
-          borderRadius: '6px',
-          border: '1px solid #dddddd',
-          fontSize: '14px',
-          fontWeight: '500'
-        }}>
+        <div className="map-state-message map-state-message--error" role="alert">
           {error}
         </div>
       )}
 
       {urlNotice && (
-        <div style={{
-          position: 'absolute',
-          top: '128px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 1000,
-          background: 'rgba(255, 251, 235, 0.96)',
-          color: '#92400e',
-          padding: '10px 18px',
-          borderRadius: '8px',
-          fontSize: '13px',
-          fontWeight: '600',
-          border: '1px solid #f59e0b',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px'
-        }}>
+        <div className="map-state-message map-state-message--notice" role="status">
           <span>{urlNotice}</span>
-          <button
-            type="button"
+          <IconButton
             aria-label="Dismiss notice"
+            icon="×"
+            size="small"
             onClick={() => setUrlNotice(null)}
-            style={{
-              appearance: 'none',
-              border: 0,
-              background: 'transparent',
-              color: '#92400e',
-              cursor: 'pointer',
-              fontSize: '16px',
-              fontWeight: 700,
-              lineHeight: 1,
-              padding: 0
-            }}
-          >
-            ×
-          </button>
+            style={{ color: 'inherit' }}
+          />
         </div>
       )}
 
-      {!loading && !scenarioActive && (
-        <div style={{
-          position: 'absolute',
-          top: '20px',
-          left: '60px',
-          zIndex: 1000,
-          display: 'flex',
-          gap: '10px'
-        }}>
-          {/* Airtable Secondary Button Style */}
-          <button
-            onClick={toggleGapMode}
-            type="button"
-            aria-label="Open Gap Hunter layer"
-            style={{
-              backgroundColor: '#ffffff',
-              color: '#181d26',
-              border: '1px solid #dddddd',
-              borderRadius: '12px',
-              padding: '10px 16px',
-              fontSize: '14px',
-              fontWeight: '500',
-              fontFamily: 'inherit',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            Gap Hunter
-          </button>
+      <MapToolbar
+        season={season}
+        scenarioActive={scenarioActive}
+        scenarioDisabled={loading}
+        onSeasonChange={setSeason}
+        onOpenInsights={() => setActiveView('dashboard')}
+        onToggleScenario={toggleScenarioMode}
+      />
 
-          <button
-            onClick={toggleAffordabilityLayer}
-            type="button"
-            aria-label="Open affordability layer"
-            style={{
-              backgroundColor: '#ffffff',
-              color: '#181d26',
-              border: '1px solid #dddddd',
-              borderRadius: '12px',
-              padding: '10px 16px',
-              fontSize: '14px',
-              fontWeight: '500',
-              fontFamily: 'inherit',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
-            }}
-          >
-            Affordability
-          </button>
-        </div>
+      {!loading && (
+        <LayerSwitcher
+          activeLayer={activeSidebarLayer}
+          scenarioActive={scenarioActive}
+          onChange={handleLayerChange}
+        />
       )}
 
-      {/* RIGHT SIDE: Title + Season Dropdown */}
-      <div style={{
-        position: 'absolute',
-        top: '20px',
-        right: '20px',
-        zIndex: 1001,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'flex-end',
-        gap: '12px'
-      }}>
-        {/* Title Card with Dropdown (Airtable flat card style) */}
-        <div style={{
-          background: '#ffffff',
-          padding: '12px 16px',
-          borderRadius: '10px',
-          border: '1px solid #dddddd',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px'
-        }}>
-          <div>
-            <div style={{
-              fontSize: '16px',
-              fontWeight: '500',
-              color: '#181d26',
-              letterSpacing: '0'
-            }}>
-              TENeT
-            </div>
-            <div style={{
-              fontSize: '12px',
-              color: '#41454d'
-            }}>
-              Telehealth Network Tracker
-            </div>
-          </div>
-          <div style={{
-            width: '1px',
-            height: '32px',
-            backgroundColor: '#dddddd',
-            margin: '0 4px'
-          }}></div>
-          <div>
-            <SeasonSelector season={season} onChange={setSeason} />
-          </div>
-        </div>
-
-        {/* Scenario Mode Toggle */}
-        {!loading && (
-          <button
-            onClick={toggleScenarioMode}
-            id="scenario-toggle-button"
-            data-testid="scenario-button"
-            type="button"
-            aria-label={scenarioActive ? 'Exit scenario mode' : 'Open what-if scenario mode'}
-            style={{
-              background: scenarioActive
-                ? 'linear-gradient(135deg, #6D28D9 0%, #5B21B6 100%)'
-                : 'rgba(255, 255, 255, 0.92)',
-              backdropFilter: 'blur(12px)',
-              WebkitBackdropFilter: 'blur(12px)',
-              color: scenarioActive ? 'white' : '#6D28D9',
-              border: scenarioActive ? 'none' : '1px solid rgba(124, 58, 237, 0.25)',
-              borderRadius: '10px',
-              padding: '10px 18px',
-              fontSize: '13px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              boxShadow: scenarioActive
-                ? '0 4px 16px rgba(124, 58, 237, 0.35)'
-                : '0 4px 16px rgba(31, 38, 135, 0.1)',
-              transition: 'all 0.2s',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              alignSelf: 'flex-end',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-1px)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <span style={{ fontSize: '14px' }}>🔬</span>
-            {scenarioActive ? '✕ Exit Scenarios' : 'What-If Scenarios'}
-          </button>
-        )}
-
-        {/* Scenario Panel */}
-        {scenarioActive && (
+      {scenarioActive && (
+        <div className="scenario-panel-shell">
           <ScenarioPanel
             scenario={scenarioState}
             preview={scenarioPreview}
-            gapModeActive={gapModeActive}
+            onClose={toggleScenarioMode}
           />
-        )}
-
-        {/* Close Affordability button */}
-        {affordabilityLayerVisible && (
-          <button
-            onClick={() => setAffordabilityLayerVisible(false)}
-            type="button"
-            aria-label="Close affordability layer"
-            style={{
-              background: 'rgba(55, 65, 81, 0.9)',
-              backdropFilter: 'blur(10px)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '10px 16px',
-              fontSize: '13px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-            }}
-          >
-            ✕ Close Affordability
-          </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* BOTTOM LEFT: Data Coverage Panel */}
-      {!loading && !gapModeActive && !affordabilityLayerVisible && !scenarioActive && (
-        <DataCoveragePanel totalRegions={regions.length} />
+      {!loading && mapMode.type === 'cat' && (
+        <DataCoveragePanel />
       )}
 
       {/* BOTTOM RIGHT: Legend Panel */}
-      {!loading && !gapModeActive && !affordabilityLayerVisible && !scenarioActive && (
+      {!loading && mapMode.type === 'cat' && (
         <Legend totalRegions={regions.length} />
       )}
 
       {/* Affordability Legend */}
-      {!loading && affordabilityLayerVisible && !scenarioActive && (
+      {!loading && mapMode.type === 'telehealthAccess' && (
         <AffordabilityLegend summary={affordabilitySummary} />
       )}
 
       {/* Scenario Legend */}
-      {!loading && scenarioActive && !gapModeActive && (
+      {!loading && scenarioActive && (
         <ScenarioLegend />
       )}
-      </div>
+      </main>
     </div>
   );
 }

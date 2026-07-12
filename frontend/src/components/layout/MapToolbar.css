@@ -1,0 +1,117 @@
+.map-toolbar {
+  position: absolute;
+  top: var(--spacing-4);
+  right: var(--spacing-4);
+  z-index: var(--z-overlay);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+  max-width: calc(100% - 390px);
+  min-height: 58px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-overlay);
+  padding: var(--spacing-2) var(--spacing-3);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.map-toolbar__brand {
+  display: flex;
+  min-width: 142px;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.map-toolbar__brand strong {
+  color: var(--color-text);
+  font-size: var(--font-base);
+  letter-spacing: -0.01em;
+}
+
+.map-toolbar__brand span {
+  color: var(--color-text-secondary);
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+
+.map-toolbar__divider {
+  align-self: stretch;
+  width: 1px;
+  background: var(--color-border-subtle);
+}
+
+.map-toolbar__controls {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-2);
+}
+
+.map-toolbar__season {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.map-toolbar__control-label {
+  color: var(--color-text-muted);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.map-toolbar__scenario-button.is-active {
+  border-color: var(--color-status-limited);
+  background: var(--color-status-limited);
+}
+
+.map-toolbar__scenario-button.is-active:hover:not(:disabled) {
+  border-color: #5b21b6;
+  background: #5b21b6;
+}
+
+@media (max-width: 1200px) {
+  .map-toolbar {
+    max-width: calc(100% - var(--spacing-8));
+  }
+}
+
+@media (max-width: 700px) {
+  .map-toolbar {
+    right: var(--spacing-3);
+    left: var(--spacing-3);
+    max-width: none;
+    flex-wrap: wrap;
+    gap: var(--spacing-2) var(--spacing-3);
+  }
+
+  .map-toolbar__brand {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .map-toolbar__brand span,
+  .map-toolbar__divider,
+  .map-toolbar__control-label {
+    display: none;
+  }
+
+  .map-toolbar__controls {
+    width: 100%;
+  }
+
+  .map-toolbar__season {
+    min-width: 0;
+    flex: 1;
+  }
+}
+
+@media (max-width: 430px) {
+  .map-toolbar__controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+}
