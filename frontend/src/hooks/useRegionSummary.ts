@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchRegionSummary, RegionSummary } from '../api/catApi';
+import { errorMessage, isAbortError } from '../api/http';
 
 export function useRegionSummary() {
     const [regions, setRegions] = useState<RegionSummary[]>([]);
@@ -7,22 +8,22 @@ export function useRegionSummary() {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        let cancelled = false;
+        const controller = new AbortController();
 
         async function loadSummary() {
             try {
                 setLoading(true);
-                const data = await fetchRegionSummary();
-                if (!cancelled) {
+                const data = await fetchRegionSummary(controller.signal);
+                if (!controller.signal.aborted) {
                     setRegions(data);
                     setError(null);
                 }
-            } catch (err) {
-                if (!cancelled) {
-                    setError(err instanceof Error ? err.message : 'Failed to load region summary');
+            } catch (caught: unknown) {
+                if (!isAbortError(caught)) {
+                    setError(errorMessage(caught, 'Failed to load region summary'));
                 }
             } finally {
-                if (!cancelled) {
+                if (!controller.signal.aborted) {
                     setLoading(false);
                 }
             }
@@ -31,7 +32,7 @@ export function useRegionSummary() {
         loadSummary();
 
         return () => {
-            cancelled = true;
+            controller.abort();
         };
     }, []);
 

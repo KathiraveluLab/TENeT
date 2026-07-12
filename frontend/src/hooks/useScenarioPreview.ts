@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchScenarioPreview } from '../api/scenarioApi';
 import type { Season } from '../api/catApi';
+import { errorMessage, isAbortError } from '../api/http';
 import type {
     ScenarioMode,
     ScenarioPreviewResponse,
@@ -33,6 +34,7 @@ export function useScenarioPreview(
     regionCodes: string[] | null = null,
     setMode?: (mode: ScenarioMode) => void,
 ): ScenarioPreviewState {
+    const enabled = mode !== 'off';
     const [data, setData] = useState<ScenarioPreviewResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -96,10 +98,11 @@ export function useScenarioPreview(
             setError(null);
             setMode?.('active');
             abortRef.current = null;
-        } catch (err: any) {
-            if (err?.name === 'AbortError') return;
+        } catch (err: unknown) {
+            if (isAbortError(err)) return;
             if (!controller.signal.aborted && abortRef.current === controller) {
-                setError(err?.message || 'Scenario preview failed');
+                setData(null);
+                setError(errorMessage(err, 'Scenario preview failed'));
                 setLoading(false);
                 setMode?.('active');
                 abortRef.current = null;
@@ -109,7 +112,7 @@ export function useScenarioPreview(
 
     // Debounced fetch
     useEffect(() => {
-        if (mode === 'off') {
+        if (!enabled) {
             setData(null);
             setError(null);
             setLoading(false);
@@ -126,6 +129,13 @@ export function useScenarioPreview(
             window.clearTimeout(timerRef.current);
         }
 
+        abortRef.current?.abort();
+        abortRef.current = null;
+        setData(null);
+        setError(null);
+        setLoading(true);
+        setMode?.('calculating');
+
         timerRef.current = window.setTimeout(() => {
             fetchPreview(thresholds, season, regionCodes);
         }, DEBOUNCE_MS);
@@ -136,7 +146,7 @@ export function useScenarioPreview(
                 timerRef.current = null;
             }
         };
-    }, [mode, thresholds, season, regionCodes, fetchPreview]);
+    }, [enabled, thresholds, season, regionCodes, fetchPreview, setMode]);
 
     // Cleanup on unmount
     useEffect(() => {

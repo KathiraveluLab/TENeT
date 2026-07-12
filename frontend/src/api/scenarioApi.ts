@@ -5,6 +5,7 @@
 import type { Season } from './catApi';
 import { API_BASE } from './catApi';
 import type { ScenarioPreviewResponse, ScenarioThresholds } from '../types/scenario';
+import { fetchJson } from './http';
 
 export interface ScenarioPreviewRequest {
     mode: 'preview';
@@ -22,17 +23,10 @@ export async function fetchScenarioPreview(
     request: ScenarioPreviewRequest,
     signal?: AbortSignal,
 ): Promise<ScenarioPreviewResponse> {
-    const response = await fetch(`${API_BASE}/scenarios/preview`, {
+    return fetchJson<ScenarioPreviewResponse>(`${API_BASE}/scenarios/preview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
         signal,
-    });
-
-    if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({}));
-        throw new Error(errorBody.error || `Scenario preview failed: ${response.statusText}`);
-    }
-
-    return response.json();
+    }, 'Scenario preview failed');
 }
