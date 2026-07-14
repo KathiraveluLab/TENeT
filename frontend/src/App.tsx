@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import './utils/leafletSmoothWheelZoom';
 import { fetchRegions, CATRegion, Season, AllTelehealthStatusResponse } from './api/catApi';
 import { errorMessage, isAbortError } from './api/http';
 import RegionClusters from './components/RegionClusters';
@@ -291,13 +292,17 @@ function App() {
           maxBoundsViscosity={1.0}
           minZoom={4}
           zoomControl={true}
+          scrollWheelZoom={false}
+          smoothWheelZoom={true}
+          smoothSensitivity={3}
+          zoomSnap={0}
           style={{ height: '100%', width: '100%' }}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
             keepBuffer={12}
-            updateWhenZooming={false}
+            updateWhenZooming={true}
           />
 
           {mapMode.type === 'cat' && (

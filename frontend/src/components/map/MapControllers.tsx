@@ -16,17 +16,17 @@ export function MapViewportController({
 }: MapViewportControllerProps) {
     const map = useMapEvents({
         moveend: () => {
+            const nextZoom = map.getZoom();
+
+            // Continuous wheel zoom deliberately ends at a fractional level.
+            // Keep that interaction local to Leaflet so it cannot trigger an
+            // App render and URL rewrite at the end of every gesture.
+            if (!Number.isInteger(nextZoom)) return;
+
             const nextCenter = map.getCenter();
             onViewportChange(
                 [Number(nextCenter.lat.toFixed(5)), Number(nextCenter.lng.toFixed(5))],
-                map.getZoom(),
-            );
-        },
-        zoomend: () => {
-            const nextCenter = map.getCenter();
-            onViewportChange(
-                [Number(nextCenter.lat.toFixed(5)), Number(nextCenter.lng.toFixed(5))],
-                map.getZoom(),
+                nextZoom,
             );
         },
     });
@@ -36,7 +36,7 @@ export function MapViewportController({
         if (
             Math.abs(current.lat - center[0]) < 0.00001
             && Math.abs(current.lng - center[1]) < 0.00001
-            && map.getZoom() === zoom
+            && Math.abs(map.getZoom() - zoom) < 0.0005
         ) return;
         map.setView(center, zoom, { animate: false });
     }, [center, map, zoom]);
