@@ -17,12 +17,6 @@ export function MapViewportController({
     const map = useMapEvents({
         moveend: () => {
             const nextZoom = map.getZoom();
-
-            // Continuous wheel zoom deliberately ends at a fractional level.
-            // Keep that interaction local to Leaflet so it cannot trigger an
-            // App render and URL rewrite at the end of every gesture.
-            if (!Number.isInteger(nextZoom)) return;
-
             const nextCenter = map.getCenter();
             onViewportChange(
                 [Number(nextCenter.lat.toFixed(5)), Number(nextCenter.lng.toFixed(5))],

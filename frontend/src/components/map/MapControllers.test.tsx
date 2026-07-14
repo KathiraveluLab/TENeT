@@ -28,7 +28,7 @@ describe('MapViewportController', () => {
         leaflet.map.setView.mockReset();
     });
 
-    it('keeps a fractional smooth-zoom viewport out of React state', () => {
+    it('reports a fractional smooth-zoom viewport without resetting the map', () => {
         const onReport = vi.fn();
 
         function Harness() {
@@ -55,7 +55,10 @@ describe('MapViewportController', () => {
 
         act(() => leaflet.events.moveend());
 
-        expect(onReport).not.toHaveBeenCalled();
+        expect(onReport).toHaveBeenCalledWith(
+            [63.31067, -158.42675],
+            4.54046159397577,
+        );
         expect(leaflet.map.setView).not.toHaveBeenCalled();
     });
 });
