@@ -3,16 +3,16 @@
     left: 24px;
     right: 24px;
     bottom: 16px;
-    z-index: 650;
+    z-index: var(--z-overlay);
     max-height: min(34vh, 340px);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border: 1px solid #c7d0da;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.96);
-    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.18);
-    color: #172033;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-overlay);
+    box-shadow: var(--shadow-lg);
+    color: var(--color-text);
 }
 
 .research-comparison-panel.collapsed {
@@ -24,12 +24,12 @@
     position: absolute;
     right: 24px;
     bottom: 16px;
-    z-index: 650;
-    border: 1px solid #c7d0da;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.96);
-    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
-    color: #334155;
+    z-index: var(--z-overlay);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-overlay);
+    box-shadow: var(--shadow-md);
+    color: var(--color-text-secondary);
     padding: 10px 12px;
     font-size: 12px;
     font-weight: 800;
@@ -43,19 +43,19 @@
     justify-content: space-between;
     gap: 12px;
     padding: 12px 14px;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--color-border);
 }
 
 .research-comparison-header h2 {
     margin: 0;
-    color: #111827;
+    color: var(--color-text);
     font-size: 16px;
     line-height: 1.2;
 }
 
 .research-comparison-header p {
     margin: 3px 0 0;
-    color: #64748b;
+    color: var(--color-text-muted);
     font-size: 12px;
 }
 
@@ -65,22 +65,9 @@
     gap: 6px;
 }
 
-.research-comparison-actions button {
-    border: 1px solid #c7d0da;
-    border-radius: 6px;
-    background: #ffffff;
-    color: #334155;
-    padding: 5px 8px;
-    font-size: 11px;
-    font-weight: 800;
-    cursor: pointer;
-    white-space: nowrap;
-}
-
-.research-comparison-actions button:hover,
 .research-comparison-reopen:hover {
-    background: #f8fbff;
-    border-color: #93c5fd;
+    background: var(--color-surface-subtle);
+    border-color: var(--color-primary);
 }
 
 .research-comparison-body {
@@ -97,15 +84,15 @@
 }
 
 .comparison-muted {
-    border: 1px solid #dbe3ea;
-    background: #f8fafc;
-    color: #64748b;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-subtle);
+    color: var(--color-text-muted);
 }
 
 .comparison-error {
     border: 1px solid #fecaca;
-    background: #fef2f2;
-    color: #b91c1c;
+    background: var(--color-danger-subtle);
+    color: var(--color-danger);
 }
 
 .comparison-table {
@@ -118,7 +105,7 @@
     gap: 8px;
     align-items: stretch;
     padding: 9px 14px;
-    border-bottom: 1px solid #edf2f7;
+    border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .comparison-grid:last-child {
@@ -129,8 +116,8 @@
     position: sticky;
     top: 0;
     z-index: 1;
-    background: #f8fafc;
-    color: #536176;
+    background: var(--color-surface-subtle);
+    color: var(--color-text-secondary);
     font-size: 11px;
     font-weight: 800;
     text-transform: uppercase;
@@ -149,7 +136,7 @@
 
 .comparison-metric-label {
     align-self: center;
-    color: #475569;
+    color: var(--color-text-secondary);
     font-size: 12px;
     font-weight: 800;
 }
@@ -167,7 +154,7 @@
 
 .comparison-value-line strong {
     min-width: 0;
-    color: #111827;
+    color: var(--color-text);
     font-size: 12px;
     overflow-wrap: anywhere;
 }
@@ -195,7 +182,7 @@
     margin-top: 5px;
     overflow: hidden;
     border-radius: 999px;
-    background: #e2e8f0;
+    background: var(--color-surface-muted);
 }
 
 .comparison-bar-track span {
@@ -208,7 +195,7 @@
 .comparison-cell small {
     display: block;
     margin-top: 4px;
-    color: #64748b;
+    color: var(--color-text-muted);
     font-size: 10px;
     line-height: 1.3;
 }
@@ -217,7 +204,8 @@
     .research-comparison-panel {
         left: 10px;
         right: 10px;
-        bottom: 10px;
+        bottom: calc(46vh + var(--spacing-5));
+        bottom: calc(46dvh + var(--spacing-5));
         width: auto;
         max-height: 32vh;
     }
@@ -230,6 +218,8 @@
     .research-comparison-reopen {
         left: 10px;
         right: 10px;
+        bottom: calc(46vh + var(--spacing-5));
+        bottom: calc(46dvh + var(--spacing-5));
         width: auto;
     }
 }
