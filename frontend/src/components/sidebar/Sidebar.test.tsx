@@ -132,8 +132,27 @@ describe('Sidebar discovery', () => {
         expect(screen.getByText('Eareckson')).toBeInTheDocument();
         expect(screen.getByText('Missing Data')).toBeInTheDocument();
         expect(screen.getAllByText('Data incomplete').length).toBeGreaterThan(0);
-        expect(screen.getAllByText('Confidence Missing').length).toBeGreaterThan(0);
-        expect(screen.getByText('Desert Unknown')).toBeInTheDocument();
+        expect(screen.getAllByLabelText(/Data incomplete\. Missing confidence/i).length).toBeGreaterThan(0);
+        expect(screen.getByLabelText('Desert score Unknown')).toBeInTheDocument();
+    });
+
+    it('keeps quick filters synchronized with the existing filter controls', () => {
+        renderSidebar();
+
+        const critical = screen.getByRole('button', { name: 'Critical gaps' });
+        fireEvent.click(critical);
+
+        expect(critical).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByLabelText(/^Status$/i)).toHaveValue('CRITICAL_GAP');
+        expect(resultCodes()).toEqual(['AK-EARECKSON']);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Data incomplete' }));
+        expect(screen.getByLabelText(/^Data gaps$/i)).toHaveValue('missing');
+        expect(resultCodes()).toEqual(['AK-EARECKSON']);
+
+        fireEvent.click(critical);
+        expect(screen.getByLabelText(/^Status$/i)).toHaveValue('');
+        expect(resultCodes()).toEqual(['AK-BETHEL', 'AK-EARECKSON', 'AK-MISSING']);
     });
 
     it('filters by CAT tier', async () => {
@@ -167,7 +186,7 @@ describe('Sidebar discovery', () => {
     it('filters by healthcare desert score', async () => {
         renderSidebar();
 
-        fireEvent.change(screen.getByLabelText(/Desert score/i), { target: { value: '70-plus' } });
+        fireEvent.change(screen.getByLabelText(/^Desert score$/i), { target: { value: '75-plus' } });
 
         expect(screen.getByText('Eareckson')).toBeInTheDocument();
         expect(screen.queryByText('Bethel')).not.toBeInTheDocument();

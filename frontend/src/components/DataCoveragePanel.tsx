@@ -1,10 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import {
-    DataGapsSummary,
+    type DataGapsSummary,
     fetchDataGapsSummary,
-    getConfidenceColor,
-    getDataGapInfo
 } from '../api/catApi';
+import { errorMessage, isAbortError } from '../api/http';
+import {
+    DATA_CONFIDENCE_LEVELS,
+    DATA_CONFIDENCE_PRESENTATION,
+    getDataGapPresentation,
+} from '../domain/metrics';
+import Button from './ui/Button';
+import IconButton from './ui/IconButton';
 import './DataCoveragePanel.css';
 
 interface DataCoveragePanelProps {
@@ -13,250 +19,197 @@ interface DataCoveragePanelProps {
     totalRegions?: number;
 }
 
-/**
- * Panel showing data coverage and data gaps summary
- * Supports the 'data coverage/confidence' layer visualization
- */
-export default function DataCoveragePanel({ isExpanded = false, onToggle, totalRegions }: DataCoveragePanelProps) {
+export default function DataCoveragePanel({
+    isExpanded = false,
+    onToggle,
+}: DataCoveragePanelProps) {
     const [summary, setSummary] = useState<DataGapsSummary | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [open, setOpen] = useState(false);
+    const shellRef = useRef<HTMLDivElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const panelId = useId();
 
     useEffect(() => {
+        const controller = new AbortController();
         async function loadData() {
             try {
                 setLoading(true);
-                const data = await fetchDataGapsSummary();
+                const data = await fetchDataGapsSummary(controller.signal);
                 setSummary(data);
                 setError(null);
-            } catch (err) {
-                setError(err instanceof Error ? err.message : 'Failed to load data gaps');
-                console.error('Error loading data gaps:', err);
+            } catch (caught: unknown) {
+                if (!isAbortError(caught)) {
+                    setError(errorMessage(caught, 'Failed to load data gaps'));
+                }
             } finally {
-                setLoading(false);
+                if (!controller.signal.aborted) setLoading(false);
             }
         }
         loadData();
+        return () => controller.abort();
     }, []);
 
-    const renderShell = (content: React.ReactNode) => (
-        <div className="data-coverage-hover">
-            <button type="button" className="data-coverage-trigger" aria-label="Show data coverage layer legend">
-                Data
-            </button>
-            <div className="data-coverage-panel" style={panelStyle}>
-                {content}
+    useEffect(() => {
+        if (!open) return;
+
+        const handlePointerDown = (event: PointerEvent) => {
+            if (!shellRef.current?.contains(event.target as Node)) setOpen(false);
+        };
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            setOpen(false);
+            triggerRef.current?.focus();
+        };
+
+        document.addEventListener('pointerdown', handlePointerDown);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('pointerdown', handlePointerDown);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [open]);
+
+    const close = () => {
+        setOpen(false);
+        triggerRef.current?.focus();
+    };
+
+    const totalPlaces = summary?.total_places ?? 0;
+    const gapsPercentage = summary && summary.total_places > 0
+        ? Math.round((summary.places_with_gaps / summary.total_places) * 100)
+        : 0;
+    const satellitePercent = summary && summary.total_places > 0
+        ? Math.round(((summary.primary_access.SATELLITE ?? 0) / summary.total_places) * 100)
+        : null;
+
+    return (
+        <div ref={shellRef} className="data-coverage-popover">
+            <Button
+                ref={triggerRef}
+                size="small"
+                className="data-coverage-trigger"
+                aria-label={open ? 'Close data coverage summary' : 'Open data coverage summary'}
+                aria-expanded={open}
+                aria-controls={panelId}
+                onClick={() => setOpen(value => !value)}
+            >
+                Data coverage
+            </Button>
+
+            <div
+                id={panelId}
+                className="data-coverage-panel"
+                role="region"
+                aria-label="Data coverage summary"
+                hidden={!open}
+            >
+                <div className="data-coverage-header">
+                    <div>
+                        <h4>Data Coverage</h4>
+                        <span>Availability and confidence</span>
+                    </div>
+                    <IconButton
+                        icon="×"
+                        size="small"
+                        aria-label="Close data coverage summary"
+                        onClick={close}
+                    />
+                </div>
+
+                {loading && <div className="data-coverage-state" role="status">Loading coverage data…</div>}
+
+                {!loading && (error || !summary) && (
+                    <div className="data-coverage-state data-coverage-state--error" role="alert">
+                        {error || 'No data available'}
+                    </div>
+                )}
+
+                {!loading && summary && (
+                    <>
+                        <div className="data-coverage-stats">
+                            <div>
+                                <span>Broadband places</span>
+                                <strong>{totalPlaces}</strong>
+                            </div>
+                            <div className="data-coverage-stat--alert">
+                                <span>With data gaps</span>
+                                <strong>{summary.places_with_gaps}</strong>
+                                <small>{gapsPercentage}% of total</small>
+                            </div>
+                        </div>
+
+                        <section className="data-coverage-section">
+                            <h5>Data confidence</h5>
+                            <div className="data-coverage-distribution" aria-label="Data confidence distribution">
+                                {DATA_CONFIDENCE_LEVELS.map(level => {
+                                    const count = summary.confidence_distribution[level];
+                                    const presentation = DATA_CONFIDENCE_PRESENTATION[level];
+                                    return (
+                                        <span
+                                            key={level}
+                                            className={presentation.className}
+                                            style={{ flex: count, display: count > 0 ? undefined : 'none' }}
+                                            title={`${count} ${presentation.label.toLowerCase()}-confidence places`}
+                                        />
+                                    );
+                                })}
+                            </div>
+                            <div className="data-coverage-key">
+                                {DATA_CONFIDENCE_LEVELS.map(level => {
+                                    const presentation = DATA_CONFIDENCE_PRESENTATION[level];
+                                    return (
+                                        <span key={level}>
+                                            <i className={presentation.className} />
+                                            {presentation.label} {summary.confidence_distribution[level]}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </section>
+
+                        <section className="data-coverage-section">
+                            <h5>Primary internet access</h5>
+                            <div className="data-coverage-access">
+                                <div><strong>{satellitePercent === null ? '—' : `${satellitePercent}%`}</strong><span>Satellite</span></div>
+                                <div><strong>{satellitePercent === null ? '—' : `${100 - satellitePercent}%`}</strong><span>Wired or other</span></div>
+                            </div>
+                        </section>
+
+                        {(isExpanded || !onToggle) && (
+                            <section className="data-coverage-section">
+                                <h5>Most common gap types</h5>
+                                <div className="data-coverage-gaps">
+                                    {Object.entries(summary.gap_breakdown)
+                                        .filter(([, data]) => data.count > 0)
+                                        .sort(([, a], [, b]) => b.count - a.count)
+                                        .slice(0, 5)
+                                        .map(([gapType, data]) => {
+                                            const info = getDataGapPresentation(gapType);
+                                            return (
+                                                <div key={gapType}>
+                                                    <span>{info.label}</span>
+                                                    <strong className={`is-${info.severity}`}>
+                                                        {data.count} ({data.percentage}%)
+                                                    </strong>
+                                                </div>
+                                            );
+                                        })}
+                                </div>
+                            </section>
+                        )}
+
+                        {onToggle && (
+                            <Button size="small" variant="ghost" onClick={onToggle}>
+                                {isExpanded ? 'Show less detail' : 'Show more detail'}
+                            </Button>
+                        )}
+
+                        <div className="data-coverage-source">Source: FCC Broadband Availability</div>
+                    </>
+                )}
             </div>
         </div>
     );
-
-    if (loading) {
-        return renderShell(
-            <>
-                <div style={{ padding: '24px 24px 8px 24px', fontSize: '16px', fontWeight: '500', color: '#181d26' }}>
-                    <span>Data Coverage Layer</span>
-                </div>
-                <div style={{ padding: '8px 24px 24px 24px', fontSize: '12px', color: '#41454d' }}>
-                    Loading...
-                </div>
-            </>
-        );
-    }
-
-    if (error || !summary) {
-        return renderShell(
-            <>
-                <div style={{ padding: '24px 24px 8px 24px', fontSize: '16px', fontWeight: '500', color: '#181d26' }}>
-                    <span>Data Coverage Layer</span>
-                </div>
-                <div style={{ padding: '8px 24px 24px 24px', fontSize: '12px', color: '#dc2626' }}>
-                    {error || 'No data available'}
-                </div>
-            </>
-        );
-    }
-
-    const gapsPercentage = Math.round((summary.places_with_gaps / summary.total_places) * 100);
-    const satellitePercent = Math.round((summary.primary_access.SATELLITE / summary.total_places) * 100);
-
-    return renderShell(
-        <>
-            {/* Header */}
-            <div
-                style={{
-                    padding: '24px 24px 8px 24px',
-                    fontSize: '16px',
-                    fontWeight: '500',
-                    color: '#181d26',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    cursor: onToggle ? 'pointer' : 'default'
-                }}
-                onClick={onToggle}
-            >
-                <span>Data Coverage Layer</span>
-                {onToggle && (
-                    <span style={{ fontSize: '10px', marginLeft: '8px', color: '#9297a0' }}>
-                        {isExpanded ? '▼' : '▶'}
-                    </span>
-                )}
-            </div>
-
-            {/* Quick Stats */}
-            <div style={{ padding: '8px 24px 16px 24px' }}>
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '16px'
-                }}>
-                    <div>
-                        <div style={{ color: '#41454d', fontSize: '12px', marginBottom: '4px' }}>Total Places</div>
-                        <div style={{ fontWeight: '400', fontSize: '24px', color: '#181d26', letterSpacing: '-0.02em' }}>
-                            {summary.total_places}
-                        </div>
-                    </div>
-                    <div>
-                        <div style={{ color: '#41454d', fontSize: '12px', marginBottom: '4px' }}>With Data Gaps</div>
-                        <div style={{ fontWeight: '400', fontSize: '24px', color: '#aa2d00', letterSpacing: '-0.02em' }}>
-                            {summary.places_with_gaps} <span style={{ fontSize: '13px', fontWeight: '400', color: '#aa2d00' }}>({gapsPercentage}%)</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Confidence Distribution */}
-            <div style={{ padding: '16px 24px' }}>
-                <div style={{ fontSize: '12px', color: '#181d26', marginBottom: '12px', fontWeight: '500' }}>
-                    Data Confidence
-                </div>
-                <div style={{ display: 'flex', gap: '2px', height: '8px', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div
-                        style={{
-                            flex: summary.confidence_distribution.HIGH,
-                            backgroundColor: '#006400',
-                            minWidth: summary.confidence_distribution.HIGH > 0 ? '4px' : '0'
-                        }}
-                    />
-                    <div
-                        style={{
-                            flex: summary.confidence_distribution.MEDIUM,
-                            backgroundColor: '#f4d35e',
-                            minWidth: summary.confidence_distribution.MEDIUM > 0 ? '4px' : '0'
-                        }}
-                    />
-                    <div
-                        style={{
-                            flex: summary.confidence_distribution.LOW,
-                            backgroundColor: '#aa2d00',
-                            minWidth: summary.confidence_distribution.LOW > 0 ? '4px' : '0'
-                        }}
-                    />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '11px', color: '#41454d' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#006400' }} />
-                        High
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#f4d35e' }} />
-                        Med
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: '#aa2d00' }} />
-                        Low
-                    </span>
-                </div>
-            </div>
-
-            {/* Primary Access Type */}
-            <div style={{ padding: '16px 24px' }}>
-                <div style={{ fontSize: '12px', color: '#181d26', marginBottom: '12px', fontWeight: '500' }}>
-                    Primary Internet Access
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                    <div style={{
-                        flex: 1,
-                        padding: '12px',
-                        borderRadius: '6px',
-                        backgroundColor: '#f8fafc',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center'
-                    }}>
-                        <div style={{ fontWeight: '400', color: '#181d26', fontSize: '18px' }}>{satellitePercent}%</div>
-                        <div style={{ color: '#41454d', fontSize: '12px', marginTop: '4px' }}>Satellite</div>
-                    </div>
-                    <div style={{
-                        flex: 1,
-                        padding: '12px',
-                        borderRadius: '6px',
-                        backgroundColor: '#f8fafc',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center'
-                    }}>
-                        <div style={{ fontWeight: '400', color: '#181d26', fontSize: '18px' }}>{100 - satellitePercent}%</div>
-                        <div style={{ color: '#41454d', fontSize: '12px', marginTop: '4px' }}>Wired</div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Expanded: Gap Breakdown */}
-            {(isExpanded || !onToggle) && (
-                <div style={{ padding: '10px 12px' }}>
-                    <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '6px', fontWeight: '600' }}>
-                        Data Gap Types
-                    </div>
-                    {Object.entries(summary.gap_breakdown)
-                        .filter(([_, data]) => data.count > 0)
-                        .sort(([_, a], [__, b]) => b.count - a.count)
-                        .slice(0, 5)
-                        .map(([gapType, data]) => {
-                            const info = getDataGapInfo(gapType);
-                            return (
-                                <div key={gapType} style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    padding: '4px 0',
-                                    fontSize: '11px',
-                                    borderBottom: '1px solid #f3f4f6'
-                                }}>
-                                    <span>{info.label}</span>
-                                    <span style={{
-                                        color: info.severity === 'error' ? '#dc2626' :
-                                            info.severity === 'warning' ? '#f97316' : '#6b7280',
-                                        fontWeight: '500'
-                                    }}>
-                                        {data.count} ({data.percentage}%)
-                                    </span>
-                                </div>
-                            );
-                        })}
-                </div>
-            )}
-
-            {/* Footer Note */}
-            <div style={{
-                padding: '16px 24px 24px 24px',
-                fontSize: '11px',
-                color: '#9297a0'
-            }}>
-                Data source: FCC Broadband Availability
-            </div>
-        </>
-    );
 }
-
-// Airtable Styles (Flat Canvas, Hairline Border)
-const panelStyle: React.CSSProperties = {
-    minWidth: '240px',
-    maxWidth: '280px',
-    background: '#ffffff',
-    borderRadius: '10px',
-    border: '1px solid #dddddd',
-    fontSize: '13px',
-    overflow: 'hidden',
-    fontFamily: 'inherit'
-};

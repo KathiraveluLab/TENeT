@@ -1,3 +1,5 @@
+import { BASE_TELEHEALTH_STATUSES, getTelehealthStatusLabel } from '../../domain/statusPresentation';
+import { CAT_TIERS, DESERT_SCORE_FILTER_OPTIONS } from '../../domain/metrics';
 import { DataGapFilter, SidebarFilters } from './sidebarUtils';
 
 interface FilterControlsProps {
@@ -7,10 +9,10 @@ interface FilterControlsProps {
 
 const STATUS_OPTIONS = [
     { value: '', label: 'All statuses' },
-    { value: 'TELEHEALTH_READY', label: 'Ready' },
-    { value: 'COMMUNITY_ANCHOR', label: 'Anchor' },
-    { value: 'CRITICAL_GAP', label: 'Critical' },
-    { value: 'DATA_UNAVAILABLE', label: 'Unknown' },
+    ...BASE_TELEHEALTH_STATUSES.map(value => ({
+        value,
+        label: getTelehealthStatusLabel(value),
+    })),
 ];
 
 export default function FilterControls({ filters, onChange }: FilterControlsProps) {
@@ -20,13 +22,13 @@ export default function FilterControls({ filters, onChange }: FilterControlsProp
                 CAT tier
                 <select
                     value={filters.tier}
-                    onChange={(event) => onChange({ ...filters, tier: event.target.value })}
+                    onChange={(event) => onChange({
+                        ...filters,
+                        tier: event.target.value as SidebarFilters['tier'],
+                    })}
                 >
                     <option value="">All tiers</option>
-                    <option value="1">Tier 1</option>
-                    <option value="2">Tier 2</option>
-                    <option value="3">Tier 3</option>
-                    <option value="4">Tier 4</option>
+                    {CAT_TIERS.map(tier => <option key={tier} value={tier}>Tier {tier}</option>)}
                 </select>
             </label>
 
@@ -34,7 +36,10 @@ export default function FilterControls({ filters, onChange }: FilterControlsProp
                 Status
                 <select
                     value={filters.status}
-                    onChange={(event) => onChange({ ...filters, status: event.target.value })}
+                    onChange={(event) => onChange({
+                        ...filters,
+                        status: event.target.value as SidebarFilters['status'],
+                    })}
                 >
                     {STATUS_OPTIONS.map(option => (
                         <option key={option.value} value={option.value}>{option.label}</option>
@@ -46,13 +51,14 @@ export default function FilterControls({ filters, onChange }: FilterControlsProp
                 Desert score
                 <select
                     value={filters.desert}
-                    onChange={(event) => onChange({ ...filters, desert: event.target.value })}
+                    onChange={(event) => onChange({
+                        ...filters,
+                        desert: event.target.value as SidebarFilters['desert'],
+                    })}
                 >
-                    <option value="">All scores</option>
-                    <option value="70-plus">70+ severe need</option>
-                    <option value="50-plus">50+ high need</option>
-                    <option value="below-50">Below 50</option>
-                    <option value="unknown">Unknown score</option>
+                    {DESERT_SCORE_FILTER_OPTIONS.map(option => (
+                        <option key={option.value || 'all'} value={option.value}>{option.label}</option>
+                    ))}
                 </select>
             </label>
 
