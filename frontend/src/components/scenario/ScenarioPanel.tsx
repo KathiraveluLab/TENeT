@@ -205,16 +205,19 @@ const ERROR_STYLE: React.CSSProperties = {
 interface ScenarioPanelProps {
     scenario: ScenarioState;
     preview: ScenarioPreviewState;
-    gapModeActive: boolean;
+    gapModeActive?: boolean;
+    onClose?: () => void;
 }
 
 export default function ScenarioPanel({
     scenario,
     preview,
-    gapModeActive,
+    gapModeActive = false,
+    onClose,
 }: ScenarioPanelProps) {
     const { mode, thresholds, activePreset, setThreshold, applyPreset, resetToBaseline, deactivate } = scenario;
     const { data, loading, error } = preview;
+    const closePanel = onClose ?? deactivate;
 
     if (mode === 'off') return null;
 
@@ -229,7 +232,7 @@ export default function ScenarioPanel({
                 <button
                     type="button"
                     style={CLOSE_BTN_STYLE}
-                    onClick={deactivate}
+                    onClick={closePanel}
                     aria-label="Close scenario panel"
                     title="Close scenario mode"
                 >

@@ -1,0 +1,33 @@
+.season-selector {
+  width: 100%;
+  min-width: 134px;
+  height: var(--control-height-sm);
+  appearance: none;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23536176' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  color: var(--color-text-secondary);
+  padding: 0 32px 0 var(--spacing-3);
+  font-size: var(--font-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.season-selector:hover {
+  border-color: #94a3b8;
+}
+
+.season-selector:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--focus-ring);
+}
+
+@media (max-width: 430px) {
+  .season-selector {
+    min-width: 0;
+  }
+}
