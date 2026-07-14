@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { ChoroplethLayer } from './ChoroplethLayer';
@@ -9,20 +9,24 @@ import {
     fetchPerformance,
     fetchAffordability
 } from '../api/catApi';
-import { getScenarioCost, getTrafficLightStatus, AFFORDABILITY_BURDEN_THRESHOLD } from '../utils/trafficLight';
+import { errorMessage, isAbortError } from '../api/http';
+import { escapeHtml } from '../utils/escapeHtml';
+import { getScenarioCost, getTrafficLightStatus } from '../utils/trafficLight';
+import IconButton from './ui/IconButton';
+import './PerformanceLayer.css';
 
 interface PerformanceLayerProps {
     visible: boolean;
     onToggle: () => void;
-    onModeChange?: (isGapMode: boolean) => void;
 }
 
 const DETAIL_ZOOM_THRESHOLD = 8;
 
-export default function PerformanceLayer({ visible, onToggle, onModeChange }: PerformanceLayerProps) {
+export default function PerformanceLayer({ visible, onToggle }: PerformanceLayerProps) {
     const [tiles, setTiles] = useState<PerformanceTile[]>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [partialWarning, setPartialWarning] = useState<string | null>(null);
     const [zoomLevel, setZoomLevel] = useState(5);
 
     // UI State for Filters
@@ -46,7 +50,9 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
 
     useEffect(() => {
         if (visible) {
-            loadData();
+            const controller = new AbortController();
+            loadData(controller.signal);
+            return () => controller.abort();
         } else {
             if (canvasLayerRef.current) {
                 canvasLayerRef.current.clearLayers();
@@ -54,14 +60,8 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
         }
     }, [visible]);
 
-    useEffect(() => {
-        if (onModeChange) {
-            onModeChange(visible);
-        }
-    }, [visible, onModeChange]);
-
     const getScenarioBurden = (afford: AffordabilityZone | undefined, lat: number): number | null => {
-        if (!afford || !afford.monthly_income || afford.monthly_income <= 0) return null;
+        if (!afford || afford.monthly_income <= 0) return null;
         const cost = getScenarioCost(lat, useStarlink);
         return (cost / afford.monthly_income) * 100;
     };
@@ -72,7 +72,7 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
         let minDist = Infinity;
         const MAX_DIST_DEG = 0.2;
         for (const zone of affordabilityData) {
-            if (!zone.lat || !zone.lon) continue;
+            if (zone.lat === null || zone.lon === null) continue;
             const dLat = zone.lat - lat;
             const dLon = zone.lon - lon;
             const distSq = dLat * dLat + dLon * dLon;
@@ -91,13 +91,14 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
         burden: number | null,
         scenarioCost: number
     ): 'RED' | 'ORANGE' | 'YELLOW' | 'GREEN' | 'GRAY' => {
-        return getTrafficLightStatus(tile.avg_d_mbps || 0, tile.avg_lat_ms || 0, burden, scenarioCost);
+        if (tile.avg_d_mbps === null || tile.avg_lat_ms === null || burden === null) return 'GRAY';
+        return getTrafficLightStatus(tile.avg_d_mbps, tile.avg_lat_ms, burden, scenarioCost);
     };
 
 
     const visibleTiles = useMemo(() => {
         return tiles.filter(t => {
-            if (!t.lat || !t.lon) return false;
+            if (!Number.isFinite(t.lat) || !Number.isFinite(t.lon)) return false;
             // Basic Bounds Check (Alaska)
             if (t.lat >= 59 && t.lat <= 61 && t.lon >= -134 && t.lon <= -130) return false; // BC Border
             return true;
@@ -111,20 +112,34 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
         }
     }, [visible, visibleTiles, zoomLevel, useStarlink, affordabilityData, filterMode]); // Dependencies updated
 
-    async function loadData() {
+    async function loadData(signal: AbortSignal) {
         try {
             setLoading(true);
             setError(null);
-            const [perfData, affordData] = await Promise.all([
-                fetchPerformance(),
-                fetchAffordability().catch(() => ({ zones: [] }))
+            setPartialWarning(null);
+            const [performanceResult, affordabilityResult] = await Promise.allSettled([
+                fetchPerformance(undefined, undefined, 1, signal),
+                fetchAffordability(120, 2, signal),
             ]);
-            setTiles(perfData.tiles);
-            setAffordabilityData(affordData.zones);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to load data');
+            if (signal.aborted) return;
+            if (performanceResult.status === 'rejected') {
+                throw performanceResult.reason;
+            }
+            setTiles(performanceResult.value.tiles);
+            if (affordabilityResult.status === 'fulfilled') {
+                setAffordabilityData(affordabilityResult.value.zones);
+            } else {
+                setAffordabilityData([]);
+                setPartialWarning(
+                    errorMessage(affordabilityResult.reason, 'Affordability data unavailable'),
+                );
+            }
+        } catch (caught: unknown) {
+            if (!isAbortError(caught)) {
+                setError(errorMessage(caught, 'Failed to load data'));
+            }
         } finally {
-            setLoading(false);
+            if (!signal.aborted) setLoading(false);
         }
     }
 
@@ -139,7 +154,7 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
         const isDetailView = zoomLevel >= DETAIL_ZOOM_THRESHOLD;
 
         tilesToRender.forEach(tile => {
-            if (!tile.lat || !tile.lon) return;
+            if (!Number.isFinite(tile.lat) || !Number.isFinite(tile.lon)) return;
 
             const afford = getAffordabilityForTile(tile.lat, tile.lon);
             const scenarioCost = getScenarioCost(tile.lat, useStarlink);
@@ -147,14 +162,12 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
 
             let markerColor = '#ccc';
             let markerRadius = isDetailView ? 6 : Math.min(20, Math.max(4, (tile.tests / 5)));
-            let showTile = true;
-
             // --- FILTER LOGIC ---
             if (filterMode === 'affordability') {
                 const isRuralTier = scenarioCost >= 400;
 
                 if (burdenPct === null) {
-                    markerColor = isRuralTier ? '#f97316' : '#94a3b8';
+                    markerColor = '#94a3b8';
                     markerRadius = 4;
                 } else if (isRuralTier) {
                     if (burdenPct >= 2) {
@@ -178,8 +191,11 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
                 }
 
             } else if (filterMode === 'latency') {
-                const lat = tile.avg_lat_ms || 0;
-                if (lat < 50) {
+                const lat = tile.avg_lat_ms;
+                if (lat === null) {
+                    markerColor = '#94a3b8';
+                    markerRadius = 4;
+                } else if (lat < 50) {
                     markerColor = '#10B981'; // Emerald
                     markerRadius = 3;        // Small for good
                 } else if (lat < 150) {
@@ -228,29 +244,28 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
             });
 
             // Build Popup
-            const latencyDisplay = tile.avg_lat_ms ? `${tile.avg_lat_ms.toFixed(0)} ms` : 'N/A';
-            const costDisplay = burdenPct ? `${burdenPct.toFixed(1)}%` : 'N/A';
+            const latencyDisplay = tile.avg_lat_ms !== null ? `${tile.avg_lat_ms.toFixed(0)} ms` : 'N/A';
+            const costDisplay = burdenPct !== null ? `${burdenPct.toFixed(1)}%` : 'N/A';
+            const speedDisplay = tile.avg_d_mbps !== null ? `${tile.avg_d_mbps.toFixed(1)} Mbps` : 'N/A';
             const status = getTrafficLightStatusForTile(tile, burdenPct, scenarioCost);
 
-            let capabilityLabel = "";
+            let capabilityLabel = "Insufficient Data";
             if (status === 'RED') capabilityLabel = "Async / Text Only";
             else if (status === 'ORANGE') capabilityLabel = "Expensive Infrastructure";
             else if (status === 'YELLOW') capabilityLabel = "Audio / Low-Res Video";
             else if (status === 'GREEN') capabilityLabel = "HD Video Ready";
 
             marker.bindPopup(`
-                <div style="min-width: 200px; font-family: sans-serif;">
-                    <div style="margin-bottom: 8px; font-weight: bold; color: ${markerColor}">
-                        ${filterMode === 'combined' ? capabilityLabel : 'Location Details'}
+                <div class="performance-popup" style="--popup-color:${markerColor}">
+                    <div class="performance-popup__title">
+                        ${escapeHtml(filterMode === 'combined' ? capabilityLabel : 'Location Details')}
                     </div>
-                    
-                    <div style="background: #f3f4f6; padding: 6px; border-radius: 4px; margin-bottom: 8px; font-size: 11px;">
-                         <div><strong>Latency:</strong> ${latencyDisplay}</div>
-                         <div><strong>Burden:</strong> ${costDisplay} of Income</div>
-                         <div><strong>Speed:</strong> ${tile.avg_d_mbps?.toFixed(1) ?? 'N/A'} Mbps</div>
+                    <div class="performance-popup__metrics">
+                         <div><strong>Latency:</strong> ${escapeHtml(latencyDisplay)}</div>
+                         <div><strong>Burden:</strong> ${escapeHtml(costDisplay)} of Income</div>
+                         <div><strong>Speed:</strong> ${escapeHtml(speedDisplay)}</div>
                     </div>
-
-                    <div style="font-size: 10px; color: #6b7280;">
+                    <div class="performance-popup__source">
                          Generated by Gap Hunter v2
                     </div>
                 </div>
@@ -267,30 +282,35 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
 
     return (
         <>
-            <div style={panelStyle}>
+            <div className="performance-control-panel">
                 {/* Header */}
-                <div style={headerStyle} onClick={onToggle}>
+                <div className="performance-control-header">
                     <span>Gap Hunter</span>
-                    <span style={{ fontSize: '10px', cursor: 'pointer' }}>✕</span>
+                    <IconButton
+                        icon="×"
+                        size="small"
+                        onClick={onToggle}
+                        aria-label="Close Gap Hunter"
+                    />
                 </div>
 
+                {loading && <div className="performance-control-state" role="status">Loading measured performance…</div>}
+                {error && <div className="performance-control-state is-error" role="alert">{error}</div>}
+                {partialWarning && (
+                    <div className="performance-control-state is-warning" role="status">
+                        Affordability inputs unavailable; affected locations are shown as insufficient data.
+                    </div>
+                )}
+
                 {/* Filter Dropdown */}
-                <div style={{ padding: '10px 12px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-                    <div style={{ fontSize: '11px', fontWeight: '600', color: '#64748b', marginBottom: '4px' }}>
+                <div className="performance-control-settings">
+                    <div className="performance-control-kicker">
                         ACTIVE LAYER
                     </div>
                     <select
                         value={filterMode}
                         onChange={(e) => setFilterMode(e.target.value as PerformanceFilterType)}
-                        style={{
-                            width: '100%',
-                            padding: '6px',
-                            borderRadius: '4px',
-                            border: '1px solid #cbd5e1',
-                            fontSize: '12px',
-                            marginBottom: '10px',
-                            cursor: 'pointer'
-                        }}
+                        className="performance-control-select"
                     >
                         <option value="combined">Combined Feasibility (Master)</option>
                         <option value="affordability">Affordability Cost/Income</option>
@@ -298,31 +318,31 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
                     </select>
 
                     {/* Starlink Toggle */}
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px' }}>
+                    <label className="performance-control-toggle">
                         <input
                             type="checkbox"
                             checked={useStarlink}
                             onChange={(e) => setUseStarlink(e.target.checked)}
-                            style={{ accentColor: '#3b82f6' }}
+                            className="is-blue"
                         />
                         <span>Simulate Starlink LEO ($120/mo)</span>
                     </label>
 
                     {/* Region Toggle */}
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', marginTop: '8px' }}>
+                    <label className="performance-control-toggle is-spaced">
                         <input
                             type="checkbox"
                             checked={showRegions}
                             onChange={(e) => setShowRegions(e.target.checked)}
-                            style={{ accentColor: '#10b981' }}
+                            className="is-green"
                         />
                         <span>Show Region Polygons</span>
                     </label>
                 </div>
 
                 {/* Legend - Dynamic based on Filter */}
-                <div style={{ padding: '10px 12px', fontSize: '11px' }}>
-                    <div style={{ fontWeight: '600', marginBottom: '6px' }}>Legend</div>
+                <div className="performance-legend">
+                    <div className="performance-legend__title">Legend</div>
 
                     {filterMode === 'combined' && (
                         <>
@@ -351,7 +371,7 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
                     )}
                 </div>
 
-                <div style={{ padding: '6px 12px', fontSize: '9px', color: '#9ca3af', backgroundColor: '#f9fafb', borderTop: '1px solid #e5e7eb' }}>
+                <div className="performance-control-footer">
                     Traffic Light System v1.0
                 </div>
             </div>
@@ -373,51 +393,14 @@ export default function PerformanceLayer({ visible, onToggle, onModeChange }: Pe
 
 // Legend Component Helper
 const LegendItem = ({ color, border, label, sub }: { color: string, border?: string, label: string, sub?: string }) => (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
-        <div style={{
-            width: '12px',
-            height: '12px',
-            borderRadius: '50%',
-            background: color,
-            border: border ? `2px solid ${border}` : 'none',
-            flexShrink: 0,
-            marginTop: '2px',
-            boxSizing: 'border-box'
-        }} />
+    <div className="performance-legend-item">
+        <div
+            className={`performance-legend-swatch${border ? ' has-border' : ''}`}
+            style={{ backgroundColor: color, borderColor: border }}
+        />
         <div>
-            <div style={{ color: '#334155', fontWeight: '500' }}>{label}</div>
-            {sub && <div style={{ color: '#64748b', fontSize: '10px' }}>{sub}</div>}
+            <div className="performance-legend-label">{label}</div>
+            {sub && <div className="performance-legend-note">{sub}</div>}
         </div>
     </div>
 );
-
-const panelStyle: React.CSSProperties = {
-    position: 'absolute',
-    top: '20px',
-    left: '20px',
-    zIndex: 1000,
-    minWidth: '280px',
-    // Glassmorphism effect
-    background: 'rgba(255, 255, 255, 0.92)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
-    border: '1px solid rgba(255, 255, 255, 0.3)',
-    boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.12)',
-    borderRadius: '12px',
-    fontSize: '13px',
-    overflow: 'hidden'
-};
-
-// Clean header - no dark bar (Flaw 3 fix)
-const headerStyle: React.CSSProperties = {
-    padding: '14px 16px',
-    borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
-    fontSize: '15px',
-    fontWeight: '700',
-    letterSpacing: '-0.02em',
-    color: '#0f172a',  // Dark text on white, no background
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    cursor: 'pointer'
-};

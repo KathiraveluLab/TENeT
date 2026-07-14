@@ -1,6 +1,41 @@
 import L from 'leaflet';
+import type { ScenarioTelehealthStatusName } from '../domain/statusPresentation';
+import { escapeHtml } from './escapeHtml';
 
 const markerIconCache = new Map<string, L.DivIcon>();
+
+export interface MarkerMetadata {
+    needScore?: number;
+    scenarioStatus?: ScenarioTelehealthStatusName;
+}
+
+export interface MarkerClusterLike {
+    getChildCount: () => number;
+    getAllChildMarkers: () => L.Marker[];
+}
+
+type MarkerWithMetadata = L.Marker & {
+    options: L.MarkerOptions & MarkerMetadata;
+};
+
+export function setMarkerMetadata(marker: L.Marker, metadata: MarkerMetadata): void {
+    Object.assign((marker as MarkerWithMetadata).options, metadata);
+}
+
+export function getMarkerMetadata(marker: L.Marker): Readonly<MarkerMetadata> {
+    return (marker as MarkerWithMetadata).options;
+}
+
+export function getClusterMarkerSize(pointCount: number): number {
+    if (pointCount >= 200) return 36;
+    if (pointCount >= 50) return 32.4;
+    if (pointCount >= 10) return 28.8;
+    return 24;
+}
+
+function safeMarkerColor(color: string): string {
+    return /^#[0-9a-f]{3,8}$/i.test(color) ? color : '#94a3b8';
+}
 
 /**
  * Shared Leaflet marker icon factory.
@@ -10,7 +45,8 @@ const markerIconCache = new Map<string, L.DivIcon>();
  * Clusters will just be slightly larger dots with the number centered inside.
  */
 export function createMarkerIcon(color: string, selected = false, size = 24, text?: string): L.DivIcon {
-    const cacheKey = `${color}:${selected}:${size}:${text || ''}`;
+    const markerColor = safeMarkerColor(color);
+    const cacheKey = `${markerColor}:${selected}:${size}:${text || ''}`;
     const cached = markerIconCache.get(cacheKey);
     if (cached) return cached;
 
@@ -20,37 +56,11 @@ export function createMarkerIcon(color: string, selected = false, size = 24, tex
     const innerSize = selected ? actualSize * 0.4 : actualSize * 0.35;
 
     const html = `
-    <div style="width: ${diagonal}px; height: ${diagonal}px; display: flex; align-items: center; justify-content: center; position: relative;">
-      <div style="
-        width: ${actualSize}px;
-        height: ${actualSize}px;
-        background: white;
-        border: ${selected ? '2px solid #475569' : '1.5px solid #cbd5e1'};
-        border-radius: 50% 50% 0 50%;
-        transform: rotate(45deg);
-        box-shadow: ${selected ? '2px 2px 4px rgba(0,0,0,0.3)' : '1px 1px 2px rgba(0,0,0,0.15)'};
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-sizing: border-box;
-      " class="healthsites-cluster-wrapper">
-        <div style="
-          transform: rotate(-45deg);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 100%;
-          height: 100%;
-          position: relative;
-        ">
-          <div style="
-            width: ${innerSize}px;
-            height: ${innerSize}px;
-            border-radius: 50%;
-            background-color: ${color};
-            ${selected ? 'box-shadow: 0 0 0 2px white;' : ''}
-          "></div>
-          ${text ? `<div style="position: absolute; font-size: ${Math.round(actualSize * 0.45)}px; font-weight: 800; color: #1e293b; top: -14px;">${text}</div>` : ''}
+    <div class="tenet-marker-shell" style="--marker-shell-size:${diagonal}px;--marker-size:${actualSize}px;--marker-dot-size:${innerSize}px;--marker-color:${markerColor};--marker-count-size:${Math.round(actualSize * 0.45)}px">
+      <div class="tenet-marker-pin${selected ? ' is-selected' : ''}">
+        <div class="tenet-marker-content">
+          <div class="tenet-marker-dot"></div>
+          ${text ? `<div class="tenet-marker-count">${escapeHtml(text)}</div>` : ''}
         </div>
       </div>
     </div>

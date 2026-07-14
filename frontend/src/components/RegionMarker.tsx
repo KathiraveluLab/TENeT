@@ -1,14 +1,15 @@
-import React, { useCallback, useRef, useMemo } from 'react';
+import { useCallback, useRef, useMemo } from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import {
     CATRegion,
-    getNeedColor,
-    getNeedLabel,
-    getTierColor,
     Season
 } from '../api/catApi';
-import { createMarkerIcon } from '../utils/markerUtils';
+import { CAT_TIER_PRESENTATION, getDesertScorePresentation } from '../domain/metrics';
+import { createMarkerIcon, setMarkerMetadata } from '../utils/markerUtils';
+import Button from './ui/Button';
+import StatusBadge from './ui/StatusBadge';
+import './map/MapLayers.css';
 
 interface RegionMarkerProps {
     region: CATRegion;
@@ -19,22 +20,6 @@ interface RegionMarkerProps {
     activeSeason?: Season;
     onClick?: () => void;
     needScore?: number;
-}
-
-function badgeStyle(backgroundColor: string) {
-    return {
-        display: 'inline-flex',
-        alignItems: 'center',
-        minHeight: 22,
-        padding: '3px 8px',
-        borderRadius: 999,
-        backgroundColor,
-        color: '#ffffff',
-        fontSize: 11,
-        fontWeight: 800,
-        lineHeight: 1.2,
-        whiteSpace: 'nowrap' as const,
-    };
 }
 
 export default function RegionMarker({
@@ -53,7 +38,8 @@ export default function RegionMarker({
         if (marker) {
             // Attach score directly to leaflet marker options so the clustering
             // algorithm in RegionClusters can read it to calculate average color
-            (marker.options as any).needScore = needScore ?? region.necessity_score;
+            const score = needScore ?? region.necessity_score;
+            setMarkerMetadata(marker, { needScore: Number.isFinite(score) ? score : undefined });
         }
         onMarkerReady?.(region.region_code, marker);
     }, [onMarkerReady, region.region_code, needScore, region.necessity_score]);
@@ -62,17 +48,21 @@ export default function RegionMarker({
         return null;
     }
 
-    const needColor = getNeedColor(region.necessity_score);
-    const needLabel = getNeedLabel(region.necessity_score);
-    const tierColor = getTierColor(region.tier_level);
-
-    const markerIcon = useMemo(() => createMarkerIcon(needColor, selected), [needColor, selected]);
+    const needPresentation = Number.isFinite(region.necessity_score)
+        ? getDesertScorePresentation(region.necessity_score)
+        : null;
+    const markerIcon = useMemo(
+        () => createMarkerIcon(needPresentation?.color ?? '#94a3b8', selected),
+        [needPresentation?.color, selected],
+    );
 
     return (
         <Marker
             ref={markerRefCallback}
             position={[region.centroid_lat, region.centroid_lon]}
             icon={markerIcon}
+            alt={`${region.region_name} community marker`}
+            title={region.region_name}
             eventHandlers={{
                 click: () => {
                     onSelect?.(region.region_code);
@@ -88,42 +78,23 @@ export default function RegionMarker({
                 autoPanPaddingTopLeft={[64, 120]}
                 autoPanPaddingBottomRight={[64, 210]}
             >
-                <div style={{
-                    minWidth: 210,
-                    maxWidth: 236,
-                    color: '#172033',
-                    fontSize: 12,
-                }}>
-                    <h3 style={{
-                        margin: '0 0 2px',
-                        color: '#111827',
-                        fontSize: 15,
-                        lineHeight: 1.2,
-                        fontWeight: 800,
-                    }}>
+                <div className="region-marker-popup">
+                    <h3 className="region-marker-popup__title">
                         {region.region_name}
                     </h3>
-                    <div style={{
-                        marginBottom: 9,
-                        color: '#64748b',
-                        fontSize: 11,
-                        fontWeight: 700,
-                    }}>
+                    <div className="region-marker-popup__code">
                         {region.region_code}
                     </div>
 
-                    <div style={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: 6,
-                        marginBottom: 10,
-                    }}>
-                        <span style={badgeStyle(tierColor)}>CAT {region.tier_level}</span>
-                        <span style={badgeStyle(needColor)}>{needLabel}</span>
+                    <div className="region-marker-popup__badges">
+                        <StatusBadge tone={CAT_TIER_PRESENTATION[region.tier_level].tone}>CAT {region.tier_level}</StatusBadge>
+                        <StatusBadge tone={needPresentation?.tone ?? 'neutral'}>
+                            {needPresentation?.label ?? 'Data unavailable'}
+                        </StatusBadge>
                     </div>
 
-                    <button
-                        type="button"
+                    <Button
+                        size="small"
                         onMouseDown={event => {
                             event.preventDefault();
                             event.stopPropagation();
@@ -138,20 +109,10 @@ export default function RegionMarker({
                                 markerRef.current?.closePopup();
                             }
                         }}
-                        style={{
-                            width: '100%',
-                            border: '1px solid #c7d0da',
-                            borderRadius: 6,
-                            background: '#ffffff',
-                            color: '#334155',
-                            padding: '6px 8px',
-                            fontSize: 11,
-                            fontWeight: 800,
-                            cursor: 'pointer',
-                        }}
+                        className="region-marker-popup__button"
                     >
                         View details
-                    </button>
+                    </Button>
                 </div>
             </Popup>
         </Marker>

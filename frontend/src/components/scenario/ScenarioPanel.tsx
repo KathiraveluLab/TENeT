@@ -5,267 +5,71 @@
  * Contains threshold sliders, preset selector, impact summary,
  * and a "Modeled Output" label.
  */
-import React, { useCallback, useMemo, useState } from 'react';
 import type { ScenarioState } from '../../hooks/useScenarioState';
 import type { ScenarioPreviewState } from '../../hooks/useScenarioPreview';
-import {
-    BASELINE_THRESHOLDS,
-    SCENARIO_PRESETS,
-    type ScenarioThresholds,
-} from '../../types/scenario';
-
-/* ─── Styling ──────────────────────────────────────────────────────────── */
-
-const PANEL_STYLE: React.CSSProperties = {
-    position: 'relative',
-    zIndex: 1,
-    width: 340,
-    maxHeight: 'calc(100vh - 170px)',
-    overflowY: 'auto',
-    background: 'rgba(15, 23, 42, 0.94)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    borderRadius: '14px',
-    boxShadow: '0 8px 40px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255,255,255,0.06)',
-    padding: '20px',
-    color: '#e2e8f0',
-    fontFamily: "'Inter', -apple-system, sans-serif",
-    fontSize: '13px',
-    lineHeight: '1.5',
-};
-
-const HEADER_STYLE: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '14px',
-};
-
-const TITLE_STYLE: React.CSSProperties = {
-    fontSize: '15px',
-    fontWeight: 700,
-    color: '#f1f5f9',
-    letterSpacing: '-0.01em',
-    margin: 0,
-};
-
-const BADGE_STYLE: React.CSSProperties = {
-    display: 'inline-block',
-    background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-    color: 'white',
-    fontSize: '10px',
-    fontWeight: 700,
-    padding: '2px 7px',
-    borderRadius: '4px',
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase' as const,
-};
-
-const CLOSE_BTN_STYLE: React.CSSProperties = {
-    appearance: 'none',
-    border: 'none',
-    background: 'rgba(255,255,255,0.08)',
-    color: '#94a3b8',
-    width: '28px',
-    height: '28px',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '16px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'background 0.15s',
-};
-
-const DISCLAIMER_STYLE: React.CSSProperties = {
-    fontSize: '11px',
-    color: '#94a3b8',
-    fontStyle: 'italic',
-    lineHeight: 1.4,
-    marginBottom: '16px',
-    padding: '8px 10px',
-    background: 'rgba(255,255,255,0.04)',
-    borderRadius: '6px',
-    borderLeft: '3px solid #7c3aed',
-};
-
-const SECTION_TITLE: React.CSSProperties = {
-    fontSize: '11px',
-    fontWeight: 600,
-    color: '#94a3b8',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.06em',
-    marginBottom: '8px',
-    marginTop: '16px',
-};
-
-const SELECT_STYLE: React.CSSProperties = {
-    width: '100%',
-    padding: '8px 10px',
-    borderRadius: '8px',
-    border: '1px solid rgba(255,255,255,0.1)',
-    background: 'rgba(255,255,255,0.06)',
-    color: '#e2e8f0',
-    fontSize: '13px',
-    fontWeight: 500,
-    cursor: 'pointer',
-    outline: 'none',
-};
-
-const SLIDER_CONTAINER: React.CSSProperties = {
-    marginBottom: '12px',
-};
-
-const SLIDER_LABEL: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '4px',
-};
-
-const SLIDER_NAME: React.CSSProperties = {
-    fontSize: '12px',
-    fontWeight: 500,
-    color: '#cbd5e1',
-};
-
-const SLIDER_VALUE: React.CSSProperties = {
-    fontSize: '12px',
-    fontWeight: 700,
-    color: '#7c3aed',
-    fontVariantNumeric: 'tabular-nums',
-};
-
-const IMPACT_ROW: React.CSSProperties = {
-    display: 'flex',
-    gap: '6px',
-    marginTop: '12px',
-    flexWrap: 'wrap',
-};
-
-const IMPACT_CHIP: (color: string) => React.CSSProperties = (color) => ({
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '4px',
-    padding: '4px 10px',
-    borderRadius: '20px',
-    background: `${color}18`,
-    border: `1px solid ${color}40`,
-    fontSize: '12px',
-    fontWeight: 600,
-    color,
-    fontVariantNumeric: 'tabular-nums',
-});
-
-const RESET_BTN: React.CSSProperties = {
-    width: '100%',
-    marginTop: '16px',
-    padding: '9px 0',
-    border: '1px solid rgba(255,255,255,0.12)',
-    borderRadius: '8px',
-    background: 'rgba(255,255,255,0.05)',
-    color: '#94a3b8',
-    fontSize: '12px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    transition: 'all 0.15s',
-};
-
-const IMPACT_NOTE: React.CSSProperties = {
-    fontSize: '10px',
-    color: '#64748b',
-    fontStyle: 'italic',
-    marginTop: '8px',
-    lineHeight: 1.4,
-};
-
-const LOADING_STYLE: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '8px 10px',
-    background: 'rgba(124, 58, 237, 0.1)',
-    borderRadius: '6px',
-    fontSize: '12px',
-    color: '#a78bfa',
-    marginTop: '12px',
-};
-
-const ERROR_STYLE: React.CSSProperties = {
-    padding: '8px 10px',
-    background: 'rgba(239, 68, 68, 0.1)',
-    borderRadius: '6px',
-    fontSize: '12px',
-    color: '#fca5a5',
-    marginTop: '8px',
-};
+import { SCENARIO_PRESETS } from '../../types/scenario';
+import { getTelehealthStatusLabel } from '../../domain/statusPresentation';
+import Button from '../ui/Button';
+import IconButton from '../ui/IconButton';
+import './ScenarioPanel.css';
 
 /* ─── Component ────────────────────────────────────────────────────────── */
 
 interface ScenarioPanelProps {
     scenario: ScenarioState;
     preview: ScenarioPreviewState;
-    gapModeActive?: boolean;
-    onClose?: () => void;
+    onClose: () => void;
 }
 
 export default function ScenarioPanel({
     scenario,
     preview,
-    gapModeActive = false,
     onClose,
 }: ScenarioPanelProps) {
-    const { mode, thresholds, activePreset, setThreshold, applyPreset, resetToBaseline, deactivate } = scenario;
+    const { mode, thresholds, activePreset, setThreshold, applyPreset, resetToBaseline } = scenario;
     const { data, loading, error } = preview;
-    const closePanel = onClose ?? deactivate;
+    const closePanel = () => {
+        onClose();
+        window.requestAnimationFrame(() => {
+            document.getElementById('scenario-toggle-button')?.focus();
+        });
+    };
 
     if (mode === 'off') return null;
 
     return (
-        <div style={PANEL_STYLE} id="scenario-panel" data-testid="scenario-panel">
+        <div className="scenario-panel" id="scenario-panel" data-testid="scenario-panel">
             {/* Header */}
-            <div style={HEADER_STYLE}>
+            <div className="scenario-panel__header">
                 <div>
-                    <h3 style={TITLE_STYLE}>What-If Scenarios</h3>
-                    <span style={{ ...BADGE_STYLE, marginTop: '4px' }}>Modeled Output</span>
+                    <h3 className="scenario-panel__title">What-If Scenarios</h3>
+                    <span className="scenario-panel__badge">Modeled Output</span>
                 </div>
-                <button
-                    type="button"
-                    style={CLOSE_BTN_STYLE}
+                <IconButton
+                    icon="×"
+                    size="small"
                     onClick={closePanel}
                     aria-label="Close scenario panel"
                     title="Close scenario mode"
-                >
-                    ✕
-                </button>
+                />
             </div>
 
             {/* Disclaimer */}
-            <div style={DISCLAIMER_STYLE}>
+            <div className="scenario-panel__disclaimer">
                 Scenario Mode shows modeled estimates based on selected thresholds.
                 It does not represent observed ground truth and does not modify TENeT's baseline data.
             </div>
 
-            {/* Gap Hunter note */}
-            {gapModeActive && (
-                <div style={{
-                    ...DISCLAIMER_STYLE,
-                    borderLeftColor: '#f59e0b',
-                    background: 'rgba(245, 158, 11, 0.06)',
-                }}>
-                    Gap Hunter displays observed measurement data and is not affected by scenario thresholds.
-                </div>
-            )}
-
             {/* Preset */}
             <label
-                style={{ ...SECTION_TITLE, display: 'block' }}
+                className="scenario-panel__section-title"
+                style={{ display: 'block' }}
                 htmlFor="scenario-preset-select"
             >
                 Preset
             </label>
             <select
-                style={SELECT_STYLE}
+                className="scenario-panel__select"
                 value={activePreset ?? ''}
                 onChange={e => {
                     const value = e.target.value;
@@ -285,7 +89,7 @@ export default function ScenarioPanel({
             </select>
 
             {/* Broadband */}
-            <div style={SECTION_TITLE}>Broadband</div>
+            <div className="scenario-panel__section-title">Broadband</div>
             <ThresholdSlider
                 label="Download"
                 unit="Mbps"
@@ -306,37 +110,30 @@ export default function ScenarioPanel({
             />
 
             {/* Clinic Proximity */}
-            <div style={SECTION_TITLE}>Clinic Proximity</div>
-            <div style={SLIDER_CONTAINER}>
-                <div style={SLIDER_LABEL}>
-                    <span style={SLIDER_NAME}>
+            <div className="scenario-panel__section-title">Clinic Proximity</div>
+            <div className="scenario-panel__slider-group">
+                <div className="scenario-panel__slider-header">
+                    <span className="scenario-panel__slider-name">
                         {thresholds.clinic_proximity_km === null
                             ? 'Baseline road/water/air rules'
                             : `Override: ${thresholds.clinic_proximity_km} km`
                         }
                     </span>
                     {thresholds.clinic_proximity_km !== null && (
-                        <button
-                            type="button"
+                        <Button
+                            variant="ghost"
+                            size="small"
+                            className="scenario-panel__use-baseline"
                             onClick={() => setThreshold('clinic_proximity_km', null)}
-                            style={{
-                                appearance: 'none',
-                                border: 'none',
-                                background: 'none',
-                                color: '#7c3aed',
-                                cursor: 'pointer',
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                padding: 0,
-                            }}
                         >
                             Use baseline
-                        </button>
+                        </Button>
                     )}
                 </div>
                 {thresholds.clinic_proximity_km !== null ? (
                     <input
                         type="range"
+                        aria-label="Clinic proximity threshold"
                         min={5}
                         max={200}
                         step={5}
@@ -346,23 +143,19 @@ export default function ScenarioPanel({
                         id="scenario-clinic-slider"
                     />
                 ) : (
-                    <button
-                        type="button"
+                    <Button
+                        variant="secondary"
+                        size="small"
+                        style={{ width: '100%', marginTop: '4px' }}
                         onClick={() => setThreshold('clinic_proximity_km', 25)}
-                        style={{
-                            ...RESET_BTN,
-                            marginTop: '4px',
-                            padding: '6px 0',
-                            fontSize: '11px',
-                        }}
                     >
                         Override with custom distance
-                    </button>
+                    </Button>
                 )}
             </div>
 
             {/* Affordability */}
-            <div style={SECTION_TITLE}>Affordability</div>
+            <div className="scenario-panel__section-title">Affordability</div>
             <ThresholdSlider
                 label="Burden threshold"
                 unit="%"
@@ -375,61 +168,56 @@ export default function ScenarioPanel({
 
             {/* Loading */}
             {loading && (
-                <div style={LOADING_STYLE}>
-                    <span style={{
-                        width: '14px',
-                        height: '14px',
-                        border: '2px solid rgba(124,58,237,0.3)',
-                        borderTopColor: '#7c3aed',
-                        borderRadius: '50%',
-                        animation: 'scenario-spin 0.6s linear infinite',
-                        flexShrink: 0,
-                    }} />
+                <div className="scenario-panel__loading" role="status">
+                    <span className="scenario-panel__spinner" aria-hidden="true" />
                     Calculating scenario…
                 </div>
             )}
 
             {/* Error */}
-            {error && <div style={ERROR_STYLE}>{error}</div>}
+            {error && <div className="scenario-panel__error" role="alert">{error}</div>}
 
             {/* Impact Summary */}
             {data && !loading && (
                 <>
-                    <div style={SECTION_TITLE}>Impact Summary</div>
+                    <div className="scenario-panel__section-title">Impact Summary</div>
                     <div data-testid="scenario-summary">
-                    <div style={IMPACT_ROW}>
-                        <span style={IMPACT_CHIP('#f59e0b')}>
+                    <div className="scenario-panel__impact-row">
+                        <span
+                            className="scenario-panel__impact-chip"
+                            style={{ background: '#f59e0b18', border: '1px solid #f59e0b40', color: '#f59e0b' }}
+                        >
                             Changed {data.summary.status_changed_regions}
                         </span>
-                        <span style={IMPACT_CHIP('#22c55e')}>
-                            ▲ {data.summary.improved_count}
+                        <span
+                            className="scenario-panel__impact-chip"
+                            style={{ background: '#15803d18', border: '1px solid #15803d40', color: '#15803d' }}
+                        >
+                            Improved ▲ {data.summary.improved_count}
                         </span>
-                        <span style={IMPACT_CHIP('#ef4444')}>
-                            ▼ {data.summary.worsened_count}
+                        <span
+                            className="scenario-panel__impact-chip"
+                            style={{ background: '#b4231818', border: '1px solid #b4231840', color: '#b42318' }}
+                        >
+                            Worsened ▼ {data.summary.worsened_count}
                         </span>
                     </div>
 
                     {/* Status distribution */}
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: '4px 12px',
-                        marginTop: '10px',
-                        fontSize: '12px',
-                    }}>
-                        <span style={{ color: '#94a3b8' }}>Telehealth Ready</span>
-                        <strong style={{ color: '#22c55e', textAlign: 'right' }}>{data.summary.telehealth_ready}</strong>
-                        <span style={{ color: '#94a3b8' }}>Community Anchor</span>
-                        <strong style={{ color: '#f59e0b', textAlign: 'right' }}>{data.summary.community_anchor}</strong>
-                        <span style={{ color: '#94a3b8' }}>Limited Telehealth</span>
-                        <strong style={{ color: '#8b5cf6', textAlign: 'right' }}>{data.summary.limited_telehealth}</strong>
-                        <span style={{ color: '#94a3b8' }}>Critical Gap</span>
-                        <strong style={{ color: '#ef4444', textAlign: 'right' }}>{data.summary.critical_gap}</strong>
-                        <span style={{ color: '#94a3b8' }}>Data Unavailable</span>
-                        <strong style={{ color: '#6b7280', textAlign: 'right' }}>{data.summary.data_unavailable}</strong>
+                    <div className="scenario-panel__status-grid">
+                        <span>{getTelehealthStatusLabel('TELEHEALTH_READY')}</span>
+                        <strong style={{ color: 'var(--color-status-ready)' }}>{data.summary.telehealth_ready}</strong>
+                        <span>{getTelehealthStatusLabel('COMMUNITY_ANCHOR')}</span>
+                        <strong style={{ color: 'var(--color-status-anchor)' }}>{data.summary.community_anchor}</strong>
+                        <span>{getTelehealthStatusLabel('LIMITED_TELEHEALTH')}</span>
+                        <strong style={{ color: 'var(--color-status-limited)' }}>{data.summary.limited_telehealth}</strong>
+                        <span>{getTelehealthStatusLabel('CRITICAL_GAP')}</span>
+                        <strong style={{ color: 'var(--color-status-gap)' }}>{data.summary.critical_gap}</strong>
+                        <span>{getTelehealthStatusLabel('DATA_UNAVAILABLE')}</span>
+                        <strong style={{ color: 'var(--color-status-unknown)' }}>{data.summary.data_unavailable}</strong>
                     </div>
 
-                    <div style={IMPACT_NOTE}>
+                    <div className="scenario-panel__impact-note">
                         These counts show how classifications would change under the selected assumptions.
                         They do not indicate actual measured changes in infrastructure or healthcare access.
                     </div>
@@ -438,56 +226,15 @@ export default function ScenarioPanel({
             )}
 
             {/* Reset */}
-            <button
-                type="button"
-                style={RESET_BTN}
+            <Button
+                variant="secondary"
+                size="small"
+                style={{ width: '100%', marginTop: '16px' }}
                 onClick={resetToBaseline}
                 id="scenario-reset-button"
             >
                 Reset to Baseline
-            </button>
-
-            {/* Spinner keyframes */}
-            <style>{`
-                @keyframes scenario-spin {
-                    to { transform: rotate(360deg); }
-                }
-                #scenario-panel::-webkit-scrollbar {
-                    width: 5px;
-                }
-                #scenario-panel::-webkit-scrollbar-track {
-                    background: transparent;
-                }
-                #scenario-panel::-webkit-scrollbar-thumb {
-                    background: rgba(255,255,255,0.1);
-                    border-radius: 4px;
-                }
-                #scenario-panel input[type="range"] {
-                    height: 4px;
-                    border-radius: 2px;
-                    -webkit-appearance: none;
-                    appearance: none;
-                    background: rgba(255,255,255,0.12);
-                    outline: none;
-                }
-                #scenario-panel input[type="range"]::-webkit-slider-thumb {
-                    -webkit-appearance: none;
-                    width: 16px;
-                    height: 16px;
-                    border-radius: 50%;
-                    background: #7c3aed;
-                    border: 2px solid rgba(255,255,255,0.2);
-                    cursor: pointer;
-                    transition: transform 0.15s;
-                }
-                #scenario-panel input[type="range"]::-webkit-slider-thumb:hover {
-                    transform: scale(1.15);
-                }
-                #scenario-reset-button:hover {
-                    background: rgba(255,255,255,0.1) !important;
-                    color: #e2e8f0 !important;
-                }
-            `}</style>
+            </Button>
         </div>
     );
 }
@@ -506,10 +253,10 @@ interface ThresholdSliderProps {
 
 function ThresholdSlider({ label, unit, value, min, max, step, onChange }: ThresholdSliderProps) {
     return (
-        <div style={SLIDER_CONTAINER}>
-            <div style={SLIDER_LABEL}>
-                <span style={SLIDER_NAME}>{label}</span>
-                <span style={SLIDER_VALUE}>{value} {unit}</span>
+        <div className="scenario-panel__slider-group">
+            <div className="scenario-panel__slider-header">
+                <span className="scenario-panel__slider-name">{label}</span>
+                <span className="scenario-panel__slider-value">{value} {unit}</span>
             </div>
             <input
                 type="range"

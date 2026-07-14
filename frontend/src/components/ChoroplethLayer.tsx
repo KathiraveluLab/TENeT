@@ -5,32 +5,25 @@
  * with aggregated performance data and context-rich tooltips.
  */
 import { useEffect, useState, useMemo } from 'react';
-import { useMap, GeoJSON } from 'react-leaflet';
+import { GeoJSON } from 'react-leaflet';
 import L from 'leaflet';
-import type { PerformanceTile, AffordabilityZone } from '../api/catApi';
+import type { MultiPolygon } from 'geojson';
+import {
+    fetchBoundaries,
+    type AffordabilityZone,
+    type BoundaryCollection,
+    type BoundaryProperties,
+    type PerformanceTile,
+} from '../api/catApi';
+import { errorMessage, isAbortError } from '../api/http';
+import { escapeHtml } from '../utils/escapeHtml';
 import { getScenarioCost, getTrafficLightStatus } from '../utils/trafficLight';
-
-// GeoJSON Feature type
-interface BoundaryFeature {
-    type: 'Feature';
-    properties: {
-        CommunityName: string;
-        EconomicRegion: string;
-        FIPS: string;
-        Census_Area: 'Y' | null;
-    };
-    geometry: GeoJSON.MultiPolygon;
-}
-
-interface BoundaryCollection {
-    type: 'FeatureCollection';
-    features: BoundaryFeature[];
-}
+import './map/MapLayers.css';
 
 // Aggregated stats for a region
 interface RegionStats {
-    avgSpeed: number;
-    avgLatency: number;
+    avgSpeed: number | null;
+    avgLatency: number | null;
     avgBurden: number | null;
     tileCount: number;
     status: 'GREEN' | 'YELLOW' | 'ORANGE' | 'RED' | 'GRAY';
@@ -85,27 +78,29 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
     affordabilityData,
     useStarlink
 }) => {
-    const map = useMap();
     const [boundaries, setBoundaries] = useState<BoundaryCollection | null>(null);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     // Fetch boundaries GeoJSON
     useEffect(() => {
         if (!visible) return;
 
+        const controller = new AbortController();
         setLoading(true);
-        const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/cat';
-        fetch(`${API_BASE}/boundaries`)
-            .then(res => res.json())
+        setError(null);
+        fetchBoundaries(controller.signal)
             .then(data => {
-                console.log('Loaded boundaries:', data.features?.length, 'regions');
                 setBoundaries(data);
                 setLoading(false);
             })
-            .catch(err => {
-                console.error('Failed to load boundaries:', err);
+            .catch((error: unknown) => {
+                if (isAbortError(error)) return;
+                setError(errorMessage(error, 'Regional boundaries are unavailable.'));
                 setLoading(false);
             });
+
+        return () => controller.abort();
     }, [visible]);
 
     // Calculate which tiles fall within each region (simplified: use bounding box)
@@ -135,8 +130,8 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
 
             if (regionTiles.length === 0) {
                 stats.set(name, {
-                    avgSpeed: 0,
-                    avgLatency: 0,
+                    avgSpeed: null,
+                    avgLatency: null,
                     avgBurden: null,
                     tileCount: 0,
                     status: 'GRAY'
@@ -145,8 +140,18 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
             }
 
             // Calculate averages
-            const avgSpeed = regionTiles.reduce((sum, t) => sum + (t.avg_d_mbps || 0), 0) / regionTiles.length;
-            const avgLatency = regionTiles.reduce((sum, t) => sum + (t.avg_lat_ms || 0), 0) / regionTiles.length;
+            const measuredSpeeds = regionTiles
+                .map(tile => tile.avg_d_mbps)
+                .filter((speed): speed is number => speed !== null && Number.isFinite(speed));
+            const measuredLatencies = regionTiles
+                .map(tile => tile.avg_lat_ms)
+                .filter((latency): latency is number => latency !== null && Number.isFinite(latency));
+            const avgSpeed = measuredSpeeds.length
+                ? measuredSpeeds.reduce((sum, speed) => sum + speed, 0) / measuredSpeeds.length
+                : null;
+            const avgLatency = measuredLatencies.length
+                ? measuredLatencies.reduce((sum, latency) => sum + latency, 0) / measuredLatencies.length
+                : null;
 
             // Calculate average burden
             let totalBurden = 0;
@@ -164,11 +169,13 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
             const centerLat = (minLat + maxLat) / 2;
             const scenarioCost = getScenarioCost(centerLat, useStarlink);
 
-            const status = getTrafficLightStatus(avgSpeed, avgLatency, avgBurden, scenarioCost);
+            const status = avgSpeed === null || avgLatency === null
+                ? 'GRAY'
+                : getTrafficLightStatus(avgSpeed, avgLatency, avgBurden, scenarioCost);
 
             stats.set(name, {
-                avgSpeed: Math.round(avgSpeed * 10) / 10,
-                avgLatency: Math.round(avgLatency),
+                avgSpeed: avgSpeed === null ? null : Math.round(avgSpeed * 10) / 10,
+                avgLatency: avgLatency === null ? null : Math.round(avgLatency),
                 avgBurden: avgBurden !== null ? Math.round(avgBurden * 10) / 10 : null,
                 tileCount: regionTiles.length,
                 status
@@ -178,9 +185,9 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
         return stats;
     }, [boundaries, tiles, affordabilityData, useStarlink]);
 
-    const styleFeature = (feature: any) => {
-        const name = feature.properties?.CommunityName;
-        const stats = regionStats.get(name);
+    const styleFeature: L.StyleFunction<BoundaryProperties> = feature => {
+        const name = feature?.properties.CommunityName;
+        const stats = name ? regionStats.get(name) : undefined;
         const color = stats ? STATUS_COLORS[stats.status] : STATUS_COLORS.GRAY;
 
         return {
@@ -193,33 +200,34 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
     };
 
     // Event handlers for each feature - use tooltips for hover info
-    const onEachFeature = (feature: BoundaryFeature, layer: L.Layer) => {
+    const onEachFeature: L.GeoJSONOptions<BoundaryProperties, MultiPolygon>['onEachFeature'] = (feature, layer) => {
         const name = feature.properties.CommunityName;
         const stats = regionStats.get(name) || {
-            avgSpeed: 0, avgLatency: 0, avgBurden: null, tileCount: 0, status: 'GRAY' as const
+            avgSpeed: null, avgLatency: null, avgBurden: null, tileCount: 0, status: 'GRAY' as const
         };
         const statusInfo = STATUS_INFO[stats.status];
         const color = STATUS_COLORS[stats.status];
 
         // Bind tooltip for hover info
         const tooltipContent = `
-            <div style="min-width: 200px; font-family: system-ui, sans-serif;">
-                <div style="font-weight: 600; font-size: 13px; margin-bottom: 4px; border-bottom: 2px solid ${color}; padding-bottom: 4px;">
-                    ${name}
+            <div class="region-tooltip-content" style="--tooltip-color:${color}">
+                <div class="region-tooltip-title">
+                    ${escapeHtml(name)}
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px; margin-bottom: 6px;">
-                    <div>Speed: ${stats.avgSpeed} Mbps</div>
-                    <div>Latency: ${stats.avgLatency} ms</div>
+                <div class="region-tooltip-metrics">
+                    <div>Speed: ${stats.avgSpeed === null ? 'N/A' : `${stats.avgSpeed} Mbps`}</div>
+                    <div>Latency: ${stats.avgLatency === null ? 'N/A' : `${stats.avgLatency} ms`}</div>
                     <div>Burden: ${stats.avgBurden !== null ? stats.avgBurden + '%' : 'N/A'}</div>
                     <div>Data Pts: ${stats.tileCount}</div>
                 </div>
-                <div style="background: ${color}; color: ${stats.status === 'YELLOW' ? '#1f2937' : 'white'}; padding: 4px 8px; border-radius: 4px; text-align: center; font-size: 11px; font-weight: 600;">
-                    ${statusInfo.label}
+                <div class="region-tooltip-status${stats.status === 'YELLOW' ? ' has-dark-text' : ''}">
+                    ${escapeHtml(statusInfo.label)}
                 </div>
             </div>
         `;
 
-        (layer as L.Path).bindTooltip(tooltipContent, {
+        if (!(layer instanceof L.Path)) return;
+        layer.bindTooltip(tooltipContent, {
             sticky: true,
             direction: 'top',
             offset: [0, -10],
@@ -228,17 +236,17 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
 
         layer.on({
             mouseover: (e) => {
-                const layer = e.target;
-                layer.setStyle({
+                const target = e.target as L.Path;
+                target.setStyle({
                     fillOpacity: 0.35,  // Slightly more visible on hover
                     weight: 1,
                     color: '#ffffff'
                 });
-                layer.bringToFront();
+                target.bringToFront();
             },
             mouseout: (e) => {
-                const layer = e.target;
-                layer.setStyle({
+                const target = e.target as L.Path;
+                target.setStyle({
                     fillOpacity: 0.2,   // Back to ghost
                     weight: 0.5,
                     color: 'rgba(255,255,255,0.6)'
@@ -247,33 +255,27 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
         });
     };
 
-    if (!visible || !boundaries) return null;
+    if (!visible) return null;
+    if (!boundaries) {
+        if (loading) return <div className="map-layer-state" role="status">Loading regional boundaries…</div>;
+        if (error) return <div className="map-layer-state is-error" role="status">{error}</div>;
+        return null;
+    }
 
     return (
         <>
             <GeoJSON
                 key={`choropleth-${boundaries.features.length}-${useStarlink}`}
-                data={boundaries as any}
+                data={boundaries}
                 style={styleFeature}
-                onEachFeature={onEachFeature as any}
+                onEachFeature={onEachFeature}
                 bubblingMouseEvents={false}
             />
 
-            {/* Loading indicator */}
             {loading && (
-                <div style={{
-                    position: 'absolute',
-                    top: 10,
-                    right: 10,
-                    background: 'white',
-                    padding: '8px 12px',
-                    borderRadius: 4,
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                    zIndex: 1000
-                }}>
-                    Loading regions...
-                </div>
+                <div className="map-layer-state" role="status">Refreshing regional boundaries…</div>
             )}
+            {error && <div className="map-layer-state is-error" role="status">{error}</div>}
         </>
     );
 };

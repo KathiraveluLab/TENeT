@@ -1,7 +1,14 @@
 import React, { useMemo } from 'react';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
-import { CATRegion, Season, getNeedColor } from '../api/catApi';
+import { CATRegion, Season } from '../api/catApi';
+import { getDesertScorePresentation } from '../domain/metrics';
+import {
+  createMarkerIcon,
+  getClusterMarkerSize,
+  getMarkerMetadata,
+  type MarkerClusterLike,
+} from '../utils/markerUtils';
 import RegionMarker from './RegionMarker';
 
 interface RegionClustersProps {
@@ -13,53 +20,22 @@ interface RegionClustersProps {
   onMarkerReady?: (regionCode: string, marker: L.Marker | null) => void;
 }
 
-// Minimal CSS for hover states
-const customCSS = `
-  .healthsites-cluster-wrapper {
-    transition: transform 0.15s ease-out;
-  }
-  .healthsites-cluster-wrapper:hover {
-    transform: scale(1.15) !important;
-    z-index: 1000 !important;
-  }
-  .custom-css-marker {
-    background: transparent;
-    border: none;
-  }
-`;
-
-if (typeof document !== 'undefined') {
-  const styleId = 'healthsites-custom-css';
-  if (!document.getElementById(styleId)) {
-    const style = document.createElement('style');
-    style.id = styleId;
-    style.innerHTML = customCSS;
-    document.head.appendChild(style);
-  }
-}
-
-import { createMarkerIcon } from '../utils/markerUtils';
-
 // Define globally to prevent infinite loop re-renders!
-const createClusterCustomIcon = function (cluster: any) {
+const createClusterCustomIcon = function (cluster: MarkerClusterLike) {
   const pointCount = cluster.getChildCount();
   const markers = cluster.getAllChildMarkers();
 
-  // calculate average need score for the cluster
-  let sumNeed = 0;
-  markers.forEach((marker: any) => {
-    sumNeed += marker.options.needScore || 0;
-  });
+  const needScores = markers
+    .map(marker => getMarkerMetadata(marker).needScore)
+    .filter((score): score is number => score !== undefined && Number.isFinite(score));
+  const averageNeed = needScores.length
+    ? needScores.reduce((sum, score) => sum + score, 0) / needScores.length
+    : null;
+  const clusterColor = averageNeed === null
+    ? '#94a3b8'
+    : getDesertScorePresentation(averageNeed).color;
 
-  const avgNeed = sumNeed / pointCount;
-  const clusterColor = getNeedColor(avgNeed);
-
-  let scale = 1.0;
-  if (pointCount >= 200) scale = 1.5;
-  else if (pointCount >= 50) scale = 1.35;
-  else if (pointCount >= 10) scale = 1.2;
-
-  const size = 24 * scale;
+  const size = getClusterMarkerSize(pointCount);
   return createMarkerIcon(clusterColor, false, size, pointCount.toString());
 };
 
