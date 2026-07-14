@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { RegionSearchParams, RegionSummary, searchRegions } from '../api/catApi';
+import { errorMessage, isAbortError } from '../api/http';
 
 const SEARCH_DEBOUNCE_MS = 250;
 
@@ -12,7 +13,7 @@ export function useRegionSearch(params: RegionSearchParams) {
     const stableParams = useMemo(() => JSON.stringify(params), [params]);
 
     useEffect(() => {
-        let cancelled = false;
+        const controller = new AbortController();
         const parsedParams = JSON.parse(stableParams) as RegionSearchParams;
         const hasActiveParams = Object.values(parsedParams).some(
             value => value !== undefined && value !== null && value !== '',
@@ -26,7 +27,7 @@ export function useRegionSearch(params: RegionSearchParams) {
                 hasSearched.current = false;
             }
             return () => {
-                cancelled = true;
+                controller.abort();
             };
         }
         hasSearched.current = true;
@@ -34,24 +35,24 @@ export function useRegionSearch(params: RegionSearchParams) {
         const timeoutId = window.setTimeout(async () => {
             try {
                 setLoading(true);
-                const data = await searchRegions(parsedParams);
-                if (!cancelled) {
+                const data = await searchRegions(parsedParams, controller.signal);
+                if (!controller.signal.aborted) {
                     setResults(data);
                     setError(null);
                 }
-            } catch (err) {
-                if (!cancelled) {
-                    setError(err instanceof Error ? err.message : 'Failed to search regions');
+            } catch (caught: unknown) {
+                if (!isAbortError(caught)) {
+                    setError(errorMessage(caught, 'Failed to search regions'));
                 }
             } finally {
-                if (!cancelled) {
+                if (!controller.signal.aborted) {
                     setLoading(false);
                 }
             }
         }, SEARCH_DEBOUNCE_MS);
 
         return () => {
-            cancelled = true;
+            controller.abort();
             window.clearTimeout(timeoutId);
         };
     }, [stableParams]);

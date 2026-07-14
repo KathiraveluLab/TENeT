@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Season } from '../api/catApi';
 import { fetchResearchProfile } from '../api/researchApi';
 import { ResearchProfile } from '../types/research';
+import { errorMessage, isAbortError } from '../api/http';
 
 export function useResearchProfile(regionCode: string | null, season: Season) {
     const [profile, setProfile] = useState<ResearchProfile | null>(null);
@@ -16,27 +17,27 @@ export function useResearchProfile(regionCode: string | null, season: Season) {
             return;
         }
 
-        let active = true;
+        const controller = new AbortController();
         setLoading(true);
         setProfile(null);
         setError(null);
 
-        fetchResearchProfile(regionCode, season)
+        fetchResearchProfile(regionCode, season, controller.signal)
             .then(data => {
-                if (active) setProfile(data);
+                if (!controller.signal.aborted) setProfile(data);
             })
-            .catch(err => {
-                if (active) {
+            .catch((caught: unknown) => {
+                if (!isAbortError(caught)) {
                     setProfile(null);
-                    setError(err instanceof Error ? err.message : 'Failed to load research profile');
+                    setError(errorMessage(caught, 'Failed to load research profile'));
                 }
             })
             .finally(() => {
-                if (active) setLoading(false);
+                if (!controller.signal.aborted) setLoading(false);
             });
 
         return () => {
-            active = false;
+            controller.abort();
         };
     }, [regionCode, season]);
 

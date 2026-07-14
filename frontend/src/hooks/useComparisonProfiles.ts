@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Season } from '../api/catApi';
 import { fetchResearchProfiles } from '../api/researchApi';
 import { ResearchProfile } from '../types/research';
+import { errorMessage, isAbortError } from '../api/http';
 
 export function useComparisonProfiles(regionCodes: string[], season: Season) {
     const codesKey = regionCodes.slice(0, 3).join(',');
@@ -20,30 +21,30 @@ export function useComparisonProfiles(regionCodes: string[], season: Season) {
             return;
         }
 
-        let active = true;
+        const controller = new AbortController();
         setLoading(true);
         setError(null);
 
-        fetchResearchProfiles(codes, season)
+        fetchResearchProfiles(codes, season, controller.signal)
             .then(data => {
-                if (active) {
+                if (!controller.signal.aborted) {
                     setProfiles(data.profiles);
                     setMissingCodes(data.missing_codes);
                 }
             })
-            .catch(err => {
-                if (active) {
+            .catch((caught: unknown) => {
+                if (!isAbortError(caught)) {
                     setProfiles([]);
                     setMissingCodes([]);
-                    setError(err instanceof Error ? err.message : 'Failed to load comparison');
+                    setError(errorMessage(caught, 'Failed to load comparison'));
                 }
             })
             .finally(() => {
-                if (active) setLoading(false);
+                if (!controller.signal.aborted) setLoading(false);
             });
 
         return () => {
-            active = false;
+            controller.abort();
         };
     }, [codesKey, season]);
 

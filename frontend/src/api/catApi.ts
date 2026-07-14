@@ -2,6 +2,13 @@
  * API client for CAT (Community Access Tier) data
  */
 
+import { CAT_TIER_PRESENTATION, getDesertScorePresentation, type CatTier } from '../domain/metrics';
+import type { TelehealthStatusName } from '../domain/statusPresentation';
+import type { Feature, FeatureCollection, MultiPolygon } from 'geojson';
+import { ApiError, fetchJson, withQuery } from './http';
+
+export type { TelehealthStatusName } from '../domain/statusPresentation';
+
 export const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api/cat';
 
 // Season type for user-selected seasonal scenario
@@ -13,7 +20,7 @@ export type PerformanceFilterType = 'combined' | 'affordability' | 'latency';
 export interface CATRegion {
     region_code: string;
     region_name: string;
-    tier_level: number;
+    tier_level: CatTier;
     description: string;
     centroid_lat: number | null;
     centroid_lon: number | null;
@@ -28,13 +35,18 @@ export interface RegionsResponse {
     total: number;
 }
 
-export type TelehealthStatusName =
-    | 'TELEHEALTH_READY'
-    | 'COMMUNITY_ANCHOR'
-    | 'CRITICAL_GAP'
-    | 'DATA_UNAVAILABLE';
+export interface BoundaryProperties {
+    CommunityName: string;
+    EconomicRegion: string;
+    FIPS: string;
+    Census_Area: 'Y' | null;
+}
+
+export type BoundaryFeature = Feature<MultiPolygon, BoundaryProperties>;
+export type BoundaryCollection = FeatureCollection<MultiPolygon, BoundaryProperties>;
 
 export type AffordabilityStatusName = 'affordable' | 'unaffordable' | 'unknown';
+export type RegionDataConfidence = 'high' | 'medium' | 'low' | 'missing' | 'unknown';
 
 export interface RegionSummary {
     id: number;
@@ -42,11 +54,11 @@ export interface RegionSummary {
     name: string;
     lat: number | null;
     lon: number | null;
-    cat_tier: number | null;
+    cat_tier: CatTier | null;
     telehealth_status: TelehealthStatusName;
     desert_score: number | null;
-    affordability_status: AffordabilityStatusName | string;
-    data_confidence: 'high' | 'medium' | 'low' | 'missing' | 'unknown' | string;
+    affordability_status: AffordabilityStatusName;
+    data_confidence: RegionDataConfidence;
     has_data_gap: boolean;
     region: string | null;
 }
@@ -59,8 +71,8 @@ export interface RegionSummaryResponse {
 export interface RegionSearchParams {
     q?: string;
     name?: string;
-    tier?: number | string | null;
-    status?: string | null;
+    tier?: CatTier | `${CatTier}` | null;
+    status?: TelehealthStatusName | null;
     desert_min?: number | string | null;
     desert_max?: number | string | null;
     data_gap?: boolean | string | null;
@@ -93,7 +105,7 @@ export interface SeasonScenario {
 export interface TelehealthPriorityResponse {
     region_code: string;
     region_name: string;
-    cat_tier: number;
+    cat_tier: CatTier;
     necessity_score: number;
     connectivity_score: number;
     combined_priority: number;
@@ -125,65 +137,55 @@ export interface TelehealthPriorityResponse {
 /**
  * Fetch all CAT regions with optional season adjustment
  */
-export async function fetchRegions(season: Season = 'year_round', tier?: number): Promise<CATRegion[]> {
-    let url = `${API_BASE}/regions?season=${season}`;
-    if (tier) {
-        url += `&tier=${tier}`;
-    }
-
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch regions: ${response.statusText}`);
-    }
-
-    const data: RegionsResponse = await response.json();
+export async function fetchRegions(
+    season: Season = 'year_round',
+    tier?: number,
+    signal?: AbortSignal,
+): Promise<CATRegion[]> {
+    const data = await fetchJson<RegionsResponse>(
+        withQuery(`${API_BASE}/regions`, { season, tier: tier || undefined }),
+        { signal },
+        'Failed to fetch regions',
+    );
     return data.regions;
+}
+
+export function fetchBoundaries(signal?: AbortSignal): Promise<BoundaryCollection> {
+    return fetchJson(`${API_BASE}/boundaries`, { signal }, 'Failed to load boundaries');
 }
 
 /**
  * Fetch lightweight community summaries for sidebar navigation.
  */
-export async function fetchRegionSummary(): Promise<RegionSummary[]> {
-    const response = await fetch(`${API_BASE}/regions/summary`);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch region summary: ${response.statusText}`);
-    }
-
-    const data: RegionSummaryResponse = await response.json();
+export async function fetchRegionSummary(signal?: AbortSignal): Promise<RegionSummary[]> {
+    const data = await fetchJson<RegionSummaryResponse>(
+        `${API_BASE}/regions/summary`,
+        { signal },
+        'Failed to fetch region summary',
+    );
     return data.regions;
 }
 
 /**
  * Search lightweight community summaries for sidebar discovery.
  */
-export async function searchRegions(params: RegionSearchParams = {}): Promise<RegionSummary[]> {
-    const query = new URLSearchParams();
-
-    Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-            query.append(key, String(value));
-        }
-    });
-
-    const suffix = query.toString() ? `?${query.toString()}` : '';
-    const response = await fetch(`${API_BASE}/regions/search${suffix}`);
-    if (!response.ok) {
-        throw new Error(`Failed to search regions: ${response.statusText}`);
-    }
-
-    const data: RegionSearchResponse = await response.json();
+export async function searchRegions(
+    params: RegionSearchParams = {},
+    signal?: AbortSignal,
+): Promise<RegionSummary[]> {
+    const data = await fetchJson<RegionSearchResponse>(
+        withQuery(`${API_BASE}/regions/search`, params),
+        { signal },
+        'Failed to search regions',
+    );
     return data.regions;
 }
 
 /**
  * Fetch database statistics
  */
-export async function fetchStatistics(): Promise<StatisticsResponse> {
-    const response = await fetch(`${API_BASE}/statistics`);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch statistics: ${response.statusText}`);
-    }
-    return response.json();
+export function fetchStatistics(signal?: AbortSignal): Promise<StatisticsResponse> {
+    return fetchJson(`${API_BASE}/statistics`, { signal }, 'Failed to fetch statistics');
 }
 
 /**
@@ -191,75 +193,14 @@ export async function fetchStatistics(): Promise<StatisticsResponse> {
  */
 export async function fetchTelehealthPriority(
     regionCode: string,
-    season: Season = 'year_round'
+    season: Season = 'year_round',
+    signal?: AbortSignal,
 ): Promise<TelehealthPriorityResponse> {
-    const url = `${API_BASE}/telehealth-priority/${regionCode}?season=${season}`;
-
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch telehealth priority: ${response.statusText}`);
-    }
-
-    return response.json();
-}
-
-/**
- * Get tier color based on CAT tier level
- */
-export function getTierColor(tier: number): string {
-    switch (tier) {
-        case 1: return '#22c55e'; // Green - Full access
-        case 2: return '#eab308'; // Yellow - Dual mode
-        case 3: return '#f97316'; // Orange - Limited
-        case 4: return '#ef4444'; // Red - Extreme
-        default: return '#6b7280'; // Gray - Unknown
-    }
-}
-
-/**
- * Get map color based on Telehealth Necessity Score (0-100)
- */
-export function getNeedColor(score: number): string {
-    if (score >= 75) return '#f43f5e';      // Vibrant Rose (Professional Critical)
-    if (score >= 50) return '#fb923c';      // Warm Orange (High)
-    if (score >= 25) return '#fbbf24';      // Rich Amber (Moderate)
-    return '#34d399';                       // Fresh Emerald (Adequate)
-}
-
-/**
- * Get label based on Telehealth Necessity Score (0-100)
- */
-export function getNeedLabel(score: number): string {
-    if (score >= 75) return 'Critical Need';
-    if (score >= 50) return 'High Need';
-    if (score >= 25) return 'Moderate Need';
-    return 'Adequate Need';
-}
-
-/**
- * Get tier label based on CAT tier level
- */
-export function getTierLabel(tier: number): string {
-    switch (tier) {
-        case 1: return 'Full Multimodal Access';
-        case 2: return 'Dual Mode Access';
-        case 3: return 'Limited Access';
-        case 4: return 'Extreme/No Direct Access';
-        default: return 'Unknown';
-    }
-}
-
-/**
- * Get priority color for telehealth classification
- */
-export function getPriorityColor(priority: string): string {
-    switch (priority) {
-        case 'HIGH': return '#22c55e';      // Green
-        case 'CRITICAL': return '#ef4444';   // Red
-        case 'MODERATE': return '#f97316';   // Orange
-        case 'LOW': return '#3b82f6';        // Blue
-        default: return '#6b7280';           // Gray
-    }
+    return fetchJson(
+        withQuery(`${API_BASE}/telehealth-priority/${encodeURIComponent(regionCode)}`, { season }),
+        { signal },
+        'Failed to fetch telehealth priority',
+    );
 }
 
 // =============================================================================
@@ -331,69 +272,40 @@ export async function fetchBroadbandCoverage(filters?: {
     telehealth_viable?: string;
     primary_access?: string;
     has_gaps?: boolean;
-}): Promise<BroadbandResponse> {
-    let url = `${API_BASE}/broadband`;
-    const params = new URLSearchParams();
-
-    if (filters?.confidence) params.append('confidence', filters.confidence);
-    if (filters?.telehealth_viable) params.append('telehealth_viable', filters.telehealth_viable);
-    if (filters?.primary_access) params.append('primary_access', filters.primary_access);
-    if (filters?.has_gaps) params.append('has_gaps', 'true');
-
-    if (params.toString()) {
-        url += `?${params.toString()}`;
-    }
-
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch broadband data: ${response.statusText}`);
-    }
-    return response.json();
+}, signal?: AbortSignal): Promise<BroadbandResponse> {
+    return fetchJson(
+        withQuery(`${API_BASE}/broadband`, {
+            confidence: filters?.confidence,
+            telehealth_viable: filters?.telehealth_viable,
+            primary_access: filters?.primary_access,
+            has_gaps: filters?.has_gaps ? true : undefined,
+        }),
+        { signal },
+        'Failed to fetch broadband data',
+    );
 }
 
 /**
  * Fetch data gaps summary for dashboard display
  */
-export async function fetchDataGapsSummary(signal?: AbortSignal): Promise<DataGapsSummary> {
-    const response = await fetch(`${API_BASE}/data-gaps`, { signal });
-    if (!response.ok) {
-        throw new Error(`Failed to fetch data gaps: ${response.statusText}`);
-    }
-    return response.json();
+export function fetchDataGapsSummary(signal?: AbortSignal): Promise<DataGapsSummary> {
+    return fetchJson(`${API_BASE}/data-gaps`, { signal }, 'Failed to fetch data gaps');
 }
 
-/**
- * Get confidence color for data quality visualization
- */
-export function getConfidenceColor(confidence: string): string {
-    switch (confidence) {
-        case 'HIGH': return '#22c55e';    // Green
-        case 'MEDIUM': return '#eab308';   // Yellow
-        case 'LOW': return '#ef4444';      // Red
-        default: return '#6b7280';         // Gray
-    }
+export function getNeedColor(score: number | null | undefined): string {
+    return getDesertScorePresentation(score ?? 0).color;
 }
 
-/**
- * Get icon/label for data gap types
- */
-export function getDataGapInfo(gap: string): { icon: string; label: string; severity: 'warning' | 'error' | 'info' } {
-    switch (gap) {
-        case 'SATELLITE_DEPENDENT':
-            return { icon: '', label: 'Satellite Only', severity: 'warning' };
-        case 'LOW_TERRESTRIAL':
-            return { icon: '📶', label: 'Low Wired Coverage', severity: 'warning' };
-        case 'LOW_CONFIDENCE':
-            return { icon: '❓', label: 'Low Data Confidence', severity: 'info' };
-        case 'INTERNET_DESERT':
-            return { icon: '🚫', label: 'No Internet Coverage', severity: 'error' };
-        case 'MISSING_WIRED_DATA':
-            return { icon: '📊', label: 'Missing Wired Data', severity: 'info' };
-        case 'MISSING_SATELLITE_DATA':
-            return { icon: '📊', label: 'Missing Satellite Data', severity: 'info' };
-        default:
-            return { icon: '', label: gap, severity: 'info' };
+export function getNeedLabel(score: number | null | undefined): string {
+    if (score === null || score === undefined) return 'Unknown Need';
+    return getDesertScorePresentation(score).label;
+}
+
+export function getTierColor(tier: CatTier | number | null | undefined): string {
+    if (tier === 1 || tier === 2 || tier === 3 || tier === 4) {
+        return CAT_TIER_PRESENTATION[tier].color;
     }
+    return '#94a3b8';
 }
 
 // =============================================================================
@@ -450,41 +362,23 @@ export interface HealthcareSummary {
 /**
  * Fetch healthcare facilities near a specific region
  */
-export async function fetchHealthcareByRegion(regionCode: string, limit = 10): Promise<HealthcareByRegion> {
-    const response = await fetch(`${API_BASE}/healthcare/by-region/${regionCode}?limit=${limit}`);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch healthcare data: ${response.statusText}`);
-    }
-    return response.json();
+export function fetchHealthcareByRegion(
+    regionCode: string,
+    limit = 10,
+    signal?: AbortSignal,
+): Promise<HealthcareByRegion> {
+    return fetchJson(
+        withQuery(`${API_BASE}/healthcare/by-region/${encodeURIComponent(regionCode)}`, { limit }),
+        { signal },
+        'Failed to fetch healthcare data',
+    );
 }
 
 /**
  * Fetch healthcare summary statistics
  */
-export async function fetchHealthcareSummary(): Promise<HealthcareSummary> {
-    const response = await fetch(`${API_BASE}/healthcare/summary`);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch healthcare summary: ${response.statusText}`);
-    }
-    return response.json();
-}
-
-/**
- * Get facility type icon and color
- */
-export function getFacilityTypeInfo(type: string): { icon: string; color: string; label: string } {
-    switch (type) {
-        case 'hospital':
-            return { icon: '🏥', color: '#dc2626', label: 'Hospital' };
-        case 'clinic':
-            return { icon: '🩺', color: '#2563eb', label: 'Clinic' };
-        case 'pharmacy':
-            return { icon: '💊', color: '#16a34a', label: 'Pharmacy' };
-        case 'health_center':
-            return { icon: '🏨', color: '#7c3aed', label: 'Health Center' };
-        default:
-            return { icon: '🏥', color: '#6b7280', label: type };
-    }
+export function fetchHealthcareSummary(signal?: AbortSignal): Promise<HealthcareSummary> {
+    return fetchJson(`${API_BASE}/healthcare/summary`, { signal }, 'Failed to fetch healthcare summary');
 }
 
 // =============================================================================
@@ -606,74 +500,46 @@ export interface PerformanceSummary {
 export async function fetchPerformance(
     year?: number,
     quarter?: number,
-    minTests: number = 1
+    minTests: number = 1,
+    signal?: AbortSignal,
 ): Promise<PerformanceResponse> {
-    let url = `${API_BASE}/performance?min_tests=${minTests}`;
-    if (year) url += `&year=${year}`;
-    if (quarter) url += `&quarter=${quarter}`;
-
-    const response = await fetch(url);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch performance: ${response.statusText}`);
-    }
-    return response.json();
+    return fetchJson(
+        withQuery(`${API_BASE}/performance`, {
+            min_tests: minTests,
+            year: year || undefined,
+            quarter: quarter || undefined,
+        }),
+        { signal },
+        'Failed to fetch performance',
+    );
 }
 
 /**
  * Fetch service gaps (FCC claims vs Ookla measured)
  */
-export async function fetchServiceGaps(): Promise<ServiceGapsResponse> {
-    const response = await fetch(`${API_BASE}/performance/gaps`);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch service gaps: ${response.statusText}`);
-    }
-    return response.json();
+export function fetchServiceGaps(signal?: AbortSignal): Promise<ServiceGapsResponse> {
+    return fetchJson(`${API_BASE}/performance/gaps`, { signal }, 'Failed to fetch service gaps');
 }
 
 /**
  * Fetch performance for a specific region
  */
-export async function fetchRegionPerformance(regionCode: string): Promise<RegionPerformance> {
-    const response = await fetch(`${API_BASE}/performance/by-region/${regionCode}`);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch region performance: ${response.statusText}`);
-    }
-    return response.json();
+export function fetchRegionPerformance(
+    regionCode: string,
+    signal?: AbortSignal,
+): Promise<RegionPerformance> {
+    return fetchJson(
+        `${API_BASE}/performance/by-region/${encodeURIComponent(regionCode)}`,
+        { signal },
+        'Failed to fetch region performance',
+    );
 }
 
 /**
  * Fetch performance summary
  */
-export async function fetchPerformanceSummary(): Promise<PerformanceSummary> {
-    const response = await fetch(`${API_BASE}/performance/summary`);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch performance summary: ${response.statusText}`);
-    }
-    return response.json();
-}
-
-/**
- * Get speed color for visualization
- */
-export function getSpeedColor(speedMbps: number | null): string {
-    if (speedMbps === null) return '#6b7280';  // Gray - no data
-    if (speedMbps >= 50) return '#22c55e';     // Green - excellent
-    if (speedMbps >= 25) return '#84cc16';     // Lime - good
-    if (speedMbps >= 10) return '#eab308';     // Yellow - moderate
-    if (speedMbps >= 5) return '#f97316';      // Orange - poor
-    return '#ef4444';                           // Red - critical
-}
-
-/**
- * Get speed label
- */
-export function getSpeedLabel(speedMbps: number | null): string {
-    if (speedMbps === null) return 'No Data';
-    if (speedMbps >= 50) return 'Excellent';
-    if (speedMbps >= 25) return 'Good';
-    if (speedMbps >= 10) return 'Moderate';
-    if (speedMbps >= 5) return 'Poor';
-    return 'Critical';
+export function fetchPerformanceSummary(signal?: AbortSignal): Promise<PerformanceSummary> {
+    return fetchJson(`${API_BASE}/performance/summary`, { signal }, 'Failed to fetch performance summary');
 }
 
 // ============================================================================
@@ -706,12 +572,12 @@ export interface TopGapsResponse {
 /**
  * Fetch top priority gaps with location names
  */
-export async function fetchTopGaps(limit: number = 10): Promise<TopGapsResponse> {
-    const response = await fetch(`${API_BASE}/performance/top-gaps?limit=${limit}`);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch top gaps: ${response.statusText}`);
-    }
-    return response.json();
+export function fetchTopGaps(limit: number = 10, signal?: AbortSignal): Promise<TopGapsResponse> {
+    return fetchJson(
+        withQuery(`${API_BASE}/performance/top-gaps`, { limit }),
+        { signal },
+        'Failed to fetch top gaps',
+    );
 }
 
 export interface LocationInfo {
@@ -725,12 +591,23 @@ export interface LocationInfo {
 /**
  * Fetch location name for given coordinates (reverse geocoding)
  */
-export async function fetchLocationName(lat: number, lon: number): Promise<LocationInfo> {
-    const response = await fetch(`${API_BASE}/performance/location?lat=${lat}&lon=${lon}`);
-    if (!response.ok) {
-        return { name: 'Unknown', region: '', country: '', lat, lon };
+export async function fetchLocationName(
+    lat: number,
+    lon: number,
+    signal?: AbortSignal,
+): Promise<LocationInfo> {
+    try {
+        return await fetchJson(
+            withQuery(`${API_BASE}/performance/location`, { lat, lon }),
+            { signal },
+            'Failed to fetch location name',
+        );
+    } catch (error: unknown) {
+        if (error instanceof ApiError && error.status > 0) {
+            return { name: 'Unknown', region: '', country: '', lat, lon };
+        }
+        throw error;
     }
-    return response.json();
 }
 
 // =============================================================================
@@ -802,15 +679,17 @@ export interface CombinedAccessResponse {
  */
 export async function fetchAffordability(
     monthlyCost: number = 120,
-    threshold: number = 2.0
+    threshold: number = 2.0,
+    signal?: AbortSignal,
 ): Promise<AffordabilityResponse> {
-    const response = await fetch(
-        `${API_BASE}/performance/affordability?monthly_cost=${monthlyCost}&threshold=${threshold}`
+    return fetchJson(
+        withQuery(`${API_BASE}/performance/affordability`, {
+            monthly_cost: monthlyCost,
+            threshold,
+        }),
+        { signal },
+        'Failed to fetch affordability data',
     );
-    if (!response.ok) {
-        throw new Error(`Failed to fetch affordability data: ${response.statusText}`);
-    }
-    return response.json();
 }
 
 /**
@@ -818,14 +697,15 @@ export async function fetchAffordability(
  * Shows TRUE_ACCESS, COVERAGE_NO_ACCESS, and INFRASTRUCTURE_GAP zones
  * @param monthlyCost - Internet cost per month (default: $120)
  */
-export async function fetchCombinedAccess(monthlyCost: number = 120): Promise<CombinedAccessResponse> {
-    const response = await fetch(
-        `${API_BASE}/performance/affordability/combined?monthly_cost=${monthlyCost}`
+export function fetchCombinedAccess(
+    monthlyCost: number = 120,
+    signal?: AbortSignal,
+): Promise<CombinedAccessResponse> {
+    return fetchJson(
+        withQuery(`${API_BASE}/performance/affordability/combined`, { monthly_cost: monthlyCost }),
+        { signal },
+        'Failed to fetch combined access data',
     );
-    if (!response.ok) {
-        throw new Error(`Failed to fetch combined access data: ${response.statusText}`);
-    }
-    return response.json();
 }
 
 // =============================================================================
@@ -869,23 +749,29 @@ export interface SafetyNetClassification {
 /**
  * Fetch affordability analysis for a specific region
  */
-export async function fetchRegionAffordability(regionCode: string): Promise<RegionAffordability> {
-    const response = await fetch(`${API_BASE}/regions/${regionCode}/affordability`);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch region affordability: ${response.statusText}`);
-    }
-    return response.json();
+export function fetchRegionAffordability(
+    regionCode: string,
+    signal?: AbortSignal,
+): Promise<RegionAffordability> {
+    return fetchJson(
+        `${API_BASE}/regions/${encodeURIComponent(regionCode)}/affordability`,
+        { signal },
+        'Failed to fetch region affordability',
+    );
 }
 
 /**
  * Fetch safety net classification for a specific region
  */
-export async function fetchRegionSafetyNet(regionCode: string): Promise<SafetyNetClassification> {
-    const response = await fetch(`${API_BASE}/regions/${regionCode}/safety-net`);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch safety net classification: ${response.statusText}`);
-    }
-    return response.json();
+export function fetchRegionSafetyNet(
+    regionCode: string,
+    signal?: AbortSignal,
+): Promise<SafetyNetClassification> {
+    return fetchJson(
+        `${API_BASE}/regions/${encodeURIComponent(regionCode)}/safety-net`,
+        { signal },
+        'Failed to fetch safety net classification',
+    );
 }
 
 // =============================================================================
@@ -895,7 +781,7 @@ export async function fetchRegionSafetyNet(regionCode: string): Promise<SafetyNe
 export interface TelehealthStatus {
     region_code: string;
     region_name: string;
-    status: 'TELEHEALTH_READY' | 'COMMUNITY_ANCHOR' | 'CRITICAL_GAP' | 'DATA_UNAVAILABLE';
+    status: TelehealthStatusName;
     color: string;
     label: string;
     description: string;
@@ -917,29 +803,15 @@ export interface TelehealthStatus {
  * Fetch composite telehealth status for a region
  * Combines affordability + clinic proximity into a single classification
  */
-export async function fetchTelehealthStatus(regionCode: string): Promise<TelehealthStatus> {
-    const response = await fetch(`${API_BASE}/regions/${regionCode}/telehealth-status`);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch telehealth status: ${response.statusText}`);
-    }
-    return response.json();
-}
-
-/**
- * Get the color to use for a region marker based on telehealth status
- */
-export function getTelehealthStatusColor(status: TelehealthStatus['status']): string {
-    switch (status) {
-        case 'TELEHEALTH_READY':
-            return '#22c55e';  // Green
-        case 'COMMUNITY_ANCHOR':
-            return '#f59e0b';  // Amber
-        case 'CRITICAL_GAP':
-            return '#ef4444';  // Red
-        case 'DATA_UNAVAILABLE':
-        default:
-            return '#6b7280';  // Gray
-    }
+export function fetchTelehealthStatus(
+    regionCode: string,
+    signal?: AbortSignal,
+): Promise<TelehealthStatus> {
+    return fetchJson(
+        `${API_BASE}/regions/${encodeURIComponent(regionCode)}/telehealth-status`,
+        { signal },
+        'Failed to fetch telehealth status',
+    );
 }
 
 // Bulk telehealth status for all regions
@@ -948,7 +820,7 @@ export interface RegionTelehealthStatus {
     region_name: string;
     lat: number;
     lon: number;
-    status: 'TELEHEALTH_READY' | 'COMMUNITY_ANCHOR' | 'CRITICAL_GAP' | 'DATA_UNAVAILABLE';
+    status: TelehealthStatusName;
     color: string;
     internet_cost: number | null;
     isp_name: string;
@@ -975,10 +847,10 @@ export interface AllTelehealthStatusResponse {
 /**
  * Fetch telehealth status for ALL regions (used by Affordability Layer)
  */
-export async function fetchAllTelehealthStatus(): Promise<AllTelehealthStatusResponse> {
-    const response = await fetch(`${API_BASE}/telehealth-status/all`);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch all telehealth status: ${response.statusText}`);
-    }
-    return response.json();
+export function fetchAllTelehealthStatus(signal?: AbortSignal): Promise<AllTelehealthStatusResponse> {
+    return fetchJson(
+        `${API_BASE}/telehealth-status/all`,
+        { signal },
+        'Failed to fetch all telehealth status',
+    );
 }
