@@ -103,7 +103,6 @@ class SmoothWheelZoom extends L.Handler {
     }
 
     this.wheelMousePosition = this.map.mouseEventToContainerPoint(event);
-    this.wheelMouseLatLng = this.map.containerPointToLatLng(this.wheelMousePosition);
 
     if (this.wheelEndTimer !== null) {
       window.clearTimeout(this.wheelEndTimer);

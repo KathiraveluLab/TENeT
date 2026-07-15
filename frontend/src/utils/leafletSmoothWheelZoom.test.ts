@@ -106,6 +106,7 @@ describe('leafletSmoothWheelZoom', () => {
       smoothSensitivity: 3,
       zoomSnap: 0,
     });
+    const coordinateLookup = vi.spyOn(map, 'containerPointToLatLng');
 
     const wheelEvent = new WheelEvent('wheel', {
       deltaY: -1,
@@ -127,6 +128,20 @@ describe('leafletSmoothWheelZoom', () => {
     expect(map.getZoom()).toBeGreaterThan(5.005);
     expect(animationFrames).toBeGreaterThan(0);
     expect(zoomEvents).toBe(0);
+
+    container.dispatchEvent(new WheelEvent('wheel', {
+      deltaY: -1,
+      clientX: 401,
+      clientY: 301,
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    }));
+    vi.advanceTimersByTime(16);
+
+    // The center and cursor coordinates are captured once when the gesture
+    // starts; subsequent wheel events must not replace the geographic anchor.
+    expect(coordinateLookup).toHaveBeenCalledTimes(2);
 
     vi.advanceTimersByTime(200);
     expect(zoomEvents).toBe(1);
