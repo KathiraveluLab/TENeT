@@ -9,11 +9,11 @@ import {
     fetchPerformance,
     fetchAffordability
 } from '../api/catApi';
-import { errorMessage, isAbortError } from '../api/http';
-import { escapeHtml } from '../utils/escapeHtml';
 import { getScenarioCost, getTrafficLightStatus } from '../utils/trafficLight';
 import IconButton from './ui/IconButton';
 import './PerformanceLayer.css';
+import { PerformanceCanvasLayer } from './PerformanceCanvasLayer';
+import { errorMessage, isAbortError } from '../api/http';
 
 interface PerformanceLayerProps {
     visible: boolean;
@@ -53,47 +53,10 @@ export default function PerformanceLayer({ visible, onToggle }: PerformanceLayer
             const controller = new AbortController();
             loadData(controller.signal);
             return () => controller.abort();
-        } else {
-            if (canvasLayerRef.current) {
-                canvasLayerRef.current.clearLayers();
-            }
         }
     }, [visible]);
 
-    const getScenarioBurden = (afford: AffordabilityZone | undefined, lat: number): number | null => {
-        if (!afford || afford.monthly_income <= 0) return null;
-        const cost = getScenarioCost(lat, useStarlink);
-        return (cost / afford.monthly_income) * 100;
-    };
 
-    function getAffordabilityForTile(lat: number, lon: number): AffordabilityZone | undefined {
-        if (!affordabilityData.length) return undefined;
-        let nearest: AffordabilityZone | undefined;
-        let minDist = Infinity;
-        const MAX_DIST_DEG = 0.2;
-        for (const zone of affordabilityData) {
-            if (zone.lat === null || zone.lon === null) continue;
-            const dLat = zone.lat - lat;
-            const dLon = zone.lon - lon;
-            const distSq = dLat * dLat + dLon * dLon;
-            if (distSq < minDist && distSq < MAX_DIST_DEG * MAX_DIST_DEG) {
-                minDist = distSq;
-                nearest = zone;
-            }
-        }
-        return nearest;
-    }
-
-    // --- Traffic Light Logic ---
-
-    const getTrafficLightStatusForTile = (
-        tile: PerformanceTile,
-        burden: number | null,
-        scenarioCost: number
-    ): 'RED' | 'ORANGE' | 'YELLOW' | 'GREEN' | 'GRAY' => {
-        if (tile.avg_d_mbps === null || tile.avg_lat_ms === null || burden === null) return 'GRAY';
-        return getTrafficLightStatus(tile.avg_d_mbps, tile.avg_lat_ms, burden, scenarioCost);
-    };
 
 
     const visibleTiles = useMemo(() => {
@@ -105,12 +68,7 @@ export default function PerformanceLayer({ visible, onToggle }: PerformanceLayer
         });
     }, [tiles]);
 
-    // Re-render map
-    useEffect(() => {
-        if (visible && tiles.length > 0) {
-            renderCanvasMarkers(visibleTiles);
-        }
-    }, [visible, visibleTiles, zoomLevel, useStarlink, affordabilityData, filterMode]); // Dependencies updated
+
 
     async function loadData(signal: AbortSignal) {
         try {
@@ -143,140 +101,7 @@ export default function PerformanceLayer({ visible, onToggle }: PerformanceLayer
         }
     }
 
-    function renderCanvasMarkers(tilesToRender: PerformanceTile[]) {
-        if (canvasLayerRef.current) {
-            canvasLayerRef.current.clearLayers();
-            map.removeLayer(canvasLayerRef.current);
-        }
 
-        const canvasRenderer = L.canvas({ padding: 0.5 });
-        const layerGroup = L.layerGroup();
-        const isDetailView = zoomLevel >= DETAIL_ZOOM_THRESHOLD;
-
-        tilesToRender.forEach(tile => {
-            if (!Number.isFinite(tile.lat) || !Number.isFinite(tile.lon)) return;
-
-            const afford = getAffordabilityForTile(tile.lat, tile.lon);
-            const scenarioCost = getScenarioCost(tile.lat, useStarlink);
-            const burdenPct = getScenarioBurden(afford, tile.lat);
-
-            let markerColor = '#ccc';
-            let markerRadius = isDetailView ? 6 : Math.min(20, Math.max(4, (tile.tests / 5)));
-            // --- FILTER LOGIC ---
-            if (filterMode === 'affordability') {
-                const isRuralTier = scenarioCost >= 400;
-
-                if (burdenPct === null) {
-                    markerColor = '#94a3b8';
-                    markerRadius = 4;
-                } else if (isRuralTier) {
-                    if (burdenPct >= 2) {
-                        markerColor = '#EF4444'; // Rose Red - Unattainable
-                        markerRadius = 5;        // Larger for problems
-                    } else {
-                        markerColor = '#f97316'; // Orange
-                        markerRadius = 4;
-                    }
-                } else {
-                    if (burdenPct < 1) {
-                        markerColor = '#10B981'; // Emerald - Affordable
-                        markerRadius = 3;        // Smaller for good
-                    } else if (burdenPct < 2) {
-                        markerColor = '#F59E0B'; // Amber - Burdened
-                        markerRadius = 4;
-                    } else {
-                        markerColor = '#EF4444'; // Rose - Unattainable
-                        markerRadius = 5;        // Larger for problems
-                    }
-                }
-
-            } else if (filterMode === 'latency') {
-                const lat = tile.avg_lat_ms;
-                if (lat === null) {
-                    markerColor = '#94a3b8';
-                    markerRadius = 4;
-                } else if (lat < 50) {
-                    markerColor = '#10B981'; // Emerald
-                    markerRadius = 3;        // Small for good
-                } else if (lat < 150) {
-                    markerColor = '#F59E0B'; // Amber
-                    markerRadius = 4;
-                } else {
-                    markerColor = '#EF4444'; // Rose
-                    markerRadius = 5;        // Large for problems
-                }
-
-            } else {
-                // 'combined' - Traffic Light Logic
-                const status = getTrafficLightStatusForTile(tile, burdenPct, scenarioCost);
-                switch (status) {
-                    case 'RED':
-                        markerColor = '#EF4444';  // Rose
-                        markerRadius = 5;
-                        break;
-                    case 'ORANGE':
-                        markerColor = '#f97316';
-                        markerRadius = 4;
-                        break;
-                    case 'YELLOW':
-                        markerColor = '#F59E0B';  // Amber
-                        markerRadius = 4;
-                        break;
-                    case 'GREEN':
-                        markerColor = '#10B981';  // Emerald
-                        markerRadius = 3;
-                        break;
-                    default:
-                        markerColor = '#94a3b8';
-                        markerRadius = 4;
-                }
-            }
-
-            // Gemstone effect marker
-            const marker = L.circleMarker([tile.lat, tile.lon], {
-                radius: markerRadius,       // Dynamic based on status
-                fillColor: markerColor,
-                fillOpacity: 0.65,          // KEY: Lower opacity for gemstone effect
-                color: '#ffffff',           // Pure white stroke
-                weight: 1.5,                // Thicker stroke for definition
-                opacity: 0.9,               // Almost solid border
-                renderer: canvasRenderer
-            });
-
-            // Build Popup
-            const latencyDisplay = tile.avg_lat_ms !== null ? `${tile.avg_lat_ms.toFixed(0)} ms` : 'N/A';
-            const costDisplay = burdenPct !== null ? `${burdenPct.toFixed(1)}%` : 'N/A';
-            const speedDisplay = tile.avg_d_mbps !== null ? `${tile.avg_d_mbps.toFixed(1)} Mbps` : 'N/A';
-            const status = getTrafficLightStatusForTile(tile, burdenPct, scenarioCost);
-
-            let capabilityLabel = "Insufficient Data";
-            if (status === 'RED') capabilityLabel = "Async / Text Only";
-            else if (status === 'ORANGE') capabilityLabel = "Expensive Infrastructure";
-            else if (status === 'YELLOW') capabilityLabel = "Audio / Low-Res Video";
-            else if (status === 'GREEN') capabilityLabel = "HD Video Ready";
-
-            marker.bindPopup(`
-                <div class="performance-popup" style="--popup-color:${markerColor}">
-                    <div class="performance-popup__title">
-                        ${escapeHtml(filterMode === 'combined' ? capabilityLabel : 'Location Details')}
-                    </div>
-                    <div class="performance-popup__metrics">
-                         <div><strong>Latency:</strong> ${escapeHtml(latencyDisplay)}</div>
-                         <div><strong>Burden:</strong> ${escapeHtml(costDisplay)} of Income</div>
-                         <div><strong>Speed:</strong> ${escapeHtml(speedDisplay)}</div>
-                    </div>
-                    <div class="performance-popup__source">
-                         Generated by Gap Hunter v2
-                    </div>
-                </div>
-            `);
-
-            layerGroup.addLayer(marker);
-        });
-
-        layerGroup.addTo(map);
-        canvasLayerRef.current = layerGroup;
-    }
 
     if (!visible) return null;
 
@@ -377,16 +202,23 @@ export default function PerformanceLayer({ visible, onToggle }: PerformanceLayer
             </div>
 
             {/* Choropleth Region Layer - rendered when showRegions is enabled */}
-            {
-                showRegions && (
-                    <ChoroplethLayer
-                        visible={showRegions}
-                        tiles={tiles}
-                        affordabilityData={affordabilityData}
-                        useStarlink={useStarlink}
-                    />
-                )
-            }
+            {showRegions && (
+                <ChoroplethLayer
+                    visible={showRegions}
+                    tiles={tiles}
+                    affordabilityData={affordabilityData}
+                    useStarlink={useStarlink}
+                />
+            )}
+            {!showRegions && visibleTiles.length > 0 && (
+                <PerformanceCanvasLayer
+                    visibleTiles={visibleTiles}
+                    affordabilityData={affordabilityData}
+                    useStarlink={useStarlink}
+                    filterMode={filterMode}
+                    zoomLevel={zoomLevel}
+                />
+            )}
         </>
     );
 }

@@ -13,7 +13,6 @@ import Sidebar from './components/sidebar/Sidebar';
 import ResearchComparisonPanel from './components/ResearchComparisonPanel';
 import ScenarioPanel from './components/scenario/ScenarioPanel';
 import ScenarioLayer, { ScenarioLegend } from './components/scenario/ScenarioLayer';
-import { CanvasLayer } from './components/map/CanvasLayer';
 import { usePinnedRegions } from './hooks/usePinnedRegions';
 import { useRegionSummary } from './hooks/useRegionSummary';
 import { useScenarioState } from './hooks/useScenarioState';
@@ -350,8 +349,6 @@ function App() {
             onViewDetails={handleViewRegionDetails}
             onMarkerReady={registerMarker}
           />
-
-          <CanvasLayer />
         </MapContainer>
 
         <ResearchComparisonPanel
