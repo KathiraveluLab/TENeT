@@ -81,4 +81,18 @@ describe('map URL state', () => {
 
         expect(search).toBe('external=1');
     });
+
+    it('keeps fractional zoom values stable in the URL', () => {
+        const search = serializeMapUrlState('', {
+            selectedRegionCode: null,
+            season: 'year_round',
+            mapMode: { type: 'cat' },
+            pinnedRegionCodes: [],
+            center: [63.31067, -158.42675],
+            zoom: 4.54046159397577,
+            scenario: { thresholds: BASELINE_THRESHOLDS, preset: null },
+        });
+
+        expect(new URLSearchParams(search).get('zoom')).toBe('4.54');
+    });
 });

@@ -136,7 +136,9 @@ export function serializeMapUrlState(
     if (state.pinnedRegionCodes.length) params.set('pins', state.pinnedRegionCodes.slice(0, 3).join(','));
     if (state.center[0] !== ALASKA_CENTER[0]) params.set('lat', state.center[0].toFixed(5));
     if (state.center[1] !== ALASKA_CENTER[1]) params.set('lng', state.center[1].toFixed(5));
-    if (state.zoom !== ALASKA_ZOOM) params.set('zoom', String(state.zoom));
+    if (state.zoom !== ALASKA_ZOOM) {
+        params.set('zoom', String(Number(state.zoom.toFixed(3))));
+    }
 
     if (state.mapMode.type === 'scenario') {
         const { thresholds, preset } = state.scenario;
