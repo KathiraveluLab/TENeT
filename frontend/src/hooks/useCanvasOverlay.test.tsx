@@ -56,7 +56,7 @@ describe('useCanvasOverlay', () => {
   it('cleans up resources on unmount', () => {
     const onDraw = vi.fn();
     const { unmount } = renderHook(() => useCanvasOverlay(onDraw));
-    
+
     unmount();
 
     expect(mockMap.off).toHaveBeenCalledWith('moveend', expect.any(Function));
