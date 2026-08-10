@@ -29,6 +29,10 @@ make e2e                # Playwright smoke suite against a running app
 
 `make smoke` expects the backend to be running at `http://127.0.0.1:5001` unless `API_URL` is overridden.
 
+Frontend test, typecheck, and build commands run in the dedicated Node-based
+`frontend-tooling` Compose service. The production `frontend` service continues
+to use the nginx-only `prod` image stage.
+
 ## Backend Testing
 
 Backend tests should verify:

@@ -56,6 +56,13 @@ def client(db_session):
         centroid_lat=61.2181,
         centroid_lon=-149.9003,
     ))
+    db_session.add(CensusIncome(
+        zcta="99723",
+        median_income=20000,
+        acs_year=2022,
+        centroid_lat=52.7123,
+        centroid_lon=174.114,
+    ))
     db_session.add(HealthcareSite(
         name="Anchorage Clinic",
         site_type="clinic",
@@ -79,6 +86,7 @@ def client(db_session):
         place_name="Eareckson",
         confidence="LOW",
         data_gaps="MISSING_WIRED_DATA;LOW_CONFIDENCE",
+        any_tech_25mbps_pct=10,
         telehealth_viable="UNCERTAIN",
         primary_access="SATELLITE",
         region_code="AK-EARECKSON",

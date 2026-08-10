@@ -31,13 +31,13 @@ backend-test: ## Run backend pytest suite
 	$(COMPOSE) run --rm -e DB_PATH=/tmp/tenet-test.db backend python -m pytest
 
 frontend-test: ## Run frontend Vitest suite
-	$(COMPOSE) run --rm frontend npm run test
+	$(COMPOSE) run --rm frontend-tooling npm run test
 
 frontend-build: ## Run frontend production build
-	$(COMPOSE) run --rm frontend npm run build
+	$(COMPOSE) run --rm frontend-tooling npm run build
 
 frontend-typecheck: ## Run frontend TypeScript checks
-	$(COMPOSE) run --rm frontend npm run typecheck
+	$(COMPOSE) run --rm frontend-tooling npm run typecheck
 
 backend-lint: ## Run minimal backend lint checks
 	$(COMPOSE) run --rm backend python -m flake8 . --exclude venv,data,__pycache__
