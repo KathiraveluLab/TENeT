@@ -6,11 +6,20 @@ services:
     volumes:
       - ./backend:/app
     environment:
-      FLASK_DEBUG: "${FLASK_DEBUG:-1}"
+      FLASK_DEBUG: "${FLASK_DEBUG:-0}"
       FLASK_HOST: "${FLASK_HOST:-0.0.0.0}"
       FLASK_PORT: "${FLASK_PORT:-5001}"
       DB_TYPE: "${DB_TYPE:-sqlite}"
       DB_PATH: "${DB_PATH:-/app/data/tenet.db}"
+      CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-}"
+      WEB_CONCURRENCY: "${WEB_CONCURRENCY:-2}"
+      GUNICORN_THREADS: "${GUNICORN_THREADS:-4}"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5001/api/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     restart: unless-stopped
 
   frontend:
@@ -22,5 +31,12 @@ services:
     ports:
       - "${FRONTEND_PORT:-5173}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
