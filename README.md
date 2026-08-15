@@ -98,10 +98,12 @@ Common local variables:
 | `FRONTEND_PORT` | `5173` | Host port for Vite |
 | `FLASK_HOST` | `0.0.0.0` | Backend bind address inside Docker |
 | `FLASK_PORT` | `5001` | Backend container port |
-| `FLASK_DEBUG` | `1` | Flask debug mode for local Docker |
+| `FLASK_DEBUG` | `0` | Flask debug mode (opt in locally; keep disabled in production) |
 | `DB_PATH` | `/app/data/tenet.db` | SQLite path inside the backend container |
 | `VITE_API_BASE_URL` | `/api/cat` | Frontend API base URL proxied by nginx in Docker |
-| `CORS_ALLOWED_ORIGINS` | `*` | Comma-separated frontend origins allowed by the API |
+| `CORS_ALLOWED_ORIGINS` | empty | Explicit comma-separated cross-origin frontend URLs; same-origin needs none |
+| `WEB_CONCURRENCY` | `2` | Gunicorn worker processes in the backend container |
+| `GUNICORN_THREADS` | `4` | Request threads per Gunicorn worker |
 
 ### Troubleshooting
 
