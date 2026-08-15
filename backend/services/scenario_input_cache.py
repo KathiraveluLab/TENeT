@@ -281,12 +281,13 @@ class ScenarioInputCache:
             nearest_clinic_distance_km=nearest_status_clinic,
             distance_threshold_km=distance_threshold_km,
         )
-        baseline_need_score = cls._need_score(
+        healthcare_need_score = cls._need_score(
             facility_distances=facility_distances,
             site_count=site_count,
             has_specialists=has_specialists,
             first_data_point=first_data_point,
             season=season,
+            access_modes=access_modes,
         )
 
         missing_fields: List[str] = []
@@ -302,7 +303,7 @@ class ScenarioInputCache:
             "lon": float(display_lon) if display_lon is not None else None,
             "access_modes": access_modes,
             "baseline_status": baseline_status,
-            "baseline_need_score": baseline_need_score,
+            "healthcare_need_score": healthcare_need_score,
             "nearest_clinic_distance_km": nearest_status_clinic,
             "distance_threshold_km": distance_threshold_km,
             "median_income": median_income,
@@ -460,6 +461,7 @@ class ScenarioInputCache:
         has_specialists: bool,
         first_data_point: Optional[CATDataPoint],
         season: str,
+        access_modes: str = "",
         road_quality: str = ROAD_QUALITY_LOCAL,
     ) -> float:
         if season not in VALID_SEASONS:
@@ -478,7 +480,7 @@ class ScenarioInputCache:
             first_data_point.travel_time_minutes if first_data_point else None,
             season,
             road_quality,
-            "road",
+            ScenarioInputCache._transport_mode(access_modes),
         )
 
         necessity_score = float(
@@ -488,3 +490,11 @@ class ScenarioInputCache:
             + 0.20 * transport_score
         )
         return round(necessity_score, 1)
+
+    @staticmethod
+    def _transport_mode(access_modes: str) -> str:
+        for mode in str(access_modes or "").lower().replace(";", ",").split(","):
+            normalized = mode.strip()
+            if normalized in {"air", "road", "water"}:
+                return normalized
+        return "unknown"

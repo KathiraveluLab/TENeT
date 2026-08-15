@@ -28,9 +28,7 @@ export interface ScenarioRegion {
     baseline_status: ScenarioTelehealthStatusName;
     scenario_status: ScenarioTelehealthStatusName;
     status_delta: StatusDelta;
-    baseline_need_score: number;
-    scenario_need_score: number;
-    need_score_delta: number;
+    healthcare_need_score: number;
     changed: boolean;
     has_data_gap: boolean;
     missing_fields: string[];
@@ -43,7 +41,6 @@ export interface ScenarioRegion {
 export interface ScenarioSummary {
     total_regions: number;
     status_changed_regions: number;
-    score_changed_regions: number;
     improved_count: number;
     worsened_count: number;
     unchanged_count: number;

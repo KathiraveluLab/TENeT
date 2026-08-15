@@ -2440,15 +2440,59 @@ def scenario_preview():
 
     db = SessionLocal()
     try:
-        body = request.get_json(silent=True) or {}
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({'error': 'request body must be a JSON object'}), 400
+
+        mode = body.get('mode', 'preview')
+        if mode != 'preview':
+            return jsonify({'error': 'mode must be "preview"'}), 400
+
         season = body.get('season', SEASON_YEAR_ROUND)
+        if season not in VALID_SEASONS:
+            return jsonify({
+                'error': f'season must be one of: {", ".join(VALID_SEASONS)}'
+            }), 400
+
         thresholds_raw = body.get('thresholds', {})
         region_codes = body.get('region_codes')
         if not isinstance(thresholds_raw, dict):
             return jsonify({'error': 'thresholds must be an object'}), 400
+
+        threshold_keys = {
+            'min_download_mbps',
+            'min_upload_mbps',
+            'max_latency_ms',
+            'clinic_proximity_km',
+            'affordability_burden_pct',
+        }
+        unsupported_keys = sorted(set(thresholds_raw) - threshold_keys)
+        if unsupported_keys:
+            return jsonify({
+                'error': f'unsupported threshold fields: {", ".join(unsupported_keys)}'
+            }), 400
+
         if region_codes is not None:
-            if not isinstance(region_codes, list) or not all(isinstance(code, str) for code in region_codes):
-                return jsonify({'error': 'region_codes must be a list of strings or null'}), 400
+            if (
+                not isinstance(region_codes, list)
+                or not region_codes
+                or not all(isinstance(code, str) and code.strip() for code in region_codes)
+            ):
+                return jsonify({
+                    'error': 'region_codes must be a non-empty list of strings or null'
+                }), 400
+            region_codes = list(dict.fromkeys(code.strip() for code in region_codes))
+            known_codes = {
+                code for code, in db.query(CATRegion.region_code).filter(
+                    CATRegion.region_code.in_(region_codes)
+                ).all()
+            }
+            unknown_codes = [code for code in region_codes if code not in known_codes]
+            if unknown_codes:
+                return jsonify({
+                    'error': 'one or more communities were not found',
+                    'unknown_region_codes': unknown_codes,
+                }), 400
 
         # Coerce provided threshold values to proper types. Omitted keys should
         # remain omitted so ScenarioEngine can apply baseline defaults.
@@ -2459,12 +2503,11 @@ def scenario_preview():
                 continue
             value = thresholds_raw.get(key)
             if value is not None:
-                try:
-                    thresholds[key] = float(value)
-                except (TypeError, ValueError):
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
                     return jsonify({
                         'error': f'Invalid value for {key}: {value!r}'
                     }), 400
+                thresholds[key] = float(value)
             elif key not in ('max_latency_ms', 'clinic_proximity_km'):
                 return jsonify({
                     'error': f'{key} cannot be null'

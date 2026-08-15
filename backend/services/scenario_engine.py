@@ -3,7 +3,9 @@ Scenario Engine - What-If Scenario Analysis
 
 Re-evaluates telehealth readiness status for all (or selected) communities
 under user-specified thresholds.  The engine never mutates baseline data; it
-returns a modeled preview of how status and need-scores would change.
+returns a modeled preview of how readiness status would change. Healthcare
+need remains a factual score and is included as context, not recalculated from
+policy thresholds.
 
 Reuses:
     - ResearchProfileService (income, broadband, ookla lookups)
@@ -17,7 +19,8 @@ Status ranking (worst → best):
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+import math
+from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
@@ -87,15 +90,24 @@ class ScenarioEngine:
         clinic = thresholds.get("clinic_proximity_km")
         aff = thresholds.get("affordability_burden_pct")
 
-        if bd is not None and (not isinstance(bd, (int, float)) or bd < 0 or bd > 1000):
+        def invalid_number(value, minimum, maximum):
+            return (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value < minimum
+                or value > maximum
+            )
+
+        if bd is not None and invalid_number(bd, 0, 1000):
             return f"min_download_mbps must be 0-1000, got {bd}"
-        if up is not None and (not isinstance(up, (int, float)) or up < 0 or up > 500):
+        if up is not None and invalid_number(up, 0, 500):
             return f"min_upload_mbps must be 0-500, got {up}"
-        if lat is not None and (not isinstance(lat, (int, float)) or lat < 0 or lat > 5000):
+        if lat is not None and invalid_number(lat, 0, 5000):
             return f"max_latency_ms must be 0-5000, got {lat}"
-        if clinic is not None and (not isinstance(clinic, (int, float)) or clinic < 0 or clinic > 1000):
+        if clinic is not None and invalid_number(clinic, 0, 1000):
             return f"clinic_proximity_km must be 0-1000, got {clinic}"
-        if aff is not None and (not isinstance(aff, (int, float)) or aff < 0 or aff > 100):
+        if aff is not None and invalid_number(aff, 0, 100):
             return f"affordability_burden_pct must be 0-100, got {aff}"
         return None
 
@@ -148,7 +160,6 @@ class ScenarioEngine:
             "critical_gap": 0,
             "data_unavailable": 0,
             "status_changed_regions": 0,
-            "score_changed_regions": 0,
             "improved_count": 0,
             "worsened_count": 0,
             "unchanged_count": 0,
@@ -177,8 +188,6 @@ class ScenarioEngine:
 
             if entry["status_delta"] != "unchanged":
                 summary_counters["status_changed_regions"] += 1
-            if entry["need_score_delta"] != 0:
-                summary_counters["score_changed_regions"] += 1
 
         return {
             "scenario": {
@@ -203,7 +212,7 @@ class ScenarioEngine:
         is_baseline_equivalent: bool,
     ) -> dict:
         baseline_status = scenario_input["baseline_status"]
-        baseline_need_score = scenario_input["baseline_need_score"]
+        healthcare_need_score = scenario_input["healthcare_need_score"]
 
         if is_baseline_equivalent:
             scenario = {
@@ -218,9 +227,7 @@ class ScenarioEngine:
             )
 
         scenario_status = scenario["status"]
-        scenario_need_score = baseline_need_score
         delta = _status_delta(baseline_status, scenario_status)
-        need_delta = round(scenario_need_score - baseline_need_score, 1)
 
         return {
             "region_code": scenario_input["region_code"],
@@ -230,9 +237,7 @@ class ScenarioEngine:
             "baseline_status": baseline_status,
             "scenario_status": scenario_status,
             "status_delta": delta,
-            "baseline_need_score": baseline_need_score,
-            "scenario_need_score": scenario_need_score,
-            "need_score_delta": need_delta,
+            "healthcare_need_score": healthcare_need_score,
             "changed": delta != "unchanged",
             "has_data_gap": scenario_input["has_data_gap"],
             "missing_fields": scenario_input["missing_fields"],

@@ -17,7 +17,6 @@ const preview: ScenarioPreviewResponse = {
     summary: {
         total_regions: 1,
         status_changed_regions: 0,
-        score_changed_regions: 0,
         improved_count: 0,
         worsened_count: 0,
         unchanged_count: 1,
