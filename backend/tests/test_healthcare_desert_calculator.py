@@ -164,6 +164,21 @@ def test_winter_transport_adjustment_increases_score_against_summer(db_session):
     assert winter["necessity_score"] > summer["necessity_score"]
 
 
+def test_declared_air_access_is_used_instead_of_assuming_a_road(db_session):
+    region = add_region(db_session, travel_time=120)
+    region.properties = {"primary_access_modes": "air"}
+    db_session.commit()
+
+    winter = HealthcareDesertCalculator.calculate_healthcare_necessity_score(
+        db_session,
+        "AK-TEST",
+        season=SEASON_WINTER,
+    )
+
+    assert winter["season_scenario"]["transport_mode"] == "air"
+    assert winter["breakdown"]["transport_component"] == 59
+
+
 def test_specialist_availability_lowers_need_score(db_session):
     add_region(db_session, travel_time=60)
     add_site(db_session, site_type="clinic")
