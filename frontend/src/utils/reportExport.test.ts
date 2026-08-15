@@ -3,24 +3,46 @@ import { ResearchProfile } from '../types/research';
 import { DATA_UNAVAILABLE } from './formatResearchValue';
 import { exportResearchProfileReport } from './reportExport';
 
-const textCalls: string[] = [];
-const saveMock = vi.fn();
+const {
+    textCalls,
+    saveMock,
+    addImageMock,
+    addPageMock,
+    setPageMock,
+    splitTextMock,
+    html2canvasMock,
+} = vi.hoisted(() => ({
+    textCalls: [] as string[],
+    saveMock: vi.fn(),
+    addImageMock: vi.fn(),
+    addPageMock: vi.fn(),
+    setPageMock: vi.fn(),
+    splitTextMock: vi.fn((value: string | string[]) => Array.isArray(value) ? value : [String(value)]),
+    html2canvasMock: vi.fn(),
+}));
+
+vi.mock('html2canvas', () => ({
+    default: html2canvasMock,
+}));
 
 vi.mock('jspdf', () => {
     return {
         default: vi.fn().mockImplementation(() => ({
-            addPage: vi.fn(),
+            addImage: addImageMock,
+            addPage: addPageMock,
+            getNumberOfPages: vi.fn(() => addPageMock.mock.calls.length + 1),
             line: vi.fn(),
             rect: vi.fn(),
             roundedRect: vi.fn(),
             save: saveMock,
+            setPage: setPageMock,
             setDrawColor: vi.fn(),
             setFillColor: vi.fn(),
             setFont: vi.fn(),
             setFontSize: vi.fn(),
             setLineWidth: vi.fn(),
             setTextColor: vi.fn(),
-            splitTextToSize: vi.fn((value: string | string[]) => Array.isArray(value) ? value : [String(value)]),
+            splitTextToSize: splitTextMock,
             getTextWidth: vi.fn((value: string) => String(value).length),
             text: vi.fn((value: string | string[]) => {
                 if (Array.isArray(value)) {
@@ -42,6 +64,7 @@ function profileWithMissingData(): ResearchProfile {
             lon: null,
             cat_tier: null,
             region: null,
+            population: null,
             has_data_gap: true,
             missing_fields: ['ookla_download_mbps', 'median_income'],
             data_confidence: 'LOW',
@@ -92,11 +115,59 @@ describe('report export missing data handling', () => {
     it('uses readable missing-data labels instead of blank/null/undefined fields', async () => {
         textCalls.length = 0;
         saveMock.mockClear();
+        addPageMock.mockClear();
+        html2canvasMock.mockClear();
 
         await exportResearchProfileReport(profileWithMissingData(), null);
 
         expect(textCalls).toContain(DATA_UNAVAILABLE);
+        expect(textCalls).toContain('Map snapshot unavailable');
         expect(textCalls.join('\n')).not.toMatch(/\b(undefined|null|NaN)\b/);
         expect(saveMock).toHaveBeenCalledWith('tenet-community-report-missing-data-village.pdf');
+    });
+
+    it('captures the supplied map element for the location section', async () => {
+        const mapElement = document.createElement('div');
+        html2canvasMock.mockResolvedValueOnce({
+            width: 800,
+            height: 400,
+            toDataURL: () => 'data:image/png;base64,map-snapshot',
+        });
+
+        await exportResearchProfileReport(profileWithMissingData(), mapElement);
+
+        expect(html2canvasMock).toHaveBeenCalledWith(mapElement, expect.objectContaining({
+            useCORS: true,
+        }));
+        expect(addImageMock).toHaveBeenCalledWith(
+            'data:image/png;base64,map-snapshot',
+            'PNG',
+            expect.any(Number),
+            expect.any(Number),
+            expect.any(Number),
+            expect.any(Number),
+        );
+    });
+
+    it('adds continuation pages when report fields wrap beyond the footer boundary', async () => {
+        addPageMock.mockClear();
+        splitTextMock.mockImplementation((value: string | string[], width?: number) => {
+            if (Array.isArray(value)) return value;
+            const text = String(value);
+            const chunkSize = Math.max(8, Math.floor(Number(width || 30)));
+            return text.match(new RegExp(`.{1,${chunkSize}}`, 'g')) ?? [''];
+        });
+        const profile = profileWithMissingData();
+        profile.methodology.confidence_notes = ['Long source note '.repeat(120)];
+        profile.methodology.sources = ['Long methodology source '.repeat(80)];
+
+        await exportResearchProfileReport(profile, null);
+
+        expect(addPageMock).toHaveBeenCalled();
+        expect(setPageMock).toHaveBeenCalled();
+        expect(textCalls.some(text => text.includes('Page 1 of'))).toBe(true);
+        splitTextMock.mockImplementation(
+            (value: string | string[]) => Array.isArray(value) ? value : [String(value)],
+        );
     });
 });

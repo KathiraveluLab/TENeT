@@ -9,6 +9,7 @@ export interface ResearchProfile {
         lat: number | null;
         lon: number | null;
         region: string | null;
+        population: number | null;
         cat_tier: number | null;
         data_confidence: DataConfidence;
         has_data_gap: boolean;

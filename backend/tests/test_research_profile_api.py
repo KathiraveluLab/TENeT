@@ -46,6 +46,7 @@ def client(db_session):
     db_session.add(CensusIncome(
         zcta="99501",
         median_income=120000,
+        population=16000,
         acs_year=2022,
         centroid_lat=61.2,
         centroid_lon=-149.9,
@@ -94,10 +95,12 @@ def test_single_research_profile_schema_with_complete_data(client):
         "methodology",
     }
     assert payload["region"]["region_code"] == "AK-READY"
+    assert payload["region"]["population"] == 16000
     assert payload["region"]["data_confidence"] == "HIGH"
     assert payload["region"]["has_data_gap"] is False
     assert payload["connectivity"]["ookla_download_mbps"] == 52.0
     assert payload["connectivity"]["latency_ms"] == 45.0
+    assert payload["connectivity"]["isp_name"] not in {None, "WIRED"}
     assert payload["healthcare"]["nearest_facility_name"] == "Ready Clinic"
     assert payload["healthcare"]["emergency_services"] is True
     assert payload["affordability"]["status"] in {"affordable", "unaffordable"}

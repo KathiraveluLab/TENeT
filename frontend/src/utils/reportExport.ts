@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { ResearchProfile } from '../types/research';
 import { DATA_UNAVAILABLE, formatResearchValue, formatStatusText } from './formatResearchValue';
 import { telehealthNeedLabel } from '../components/sidebar/sidebarUtils';
@@ -7,6 +8,8 @@ const PAGE_WIDTH = 210;
 const PAGE_HEIGHT = 297;
 const MARGIN = 14;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
+const CONTENT_TOP = 42;
+const CONTENT_BOTTOM = PAGE_HEIGHT - 22;
 
 const INK = '#151827';
 const MUTED = '#6b7280';
@@ -30,6 +33,8 @@ interface ReportRow {
     value: string;
     tone?: Tone;
 }
+
+type PageBreak = () => number;
 
 function rgb(hex: string): [number, number, number] {
     const value = hex.replace('#', '');
@@ -105,8 +110,8 @@ function affordabilityTone(status: ResearchProfile['affordability']['status']): 
 
 function telehealthTone(status: string): Tone {
     if (status === 'TELEHEALTH_READY') return 'good';
-    if (status === 'CLINIC_SUPPORTED') return 'warn';
-    if (status === 'NOT_READY') return 'bad';
+    if (status === 'COMMUNITY_ANCHOR' || status === 'LIMITED_TELEHEALTH') return 'warn';
+    if (status === 'CRITICAL_GAP') return 'bad';
     return 'neutral';
 }
 
@@ -130,10 +135,10 @@ function equityClassification(profile: ResearchProfile): string {
     if (profile.telehealth.status === 'TELEHEALTH_READY' && profile.affordability.status === 'affordable') {
         return 'Ready - Affordable';
     }
-    if (profile.telehealth.status === 'CLINIC_SUPPORTED') {
-        return `Clinic Supported - ${affordability}`;
+    if (profile.telehealth.status === 'COMMUNITY_ANCHOR') {
+        return `Community Anchor - ${affordability}`;
     }
-    if (profile.telehealth.status === 'NOT_READY') {
+    if (profile.telehealth.status === 'CRITICAL_GAP') {
         return `Needs Intervention - ${affordability}`;
     }
     return `${telehealth} - ${affordability}`;
@@ -143,7 +148,7 @@ function equityTone(profile: ResearchProfile): Tone {
     if (profile.telehealth.status === 'TELEHEALTH_READY' && profile.affordability.status === 'affordable') {
         return 'good';
     }
-    if (profile.telehealth.status === 'NOT_READY' || profile.affordability.status === 'unaffordable') {
+    if (profile.telehealth.status === 'CRITICAL_GAP' || profile.affordability.status === 'unaffordable') {
         return 'bad';
     }
     return 'warn';
@@ -171,7 +176,9 @@ function telehealthNeedTone(profile: ResearchProfile): Tone {
 }
 
 function generatedLine(profile: ResearchProfile): string {
-    const timestamp = new Date(profile.methodology.generated_at).toLocaleString();
+    const timestamp = new Date(profile.methodology.generated_at).toLocaleString('en-US', {
+        timeZone: 'UTC',
+    });
     return `Generated ${timestamp} UTC - Dataset Phase 3 - Season ${formatStatusText(profile.telehealth.season)}`;
 }
 
@@ -224,7 +231,7 @@ function addHeader(pdf: jsPDF, subtitle?: string) {
     }
 }
 
-function addFooter(pdf: jsPDF, pageNumber: number) {
+function addFooter(pdf: jsPDF, pageNumber: number, pageCount: number) {
     setDraw(pdf, LINE);
     pdf.setLineWidth(0.2);
     pdf.line(MARGIN, PAGE_HEIGHT - 15, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 15);
@@ -233,7 +240,7 @@ function addFooter(pdf: jsPDF, pageNumber: number) {
     pdf.setFontSize(7.5);
     setText(pdf, MUTED);
     pdf.text('TENeT community report. Planning support only; verify conditions with local providers and agencies.', MARGIN, PAGE_HEIGHT - 9);
-    pdf.text(`Page ${pageNumber} of 2`, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 9, { align: 'right' });
+    pdf.text(`Page ${pageNumber} of ${pageCount}`, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 9, { align: 'right' });
     setText(pdf, INK);
 }
 
@@ -268,7 +275,9 @@ function addReportTable(
     y: number,
     width: number,
     compact = false,
+    newPage?: PageBreak,
 ): number {
+    if (newPage && y + 15 > CONTENT_BOTTOM) y = newPage();
     y = addSectionTitle(pdf, title, x, y);
 
     const labelWidth = width * (compact ? 0.43 : 0.36);
@@ -279,36 +288,75 @@ function addReportTable(
         const value = safeText(row.value);
         const labelLines = pdf.splitTextToSize(label, labelWidth - 5);
         const valueLines = pdf.splitTextToSize(value, valueWidth - 7);
-        const rowHeight = Math.max(compact ? 7.8 : 8.8, Math.max(labelLines.length, valueLines.length) * 4.2 + 4);
+        let valueLineOffset = 0;
 
-        setFill(pdf, index % 2 === 0 ? ROW : '#ffffff');
-        setDraw(pdf, '#e7ebf0');
-        pdf.rect(x, y, width, rowHeight, 'FD');
+        while (valueLineOffset < valueLines.length) {
+            const minimumRowHeight = compact ? 7.8 : 8.8;
+            if (newPage && y + minimumRowHeight > CONTENT_BOTTOM) {
+                y = newPage();
+                y = addSectionTitle(pdf, `${title} (continued)`, x, y);
+            }
 
-        setFill(pdf, LABEL_BG);
-        pdf.rect(x, y, labelWidth, rowHeight, 'F');
+            const availableLines = Math.max(
+                1,
+                Math.floor((CONTENT_BOTTOM - y - 4) / 4.2),
+            );
+            const segmentLines = valueLines.slice(
+                valueLineOffset,
+                valueLineOffset + availableLines,
+            );
+            const rowHeight = Math.max(
+                minimumRowHeight,
+                Math.max(labelLines.length, segmentLines.length) * 4.2 + 4,
+            );
 
-        pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(compact ? 7.7 : 8.5);
-        setText(pdf, '#2f3542');
-        pdf.text(labelLines, x + 3, y + 5.4);
+            setFill(pdf, index % 2 === 0 ? ROW : '#ffffff');
+            setDraw(pdf, '#e7ebf0');
+            pdf.rect(x, y, width, rowHeight, 'FD');
 
-        if (row.tone && value.length <= 32) {
-            addBadge(pdf, value, x + labelWidth + 3, y + 5.6, valueWidth - 6, row.tone);
-        } else {
-            pdf.setFont('helvetica', 'normal');
+            setFill(pdf, LABEL_BG);
+            pdf.rect(x, y, labelWidth, rowHeight, 'F');
+
+            pdf.setFont('helvetica', 'bold');
             pdf.setFontSize(compact ? 7.7 : 8.5);
-            setText(pdf, INK);
-            pdf.text(valueLines, x + labelWidth + 3, y + 5.4);
-        }
+            setText(pdf, '#2f3542');
+            pdf.text(
+                valueLineOffset === 0 ? labelLines : [`${label} (continued)`],
+                x + 3,
+                y + 5.4,
+            );
 
-        y += rowHeight;
+            if (
+                row.tone
+                && value.length <= 32
+                && valueLineOffset === 0
+                && valueLines.length === segmentLines.length
+            ) {
+                addBadge(pdf, value, x + labelWidth + 3, y + 5.6, valueWidth - 6, row.tone);
+            } else {
+                pdf.setFont('helvetica', 'normal');
+                pdf.setFontSize(compact ? 7.7 : 8.5);
+                setText(pdf, INK);
+                pdf.text(segmentLines, x + labelWidth + 3, y + 5.4);
+            }
+
+            y += rowHeight;
+            valueLineOffset += segmentLines.length;
+        }
     });
 
     return y + 7;
 }
 
-function addFindings(pdf: jsPDF, profile: ResearchProfile, x: number, y: number, width: number): number {
+function addFindings(
+    pdf: jsPDF,
+    profile: ResearchProfile,
+    x: number,
+    y: number,
+    width: number,
+    newPage: PageBreak,
+): number {
+    if (y + 15 > CONTENT_BOTTOM) y = newPage();
     y = addSectionTitle(pdf, 'Key Findings', x, y);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(8.3);
@@ -316,6 +364,10 @@ function addFindings(pdf: jsPDF, profile: ResearchProfile, x: number, y: number,
 
     keyFindings(profile).forEach(finding => {
         const lines = pdf.splitTextToSize(`- ${finding}`, width - 4);
+        if (y + lines.length * 4.3 + 1 > CONTENT_BOTTOM) {
+            y = newPage();
+            y = addSectionTitle(pdf, 'Key Findings (continued)', x, y);
+        }
         pdf.text(lines, x + 2, y);
         y += lines.length * 4.3 + 1;
     });
@@ -323,10 +375,74 @@ function addFindings(pdf: jsPDF, profile: ResearchProfile, x: number, y: number,
     return y;
 }
 
+async function captureMap(mapElement?: HTMLElement | null): Promise<string | null> {
+    if (!mapElement) return null;
+
+    try {
+        const canvas = await html2canvas(mapElement, {
+            backgroundColor: '#ffffff',
+            logging: false,
+            scale: 1,
+            useCORS: true,
+            ignoreElements: element => element.classList?.contains('leaflet-control-container'),
+        });
+        if (!canvas.width || !canvas.height) return null;
+        return canvas.toDataURL('image/png');
+    } catch {
+        return null;
+    }
+}
+
+function addLocationMap(
+    pdf: jsPDF,
+    profile: ResearchProfile,
+    mapImage: string | null,
+    y: number,
+    newPage: PageBreak,
+): number {
+    const blockHeight = 69;
+    if (y + blockHeight > CONTENT_BOTTOM) y = newPage();
+    y = addSectionTitle(pdf, 'Location', MARGIN, y);
+
+    setDraw(pdf, LINE);
+    setFill(pdf, ROW);
+    pdf.rect(MARGIN, y, CONTENT_WIDTH, 57, 'FD');
+
+    if (mapImage) {
+        pdf.addImage(mapImage, 'PNG', MARGIN + 1, y + 1, CONTENT_WIDTH - 2, 48);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(7.5);
+        setText(pdf, MUTED);
+        pdf.text(`Map snapshot - ${coordinateText(profile)}`, MARGIN + 3, y + 54);
+    } else {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(10);
+        setText(pdf, BRAND);
+        pdf.text('Map snapshot unavailable', MARGIN + 5, y + 20);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(9);
+        setText(pdf, MUTED);
+        pdf.text(`Community coordinates: ${coordinateText(profile)}`, MARGIN + 5, y + 29);
+        pdf.text('Open TENeT to view the interactive map and surrounding access context.', MARGIN + 5, y + 37);
+    }
+
+    setText(pdf, INK);
+    return y + 64;
+}
+
+function addAllFooters(pdf: jsPDF) {
+    const pageCount = pdf.getNumberOfPages();
+    for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+        pdf.setPage(pageNumber);
+        addFooter(pdf, pageNumber, pageCount);
+    }
+}
+
 export async function exportResearchProfileReport(
     profile: ResearchProfile,
-    _mapElement?: HTMLElement | null,
+    mapElement?: HTMLElement | null,
 ) {
+    const mapImage = await captureMap(mapElement);
     const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
     const missingFields = profile.region.has_data_gap
         ? safeJoin(profile.region.missing_fields)
@@ -335,22 +451,33 @@ export async function exportResearchProfileReport(
     addPageBase(pdf);
     addHeader(pdf, generatedLine(profile));
 
+    const continuationSubtitle = `${safeText(profile.region.name)} - Evidence Detail`;
+    const newPage = () => {
+        pdf.addPage();
+        addPageBase(pdf);
+        addHeader(pdf, continuationSubtitle);
+        return CONTENT_TOP;
+    };
+
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(15);
     setText(pdf, BRAND);
-    pdf.text(safeText(profile.region.name), MARGIN, 45);
+    const communityNameLines = pdf.splitTextToSize(safeText(profile.region.name), CONTENT_WIDTH);
+    pdf.text(communityNameLines, MARGIN, 45);
 
-    let y = 55;
+    let y = 50 + communityNameLines.length * 5;
     y = addReportTable(pdf, 'Community Overview', [
         { label: 'Region', value: clean(profile.region.region) },
         { label: 'Region Code', value: clean(profile.region.region_code) },
-        { label: 'Population', value: DATA_UNAVAILABLE },
+        { label: 'Population', value: formatResearchValue(profile.region.population) },
         { label: 'Coordinates', value: coordinateText(profile) },
         { label: 'Access Tier (CAT)', value: accessTier(profile), tone: 'neutral' },
         { label: 'Data Confidence', value: formatStatusText(profile.region.data_confidence), tone: confidenceTone(profile.region.data_confidence) },
         { label: 'Data Completeness', value: dataCompleteness(profile), tone: profile.region.has_data_gap ? 'warn' : 'good' },
         { label: 'Season', value: formatStatusText(profile.telehealth.season) },
-    ], MARGIN, y, CONTENT_WIDTH);
+    ], MARGIN, y, CONTENT_WIDTH, false, newPage);
+
+    y = addLocationMap(pdf, profile, mapImage, y, newPage);
 
     y = addReportTable(pdf, 'Digital Equity Analysis', [
         { label: 'Equity Classification', value: equityClassification(profile), tone: equityTone(profile) },
@@ -364,20 +491,9 @@ export async function exportResearchProfileReport(
         { label: 'Community Anchor', value: formatResearchValue(profile.telehealth.clinic_supported, { booleanLabels: ['Yes', 'No'] }) },
         { label: 'Facility Count', value: formatResearchValue(profile.healthcare.facility_count) },
         { label: 'Classification Reason', value: interpretation(profile) },
-    ], MARGIN, y, CONTENT_WIDTH);
-    addFooter(pdf, 1);
+    ], MARGIN, y, CONTENT_WIDTH, false, newPage);
 
-    pdf.addPage();
-    addPageBase(pdf);
-    addHeader(pdf, `${safeText(profile.region.name)} - Evidence Detail`);
-
-    const leftX = MARGIN;
-    const rightX = MARGIN + CONTENT_WIDTH / 2 + 5;
-    const colWidth = CONTENT_WIDTH / 2 - 5;
-    let leftY = 45;
-    let rightY = 45;
-
-    leftY = addReportTable(pdf, 'Connectivity Metrics', [
+    y = addReportTable(pdf, 'Connectivity Metrics', [
         { label: 'FCC 25 Mbps Coverage', value: formatResearchValue(profile.connectivity.fcc_coverage_25mbps_pct, { suffix: '%', digits: 1 }) },
         { label: 'Ookla Download', value: formatResearchValue(profile.connectivity.ookla_download_mbps, { suffix: ' Mbps', digits: 1 }) },
         { label: 'Ookla Upload', value: formatResearchValue(profile.connectivity.ookla_upload_mbps, { suffix: ' Mbps', digits: 1 }) },
@@ -385,25 +501,18 @@ export async function exportResearchProfileReport(
         { label: 'Reliability', value: formatResearchValue(profile.connectivity.reliability_label) },
         { label: 'ISP Name', value: formatResearchValue(profile.connectivity.isp_name) },
         { label: 'Data Source', value: formatResearchValue(profile.connectivity.data_source) },
-    ], leftX, leftY, colWidth, true);
+    ], MARGIN, y, CONTENT_WIDTH, false, newPage);
 
-    leftY = addReportTable(pdf, 'Affordability', [
+    y = addReportTable(pdf, 'Affordability', [
         { label: 'Monthly Cost', value: formatResearchValue(profile.affordability.monthly_cost, { prefix: '$', digits: 0 }) },
         { label: 'Median Income', value: formatResearchValue(profile.affordability.median_income, { prefix: '$', digits: 0 }) },
         { label: 'Income Burden', value: formatResearchValue(profile.affordability.burden_pct, { suffix: '%', digits: 2 }) },
         { label: 'Threshold', value: formatResearchValue(profile.affordability.threshold_pct, { suffix: '%', digits: 1 }) },
         { label: 'Status', value: formatStatusText(profile.affordability.status), tone: affordabilityTone(profile.affordability.status) },
         { label: 'Value Index', value: valueIndex(profile) },
-    ], leftX, leftY, colWidth, true);
+    ], MARGIN, y, CONTENT_WIDTH, false, newPage);
 
-    leftY = addReportTable(pdf, 'Data Quality and Missing Fields', [
-        { label: 'Data Confidence', value: formatStatusText(profile.region.data_confidence), tone: confidenceTone(profile.region.data_confidence) },
-        { label: 'Data Gap Flag', value: formatResearchValue(profile.region.has_data_gap, { booleanLabels: ['Yes', 'No'] }), tone: profile.region.has_data_gap ? 'warn' : 'good' },
-        { label: 'Missing Fields', value: missingFields },
-        { label: 'Confidence Notes', value: safeJoin(profile.methodology.confidence_notes) },
-    ], leftX, leftY, colWidth, true);
-
-    rightY = addReportTable(pdf, 'Healthcare Access', [
+    y = addReportTable(pdf, 'Healthcare Access', [
         { label: 'Nearest Facility', value: formatResearchValue(profile.healthcare.nearest_facility_name) },
         { label: 'Facility Type', value: formatResearchValue(profile.healthcare.nearest_facility_type) },
         { label: 'Facility Distance', value: formatResearchValue(profile.healthcare.nearest_facility_distance_km, { suffix: ' km', digits: 1 }) },
@@ -411,9 +520,9 @@ export async function exportResearchProfileReport(
         { label: 'Specialists', value: formatResearchValue(profile.healthcare.specialist_available, { booleanLabels: ['Yes', 'No'] }) },
         { label: 'Facility Count', value: formatResearchValue(profile.healthcare.facility_count) },
         { label: 'Desert Score', value: formatResearchValue(profile.healthcare.desert_score, { digits: 1 }) },
-    ], rightX, rightY, colWidth, true);
+    ], MARGIN, y, CONTENT_WIDTH, false, newPage);
 
-    rightY = addReportTable(pdf, 'Telehealth Feasibility', [
+    y = addReportTable(pdf, 'Telehealth Feasibility', [
         { label: 'Status', value: safeText(profile.telehealth.label), tone: telehealthTone(profile.telehealth.status) },
         { label: 'Telehealth Need', value: telehealthNeed(profile), tone: telehealthNeedTone(profile) },
         { label: 'Video Feasible', value: formatResearchValue(profile.telehealth.video_feasible, { booleanLabels: ['Yes', 'No'] }) },
@@ -421,16 +530,21 @@ export async function exportResearchProfileReport(
         { label: 'Clinic Supported', value: formatResearchValue(profile.telehealth.clinic_supported, { booleanLabels: ['Yes', 'No'] }) },
         { label: 'Season', value: formatStatusText(profile.telehealth.season) },
         { label: 'Season Note', value: formatResearchValue(profile.telehealth.season_note) },
-    ], rightX, rightY, colWidth, true);
+    ], MARGIN, y, CONTENT_WIDTH, false, newPage);
 
-    rightY = addReportTable(pdf, 'Data Sources', [
+    y = addReportTable(pdf, 'Data Quality and Missing Fields', [
+        { label: 'Data Confidence', value: formatStatusText(profile.region.data_confidence), tone: confidenceTone(profile.region.data_confidence) },
+        { label: 'Data Gap Flag', value: formatResearchValue(profile.region.has_data_gap, { booleanLabels: ['Yes', 'No'] }), tone: profile.region.has_data_gap ? 'warn' : 'good' },
+        { label: 'Missing Fields', value: missingFields },
+        { label: 'Confidence Notes', value: safeJoin(profile.methodology.confidence_notes) },
+    ], MARGIN, y, CONTENT_WIDTH, false, newPage);
+
+    y = addReportTable(pdf, 'Data Sources', [
         { label: 'Sources', value: safeJoin(profile.methodology.sources) },
-        { label: 'Generated At', value: new Date(profile.methodology.generated_at).toLocaleString() },
-    ], rightX, rightY, colWidth, true);
+        { label: 'Generated At (UTC)', value: new Date(profile.methodology.generated_at).toLocaleString('en-US', { timeZone: 'UTC' }) },
+    ], MARGIN, y, CONTENT_WIDTH, false, newPage);
 
-    const finalY = Math.max(leftY, rightY);
-    addFindings(pdf, profile, MARGIN, finalY + 4, CONTENT_WIDTH);
-
-    addFooter(pdf, 2);
+    addFindings(pdf, profile, MARGIN, y + 4, CONTENT_WIDTH, newPage);
+    addAllFooters(pdf);
     pdf.save(`tenet-community-report-${fileSafe(profile.region.name)}.pdf`);
 }
