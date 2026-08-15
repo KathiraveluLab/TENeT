@@ -74,7 +74,13 @@ Seeded data includes:
 - Healthcare facilities from `backend/data/processed_data/healthcare_facilities.csv`
 - Broadband coverage from `backend/data/processed_data/broadband_data_gaps.csv`
 - Local sample Census income records for affordability workflows
-- Local sample Ookla-like performance records for the performance layer
+- A curated 2024 Q4 subset of real Ookla Open Data tiles for the performance layer
+
+The checked-in Ookla subset contains 60 measurements around ten Alaska
+communities. It keeps a fresh, offline install useful without presenting
+generated speeds as observations. For statewide detail, run
+`backend/data/scripts/ingest_ookla.py`; subsequent seed runs preserve tiles that
+are not part of the checked-in subset.
 
 ### Environment
 
