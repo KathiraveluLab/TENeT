@@ -94,7 +94,7 @@ def _build_telehealth_context(db, regions):
     }
 
 
-def _build_desert_score_lookup(db, regions):
+def _build_desert_score_lookup(db, regions, season=SEASON_YEAR_ROUND):
     region_codes = [region.region_code for region in regions if region.region_code]
     if not region_codes:
         return {}
@@ -167,9 +167,14 @@ def _build_desert_score_lookup(db, regions):
         specialist_score = HealthcareDesertCalculator.score_specialist_component(
             region.region_code in specialist_regions
         )
+        transport_mode = HealthcareDesertCalculator.resolve_transport_mode(
+            region,
+            region_points[0] if region_points else None,
+        )
         transport_score = HealthcareDesertCalculator.score_transport_component(
             travel_time,
-            transport_mode='road',
+            season=season,
+            transport_mode=transport_mode,
         )
 
         score_lookup[region.region_code] = round(float(
@@ -182,25 +187,31 @@ def _build_desert_score_lookup(db, regions):
     return score_lookup
 
 
-def _build_region_summary(db, regions):
+def _build_region_summary(db, regions, season=SEASON_YEAR_ROUND):
     broadband_lookup = _broadband_for_regions(
         db,
         [region.region_code for region in regions if region.region_code]
     )
     telehealth_lookup = _build_telehealth_context(db, regions)
-    desert_score_lookup = _build_desert_score_lookup(db, regions)
+    desert_score_lookup = _build_desert_score_lookup(db, regions, season)
 
     summaries = []
     for region in regions:
         broadband = broadband_lookup.get(region.region_code)
         telehealth = telehealth_lookup.get(region.region_code, {})
+        adjusted_tier, _, _ = _calculate_seasonal_tier(
+            region.tier_level,
+            region.access_score if region.access_score is not None else 50,
+            region.properties,
+            season,
+        )
         summaries.append({
             'id': region.id,
             'region_code': region.region_code,
             'name': region.region_name,
             'lat': _to_float_or_none(region.centroid_lat),
             'lon': _to_float_or_none(region.centroid_lon),
-            'cat_tier': region.tier_level if region.tier_level is not None else None,
+            'cat_tier': adjusted_tier if region.tier_level is not None else None,
             'telehealth_status': telehealth.get('telehealth_status', 'DATA_UNAVAILABLE'),
             'desert_score': desert_score_lookup.get(region.region_code),
             'affordability_status': telehealth.get('affordability_status', 'unknown'),
@@ -451,12 +462,16 @@ def get_regions_summary():
     """
     db = SessionLocal()
     try:
+        season = request.args.get('season', SEASON_YEAR_ROUND)
+        if season not in VALID_SEASONS:
+            season = SEASON_YEAR_ROUND
         regions = db.query(CATRegion).order_by(CATRegion.region_name).all()
-        summaries = _build_region_summary(db, regions)
+        summaries = _build_region_summary(db, regions, season)
 
         return jsonify({
             'regions': summaries,
-            'count': len(summaries)
+            'count': len(summaries),
+            'season': season,
         }), 200
 
     except Exception as e:
@@ -545,15 +560,19 @@ def search_regions():
     """
     db = SessionLocal()
     try:
+        season = request.args.get('season', SEASON_YEAR_ROUND)
+        if season not in VALID_SEASONS:
+            season = SEASON_YEAR_ROUND
         filters = _parse_region_search_args(request.args)
         regions = db.query(CATRegion).order_by(CATRegion.region_name).all()
-        summaries = _build_region_summary(db, regions)
+        summaries = _build_region_summary(db, regions, season)
         filtered = _filter_region_summaries(summaries, filters)
 
         return jsonify({
             'regions': filtered,
             'count': len(filtered),
-            'filters': filters
+            'filters': filters,
+            'season': season,
         }), 200
 
     except Exception as e:

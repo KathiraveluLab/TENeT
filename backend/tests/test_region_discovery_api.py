@@ -205,3 +205,24 @@ def test_regions_summary_preserves_missing_data_labels(client):
     assert missing["affordability_status"] == "unknown"
     assert missing["data_confidence"] == "missing"
     assert missing["has_data_gap"] is True
+
+
+def test_regions_summary_matches_map_metrics_for_selected_season(client):
+    summary_response = client.get("/api/cat/regions/summary?season=winter")
+    map_response = client.get("/api/cat/regions?season=winter")
+
+    assert summary_response.status_code == 200
+    assert summary_response.get_json()["season"] == "winter"
+
+    summaries = {
+        item["region_code"]: item
+        for item in summary_response.get_json()["regions"]
+    }
+    map_regions = {
+        item["region_code"]: item
+        for item in map_response.get_json()["regions"]
+    }
+
+    for code in ("AK-ANCHORAGE", "AK-EARECKSON"):
+        assert summaries[code]["cat_tier"] == map_regions[code]["tier_level"]
+        assert summaries[code]["desert_score"] == map_regions[code]["necessity_score"]

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { fetchRegionSummary, RegionSummary } from '../api/catApi';
+import type { Season } from '../api/catApi';
 import { errorMessage, isAbortError } from '../api/http';
 
-export function useRegionSummary() {
+export function useRegionSummary(season: Season = 'year_round') {
     const [regions, setRegions] = useState<RegionSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -13,7 +14,7 @@ export function useRegionSummary() {
         async function loadSummary() {
             try {
                 setLoading(true);
-                const data = await fetchRegionSummary(controller.signal);
+                const data = await fetchRegionSummary(season, controller.signal);
                 if (!controller.signal.aborted) {
                     setRegions(data);
                     setError(null);
@@ -34,7 +35,7 @@ export function useRegionSummary() {
         return () => {
             controller.abort();
         };
-    }, []);
+    }, [season]);
 
     return { regions, loading, error };
 }
