@@ -9,7 +9,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database.config import init_db, SessionLocal
-from database.models import CATGatingRule
+from database.models import CATGatingRule, OoklaPerformance
 from database.handlers import (
     CATDataHandler,
     CAT4_MIN_BANDWIDTH_MBPS,
@@ -142,8 +142,12 @@ def main():
     except Exception as e:
         print(f"   Warning: Could not seed Census income: {e}")
 
-    print("\n7. Skipping synthetic Ookla performance samples...")
-    print("   Gap Finder uses real Ookla tiles. Run data/scripts/ingest_ookla.py to load them.")
+    print("\n7. Seeding a curated Ookla Open Data sample...")
+    try:
+        from database.seed_ookla_data import seed_ookla_data
+        seed_ookla_data()
+    except Exception as e:
+        print(f"   Warning: Could not seed Ookla performance data: {e}")
     
     # Get statistics
     print("\n8. Database Statistics:")
@@ -159,6 +163,7 @@ def main():
         print(f"   - Total healthcare sites: {stats.get('total_healthcare_sites', 0)}")
         print(f"   - Hospitals: {stats.get('hospitals', 0)}")
         print(f"   - Clinics: {stats.get('clinics', 0)}")
+        print(f"   - Ookla performance tiles: {db.query(OoklaPerformance).count()}")
     finally:
         db.close()
     

@@ -13,6 +13,7 @@ from services.data_importer import CATDataImporter
 from services.healthcare_desert_calculator import HealthcareDesertCalculator, haversine_km as _haversine_km
 from services.isp_config import ISP_CONFIG as _ISP_CONFIG, get_internet_cost as _get_regional_internet_cost
 from services.research_profile_service import ResearchProfileService
+from services.telehealth_classification import TelehealthClassificationService
 from services.season_constants import (
     SEASON_SUMMER, SEASON_WINTER, SEASON_YEAR_ROUND, VALID_SEASONS, 
     ROAD_QUALITY_LOCAL, VALID_ROAD_QUALITIES,
@@ -82,126 +83,18 @@ def _data_confidence(record):
     return (record.confidence or 'unknown').lower()
 
 
-def _nearest_income_record(region, census_records):
-    if region.centroid_lat is None or region.centroid_lon is None:
-        return None
-
-    region_lat = float(region.centroid_lat)
-    region_lon = float(region.centroid_lon)
-    max_distance_km = 55
-    lat_window = max_distance_km / 111.0
-    lon_window = max_distance_km / (111.0 * max(math.cos(math.radians(region_lat)), 0.1))
-
-    nearest = None
-    min_dist = float('inf')
-    for record in census_records:
-        if record.centroid_lat is None or record.centroid_lon is None:
-            continue
-
-        record_lat = float(record.centroid_lat)
-        record_lon = float(record.centroid_lon)
-        if abs(record_lat - region_lat) > lat_window or abs(record_lon - region_lon) > lon_window:
-            continue
-
-        distance = _haversine_km(
-            region_lat,
-            region_lon,
-            record_lat,
-            record_lon,
-        )
-        if distance < min_dist and distance < max_distance_km:
-            min_dist = distance
-            nearest = record
-
-    return nearest
-
-
 def _build_telehealth_context(db, regions):
-    """
-    Reuse the existing telehealth status ingredients in a compact lookup for
-    list endpoints. This mirrors the status formula used by /telehealth-status/all.
-    """
-    census_records = db.query(CensusIncome).filter(
-        CensusIncome.median_income.isnot(None),
-        CensusIncome.median_income > 0
-    ).all()
-    facilities = db.query(HealthcareSite).filter(
-        HealthcareSite.is_active == True,
-        HealthcareSite.latitude.isnot(None),
-        HealthcareSite.longitude.isnot(None)
-    ).all()
-    clinics = [
-        f for f in facilities
-        if f.site_type in ['clinic', 'hospital', 'health_center']
-    ]
-
-    context = {}
-    for region in regions:
-        status = 'DATA_UNAVAILABLE'
-        affordability_status = 'unknown'
-
-        if region.centroid_lat is not None and region.centroid_lon is not None:
-            best_zcta = _nearest_income_record(region, census_records)
-            has_income_data = best_zcta is not None
-            is_affordable = False
-            burden_pct = None
-            internet_cost = None
-
-            if best_zcta is not None:
-                internet_cost, _ = _get_regional_internet_cost(str(getattr(best_zcta, 'zcta', '')))
-                median_income = float(getattr(best_zcta, 'median_income', 0) or 0)
-                monthly_income = median_income / 12.0
-                burden_pct = float((internet_cost / monthly_income) * 100.0) if monthly_income > 0 else 100.0
-
-                t_conf = _ISP_CONFIG.get('thresholds', {})
-                t_val = t_conf.get('affordability_burden_pct', 2.0) if isinstance(t_conf, dict) else 2.0
-                threshold = float(t_val) if isinstance(t_val, (int, float)) else 2.0
-
-                is_affordable = bool(burden_pct < threshold) and bool(internet_cost < 400.0)
-                affordability_status = 'affordable' if is_affordable else 'unaffordable'
-            else:
-                internet_cost = 450
-                affordability_status = 'unknown'
-
-            access_modes = (region.properties or {}).get('primary_access_modes', '')
-            distance_threshold_km = 10 if 'road' in access_modes.lower() else 50
-
-            nearest_distance = float('inf')
-            for clinic in clinics:
-                distance = _haversine_km(
-                    region.centroid_lat,
-                    region.centroid_lon,
-                    clinic.latitude,
-                    clinic.longitude,
-                )
-                nearest_distance = min(nearest_distance, distance)
-
-            has_nearby_clinic = nearest_distance <= distance_threshold_km
-            is_extreme_cost = internet_cost and internet_cost >= 400
-
-            if not has_income_data:
-                if is_extreme_cost:
-                    status = 'COMMUNITY_ANCHOR' if has_nearby_clinic else 'CRITICAL_GAP'
-                elif has_nearby_clinic:
-                    status = 'COMMUNITY_ANCHOR'
-                else:
-                    status = 'DATA_UNAVAILABLE'
-            elif is_affordable:
-                status = 'TELEHEALTH_READY'
-            elif has_nearby_clinic:
-                status = 'COMMUNITY_ANCHOR'
-            else:
-                status = 'CRITICAL_GAP'
-
-        context[region.region_code] = {
-            'telehealth_status': status,
-            'affordability_status': affordability_status,
+    contexts = TelehealthClassificationService.classify_regions(db, regions)
+    return {
+        code: {
+            'telehealth_status': context.classification.status,
+            'affordability_status': context.classification.affordability_status,
         }
+        for code, context in contexts.items()
+    }
 
-    return context
 
-
-def _build_desert_score_lookup(db, regions):
+def _build_desert_score_lookup(db, regions, season=SEASON_YEAR_ROUND):
     region_codes = [region.region_code for region in regions if region.region_code]
     if not region_codes:
         return {}
@@ -274,9 +167,14 @@ def _build_desert_score_lookup(db, regions):
         specialist_score = HealthcareDesertCalculator.score_specialist_component(
             region.region_code in specialist_regions
         )
+        transport_mode = HealthcareDesertCalculator.resolve_transport_mode(
+            region,
+            region_points[0] if region_points else None,
+        )
         transport_score = HealthcareDesertCalculator.score_transport_component(
             travel_time,
-            transport_mode='road',
+            season=season,
+            transport_mode=transport_mode,
         )
 
         score_lookup[region.region_code] = round(float(
@@ -289,25 +187,31 @@ def _build_desert_score_lookup(db, regions):
     return score_lookup
 
 
-def _build_region_summary(db, regions):
+def _build_region_summary(db, regions, season=SEASON_YEAR_ROUND):
     broadband_lookup = _broadband_for_regions(
         db,
         [region.region_code for region in regions if region.region_code]
     )
     telehealth_lookup = _build_telehealth_context(db, regions)
-    desert_score_lookup = _build_desert_score_lookup(db, regions)
+    desert_score_lookup = _build_desert_score_lookup(db, regions, season)
 
     summaries = []
     for region in regions:
         broadband = broadband_lookup.get(region.region_code)
         telehealth = telehealth_lookup.get(region.region_code, {})
+        adjusted_tier, _, _ = _calculate_seasonal_tier(
+            region.tier_level,
+            region.access_score if region.access_score is not None else 50,
+            region.properties,
+            season,
+        )
         summaries.append({
             'id': region.id,
             'region_code': region.region_code,
             'name': region.region_name,
             'lat': _to_float_or_none(region.centroid_lat),
             'lon': _to_float_or_none(region.centroid_lon),
-            'cat_tier': region.tier_level if region.tier_level is not None else None,
+            'cat_tier': adjusted_tier if region.tier_level is not None else None,
             'telehealth_status': telehealth.get('telehealth_status', 'DATA_UNAVAILABLE'),
             'desert_score': desert_score_lookup.get(region.region_code),
             'affordability_status': telehealth.get('affordability_status', 'unknown'),
@@ -558,12 +462,16 @@ def get_regions_summary():
     """
     db = SessionLocal()
     try:
+        season = request.args.get('season', SEASON_YEAR_ROUND)
+        if season not in VALID_SEASONS:
+            season = SEASON_YEAR_ROUND
         regions = db.query(CATRegion).order_by(CATRegion.region_name).all()
-        summaries = _build_region_summary(db, regions)
+        summaries = _build_region_summary(db, regions, season)
 
         return jsonify({
             'regions': summaries,
-            'count': len(summaries)
+            'count': len(summaries),
+            'season': season,
         }), 200
 
     except Exception as e:
@@ -652,15 +560,19 @@ def search_regions():
     """
     db = SessionLocal()
     try:
+        season = request.args.get('season', SEASON_YEAR_ROUND)
+        if season not in VALID_SEASONS:
+            season = SEASON_YEAR_ROUND
         filters = _parse_region_search_args(request.args)
         regions = db.query(CATRegion).order_by(CATRegion.region_name).all()
-        summaries = _build_region_summary(db, regions)
+        summaries = _build_region_summary(db, regions, season)
         filtered = _filter_region_summaries(summaries, filters)
 
         return jsonify({
             'regions': filtered,
             'count': len(filtered),
-            'filters': filters
+            'filters': filters,
+            'season': season,
         }), 200
 
     except Exception as e:
@@ -1889,151 +1801,41 @@ def get_region_telehealth_status(region_code):
     """
     Get composite telehealth access status for a region.
     
-    Combines affordability and clinic proximity into a single classification:
-    - TELEHEALTH_READY (Green): Affordable home internet
-    - COMMUNITY_ANCHOR (Yellow/Amber): Unaffordable home, but clinic nearby
-    - CRITICAL_GAP (Red): Unaffordable home AND no nearby clinic
-    - DATA_UNAVAILABLE (Gray): Cannot determine (missing income data)
+    Uses the canonical Ookla/FCC, affordability, and clinic-access classifier.
     """
     db = SessionLocal()
     try:
         region = CATDataHandler.get_region_by_code(db, region_code)
-        if not region or not region.centroid_lat:
+        if not region:
             return jsonify({'error': 'Region not found'}), 404
-        
-        # === STEP 1: Check Affordability ===
-        lat_range, lon_range = 0.5, 1.0
-        candidates = db.query(CensusIncome).filter(
-            CensusIncome.median_income.isnot(None),
-            CensusIncome.median_income > 0,
-            CensusIncome.centroid_lat.between(region.centroid_lat - lat_range, region.centroid_lat + lat_range),
-            CensusIncome.centroid_lon.between(region.centroid_lon - lon_range, region.centroid_lon + lon_range)
-        ).all()
-        
-        best_zcta = None
-        min_dist = float('inf')
-        for c in candidates:
-            if c.centroid_lat and c.centroid_lon:
-                dist = _haversine_km(region.centroid_lat, region.centroid_lon, c.centroid_lat, c.centroid_lon)
-                if dist < min_dist:
-                    min_dist = dist
-                    best_zcta = c
-        
-        has_income_data = best_zcta is not None
-        is_affordable = False
-        burden_pct = None
-        internet_cost = None
-        
-        if has_income_data and best_zcta is not None:
-            assert best_zcta is not None
-            zcta_str = str(best_zcta.zcta) if hasattr(best_zcta, 'zcta') and best_zcta.zcta else ""
-            internet_cost, isp_name = _get_regional_internet_cost(zcta_str)
-            med_inc = float(getattr(best_zcta, 'median_income', 0) or 0)
-            monthly_income = med_inc / 12.0
-            burden_pct = float((internet_cost / monthly_income) * 100.0) if monthly_income > 0 else 100.0
-            
-            t_conf = _ISP_CONFIG.get('thresholds', {})
-            t_val = t_conf.get('affordability_burden_pct', 2.0) if isinstance(t_conf, dict) else 2.0
-            threshold = float(t_val) if isinstance(t_val, (int, float)) else 2.0
-            
-            # Absolute cost threshold: $400+/mo is inherently unaffordable regardless of income
-            absolute_cost_threshold = 400.0
-            is_affordable = bool(burden_pct < threshold) and bool(internet_cost < absolute_cost_threshold)
-        else:
-            # No income data - check if cost is extreme rural ($450+)
-            # Get cost based on region location
-            region_zcta = region.properties.get('zcta') if region.properties else None
-            if region_zcta:
-                internet_cost, isp_name = _get_regional_internet_cost(region_zcta)
-            else:
-                # Default to fastwyre for unknown areas
-                internet_cost = 450
-                isp_name = 'FastWyre'
-        
-        # === STEP 2: Check Clinic Proximity ===
-        properties = region.properties or {}
-        access_modes = properties.get('primary_access_modes', '')
-        distance_threshold_km = 10 if 'road' in access_modes.lower() else 50
-        
-        facilities = db.query(HealthcareSite).filter(
-            HealthcareSite.is_active == True,
-            HealthcareSite.latitude.isnot(None)
-        ).all()
-        
-        nearest_clinic = None
-        nearest_distance = float('inf')
-        for f in facilities:
-            if f.site_type in ['clinic', 'hospital', 'health_center']:
-                dist = _haversine_km(region.centroid_lat, region.centroid_lon, f.latitude, f.longitude)
-                if dist < nearest_distance:
-                    nearest_distance = dist
-                    nearest_clinic = f
-        
-        has_nearby_clinic = nearest_distance <= distance_threshold_km
-        
-        # === STEP 3: Composite Classification ===
-        # Check for extreme cost first (>$400/mo is automatically unaffordable)
-        is_extreme_cost = internet_cost and internet_cost >= 400
-        
-        if not has_income_data:
-            # Cannot determine affordability by percentage
-            if is_extreme_cost:
-                # Extreme rural pricing - definitely unaffordable
-                if has_nearby_clinic:
-                    status = 'COMMUNITY_ANCHOR'
-                    color = '#f59e0b'  # Amber
-                    label = 'Community Anchor'
-                    description = f'Extreme cost (${internet_cost}/mo); clinic provides safety net'
-                else:
-                    status = 'CRITICAL_GAP'
-                    color = '#ef4444'  # Red
-                    label = 'Critical Gap'
-                    description = f'Extreme cost (${internet_cost}/mo) AND no nearby clinic'
-            elif has_nearby_clinic:
-                status = 'COMMUNITY_ANCHOR'
-                color = '#f59e0b'  # Amber
-                label = 'Community Anchor'
-                description = 'Income data unavailable; clinic provides safety net'
-            else:
-                status = 'DATA_UNAVAILABLE'
-                color = '#6b7280'  # Gray
-                label = 'Data Gap'
-                description = 'Cannot assess - no income data and no nearby clinic'
-        elif is_affordable:
-            status = 'TELEHEALTH_READY'
-            color = '#22c55e'  # Green
-            label = 'Telehealth Ready'
-            description = f'Home internet affordable ({burden_pct:.1f}% of income)'
-        elif has_nearby_clinic:
-            status = 'COMMUNITY_ANCHOR'
-            color = '#f59e0b'  # Amber/Yellow
-            label = 'Community Anchor'
-            description = f'Home internet unaffordable ({burden_pct:.1f}%), but clinic {nearest_distance:.1f}km away'
-        else:
-            status = 'CRITICAL_GAP'
-            color = '#ef4444'  # Red
-            label = 'Critical Gap'
-            description = f'Home internet unaffordable ({burden_pct:.1f}%) AND no clinic within {distance_threshold_km}km'
-        
+        context = TelehealthClassificationService.classify_region(db, region)
+        inputs = context.inputs
+        classification = context.classification
         return jsonify({
             'region_code': region_code,
             'region_name': region.region_name,
-            'status': status,
-            'color': color,
-            'label': label,
-            'description': description,
+            'status': classification.status,
+            'color': classification.color,
+            'label': classification.label,
+            'description': classification.explanation,
             'affordability': {
-                'has_data': has_income_data,
-                'is_affordable': is_affordable,
-                'burden_pct': float(f"{burden_pct:.2f}") if burden_pct else None,
-                'internet_cost': internet_cost
+                'has_data': classification.affordability_status != 'unknown',
+                'is_affordable': (
+                    classification.affordability_status == 'affordable'
+                    if classification.affordability_status != 'unknown' else None
+                ),
+                'burden_pct': round(inputs.burden_pct, 2) if inputs.burden_pct is not None else None,
+                'internet_cost': inputs.monthly_internet_cost,
             },
             'clinic_proximity': {
-                'has_nearby': has_nearby_clinic,
-                'nearest_name': nearest_clinic.name if nearest_clinic else None,
-                'nearest_distance_km': float(f"{nearest_distance:.1f}") if nearest_clinic else None,
-                'threshold_km': distance_threshold_km
-            }
+                'has_nearby': classification.clinic_supported,
+                'nearest_name': context.nearest_clinic.name if context.nearest_clinic else None,
+                'nearest_distance_km': (
+                    round(inputs.nearest_clinic_distance_km, 1)
+                    if inputs.nearest_clinic_distance_km is not None else None
+                ),
+                'threshold_km': classification.clinic_threshold_km,
+            },
         }), 200
         
     except Exception as e:
@@ -2051,124 +1853,42 @@ def get_all_telehealth_status():
     db = SessionLocal()
     try:
         regions = db.query(CATRegion).all()
-        
-        # Pre-fetch all census and healthcare data for efficiency
-        all_census = db.query(CensusIncome).filter(
-            CensusIncome.median_income.isnot(None),
-            CensusIncome.median_income > 0
-        ).all()
-        
-        all_facilities = db.query(HealthcareSite).filter(
-            HealthcareSite.is_active == True,
-            HealthcareSite.latitude.isnot(None)
-        ).all()
-        
-        # Filter to clinics/hospitals only
-        clinics = [f for f in all_facilities if f.site_type in ['clinic', 'hospital', 'health_center']]
-        
+        contexts = TelehealthClassificationService.classify_regions(db, regions)
         results = []
-        summary = {'telehealth_ready': 0, 'community_anchor': 0, 'critical_gap': 0, 'data_unavailable': 0}
-        
+        summary = {
+            'telehealth_ready': 0,
+            'community_anchor': 0,
+            'limited_telehealth': 0,
+            'critical_gap': 0,
+            'data_unavailable': 0,
+        }
+
         for region in regions:
-            if not region.centroid_lat or not region.centroid_lon:
-                continue
-            
-            # Find nearest ZCTA with income
-            best_zcta = None
-            min_dist = float('inf')
-            for c in all_census:
-                if c.centroid_lat and c.centroid_lon:
-                    dist = _haversine_km(region.centroid_lat, region.centroid_lon, c.centroid_lat, c.centroid_lon)
-                    if dist < min_dist and dist < 55:  # 55km threshold
-                        min_dist = dist
-                        best_zcta = c
-            
-            has_income_data = best_zcta is not None
-            is_affordable = False
-            burden_pct = None
-            internet_cost = None
-            median_income = None
-            isp_name = 'Unknown'
-            
-            if has_income_data and best_zcta is not None:
-                assert best_zcta is not None
-                internet_cost, isp_name = _get_regional_internet_cost(str(getattr(best_zcta, 'zcta', '')))
-                median_income = float(getattr(best_zcta, 'median_income', 0) or 0)
-                monthly_income = median_income / 12.0
-                burden_pct = float((internet_cost / monthly_income) * 100.0) if monthly_income > 0 else 100.0
-                
-                t_conf = _ISP_CONFIG.get('thresholds', {})
-                t_val = t_conf.get('affordability_burden_pct', 2.0) if isinstance(t_conf, dict) else 2.0
-                threshold = float(t_val) if isinstance(t_val, (int, float)) else 2.0
-                
-                is_affordable = bool(burden_pct < threshold) and bool(internet_cost < 400.0)
-            else:
-                internet_cost = 450  # Default fastwyre
-                isp_name = 'FastWyre (est.)'
-            
-            # Find nearest clinic
-            properties = region.properties or {}
-            access_modes = properties.get('primary_access_modes', '')
-            distance_threshold_km = 10 if 'road' in access_modes.lower() else 50
-            
-            nearest_distance = float('inf')
-            nearest_clinic_name = None
-            for f in clinics:
-                dist = _haversine_km(region.centroid_lat, region.centroid_lon, f.latitude, f.longitude)
-                if dist < nearest_distance:
-                    nearest_distance = dist
-                    nearest_clinic_name = f.name
-            
-            has_nearby_clinic = nearest_distance <= distance_threshold_km
-            is_extreme_cost = internet_cost and internet_cost >= 400
-            
-            # Classification + Recommendation
-            if not has_income_data:
-                if is_extreme_cost:
-                    # $450+/mo is inherently unaffordable - mark as such even without income data
-                    if has_nearby_clinic:
-                        status, color = 'COMMUNITY_ANCHOR', '#f59e0b'
-                        recommendation = f'Extreme cost (${internet_cost}/mo) - use community clinic for telehealth'
-                    else:
-                        status, color = 'CRITICAL_GAP', '#ef4444'
-                        recommendation = f'UNAFFORDABLE (${internet_cost}/mo) + No clinic access - urgent intervention needed'
-                elif has_nearby_clinic:
-                    status, color = 'COMMUNITY_ANCHOR', '#f59e0b'
-                    recommendation = 'Use community clinic for telehealth access'
-                else:
-                    status, color = 'DATA_UNAVAILABLE', '#6b7280'
-                    recommendation = 'Collect income data to assess affordability'
-            elif is_affordable:
-                status, color = 'TELEHEALTH_READY', '#22c55e'
-                recommendation = 'Home-based telehealth is viable'
-            elif has_nearby_clinic:
-                status, color = 'COMMUNITY_ANCHOR', '#f59e0b'
-                recommendation = 'Use community clinic for telehealth access'
-            else:
-                status, color = 'CRITICAL_GAP', '#ef4444'
-                recommendation = f'UNAFFORDABLE ({burden_pct:.1f}% burden) + No clinic - urgent intervention needed'
-            
-            # Update summary
-            summary[status.lower()] = summary.get(status.lower(), 0) + 1
-            
+            context = contexts[region.region_code]
+            inputs = context.inputs
+            classification = context.classification
+            summary[classification.status.lower()] += 1
             results.append({
                 'region_code': region.region_code,
                 'region_name': region.region_name,
                 'lat': region.centroid_lat,
                 'lon': region.centroid_lon,
-                'status': status,
-                'color': color,
-                'internet_cost': internet_cost,
-                'isp_name': isp_name,
-                'burden_pct': float(f"{burden_pct:.1f}") if burden_pct else None,
-                'median_income': median_income,
-                'has_nearby_clinic': has_nearby_clinic,
-                'nearest_clinic_name': nearest_clinic_name,
-                'nearest_clinic_km': float(f"{nearest_distance:.1f}") if nearest_distance != float('inf') else None,
-                'access_mode': access_modes or 'unknown',
-                'recommendation': recommendation
+                'status': classification.status,
+                'color': classification.color,
+                'internet_cost': inputs.monthly_internet_cost,
+                'isp_name': context.isp_name or 'Unknown',
+                'burden_pct': round(inputs.burden_pct, 1) if inputs.burden_pct is not None else None,
+                'median_income': inputs.median_income,
+                'has_nearby_clinic': classification.clinic_supported,
+                'nearest_clinic_name': context.nearest_clinic.name if context.nearest_clinic else None,
+                'nearest_clinic_km': (
+                    round(inputs.nearest_clinic_distance_km, 1)
+                    if inputs.nearest_clinic_distance_km is not None else None
+                ),
+                'access_mode': inputs.access_modes or 'unknown',
+                'recommendation': classification.explanation,
             })
-        
+
         return jsonify({
             'regions': results,
             'count': len(results),

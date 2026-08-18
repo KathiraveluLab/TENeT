@@ -103,7 +103,7 @@ function App() {
     regions: regionSummaries,
     loading: summaryLoading,
     error: summaryError,
-  } = useRegionSummary();
+  } = useRegionSummary(season);
   const restoreScenarioFromUrl = scenarioState.restoreFromUrl;
 
   const handleVisibleRegionsChange = useCallback((regionCodes: string[]) => {

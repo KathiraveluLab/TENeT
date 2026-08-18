@@ -7,9 +7,7 @@ comparison, and future research exports.
 
 from __future__ import annotations
 
-import json
 import math
-import os
 from datetime import datetime, timezone
 
 from sqlalchemy import and_, func
@@ -26,9 +24,13 @@ from services.data_quality_service import DataQualityService
 from services.healthcare_desert_calculator import HealthcareDesertCalculator, haversine_km as _haversine_km
 from services.isp_config import get_internet_cost, get_affordability_threshold
 from services.season_constants import SEASON_YEAR_ROUND, VALID_SEASONS, get_season_display_name
+from services.telehealth_classification import (
+    ABSOLUTE_COST_LIMIT,
+    TelehealthClassification,
+    TelehealthClassificationService,
+)
 
 
-AFFORDABILITY_DEFAULT_THRESHOLD = 2.0
 MAX_INCOME_MATCH_KM = 55.0
 MAX_OOKLA_MATCH_KM = 75.0
 
@@ -58,9 +60,10 @@ class ResearchProfileService:
         if region is None:
             return None
 
-        broadband = ResearchProfileService._broadband_for_region(db, region.region_code)
-        ookla = ResearchProfileService._nearest_ookla_tile(db, region)
-        income = ResearchProfileService._nearest_income_record(db, region)
+        telehealth_context = TelehealthClassificationService.classify_region(db, region)
+        broadband = telehealth_context.broadband
+        ookla = telehealth_context.ookla
+        income = telehealth_context.income
         nearest_facility = ResearchProfileService._nearest_facility(db, region)
         facility_count = db.query(HealthcareSite).filter(
             HealthcareSite.region_code == region.region_code,
@@ -93,11 +96,8 @@ class ResearchProfileService:
         )
         access_modes = (region.properties or {}).get("primary_access_modes", "")
         telehealth = ResearchProfileService._telehealth_payload(
-            connectivity,
-            affordability,
-            healthcare,
+            telehealth_context.classification,
             season,
-            access_modes,
         )
 
         sources = ["CAT region boundaries"]
@@ -290,7 +290,11 @@ class ResearchProfileService:
             status = "unknown"
         else:
             burden_pct = (float(cost) / (float(median_income) / 12.0)) * 100.0
-            status = "affordable" if burden_pct < threshold else "unaffordable"
+            status = (
+                "affordable"
+                if burden_pct < threshold and float(cost) < ABSOLUTE_COST_LIMIT
+                else "unaffordable"
+            )
 
         return {
             "monthly_cost": _round(cost, 2),
@@ -317,51 +321,13 @@ class ResearchProfileService:
         }
 
     @staticmethod
-    def _telehealth_payload(connectivity: dict, affordability: dict, healthcare: dict, season: str, access_modes: str = "") -> dict:
-        download = connectivity["ookla_download_mbps"]
-        latency = connectivity["latency_ms"]
-        coverage = connectivity["fcc_coverage_25mbps_pct"]
-
-        video_feasible = None
-        if download is not None or coverage is not None:
-            video_feasible = bool(
-                (download is not None and download >= 25 and (latency is None or latency <= 150))
-                or (download is None and coverage is not None and coverage >= 70)
-            )
-
-        audio_feasible = None
-        if download is not None or coverage is not None:
-            audio_feasible = bool(
-                (download is not None and download >= 5)
-                or (download is None and coverage is not None and coverage >= 25)
-            )
-
-        clinic_supported = None
-        if healthcare["nearest_facility_distance_km"] is not None:
-            threshold = 10 if "road" in (access_modes or "").lower() else 50
-            clinic_supported = healthcare["nearest_facility_distance_km"] <= threshold
-        if video_feasible and affordability["status"] == "affordable":
-            status = "TELEHEALTH_READY"
-            label = "Telehealth ready"
-        elif clinic_supported:
-            status = "COMMUNITY_ANCHOR"
-            label = "Clinic-supported"
-        elif audio_feasible:
-            status = "LIMITED_TELEHEALTH"
-            label = "Limited telehealth"
-        elif video_feasible is None and audio_feasible is None:
-            status = "DATA_UNAVAILABLE"
-            label = "Data unavailable"
-        else:
-            status = "CRITICAL_GAP"
-            label = "Critical access gap"
-
+    def _telehealth_payload(classification: TelehealthClassification, season: str) -> dict:
         return {
-            "status": status,
-            "label": label,
-            "video_feasible": video_feasible,
-            "audio_feasible": audio_feasible,
-            "clinic_supported": clinic_supported,
+            "status": classification.status,
+            "label": classification.label,
+            "video_feasible": classification.video_feasible,
+            "audio_feasible": classification.audio_feasible,
+            "clinic_supported": classification.clinic_supported,
             "season": season,
             "season_note": f"{get_season_display_name(season)} scenario applied.",
         }
