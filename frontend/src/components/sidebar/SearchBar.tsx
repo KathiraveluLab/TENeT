@@ -1,5 +1,5 @@
 import { KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { RegionSummary } from '../../api/catApi';
+import { RegionSummary, type Season } from '../../api/catApi';
 import { useRegionSearch } from '../../hooks/useRegionSearch';
 import { getTelehealthStatusLabel, getTelehealthStatusTone } from '../../domain/statusPresentation';
 import StatusBadge from '../ui/StatusBadge';
@@ -8,13 +8,17 @@ interface SearchBarProps {
     value: string;
     onChange: (value: string) => void;
     onSelectRegion: (regionCode: string) => void;
+    season?: Season;
 }
 
-export default function SearchBar({ value, onChange, onSelectRegion }: SearchBarProps) {
+export default function SearchBar({ value, onChange, onSelectRegion, season = 'year_round' }: SearchBarProps) {
     const [isOpen, setIsOpen] = useState(false);
     const rootRef = useRef<HTMLDivElement>(null);
     const listboxId = useId();
-    const searchParams = useMemo(() => ({ q: value }), [value]);
+    const searchParams = useMemo(
+        () => ({ q: value, season: value.trim() ? season : undefined }),
+        [season, value],
+    );
     const { results } = useRegionSearch(searchParams);
     const dropdownResults = value.trim() ? results.slice(0, 8) : [];
     const listboxOpen = isOpen && dropdownResults.length > 0;

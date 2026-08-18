@@ -34,6 +34,9 @@ Backend:
 | `DB_TYPE` | `sqlite` | Current database backend |
 | `DB_PATH` | `/app/data/tenet.db` | SQLite path inside backend container |
 | `CORS_ALLOWED_ORIGINS` | `https://tenet.example.org` | Comma-separated frontend origins |
+| `PORT` | platform-provided or `5001` | Gunicorn bind port outside Docker |
+| `WEB_CONCURRENCY` | `2` | Gunicorn worker processes |
+| `GUNICORN_THREADS` | `4` | Request threads per worker |
 
 Frontend:
 
@@ -51,16 +54,17 @@ Frontend:
    python -c "from database.init_db import main; main()"
    ```
 
-4. Start the API:
+4. Start the API with the production server:
 
    ```bash
-   python app.py
+   gunicorn --config gunicorn.conf.py app:app
    ```
 
 5. Verify:
 
    ```bash
    curl -fsS https://<backend-host>/api/health
+   curl -fsS https://<backend-host>/api/ready
    ```
 
 Expected response:
@@ -71,6 +75,13 @@ Expected response:
   "service": "tenet-api"
 }
 ```
+
+`/api/health` is the process liveness check. `/api/ready` also verifies the
+configured database connection and returns HTTP 503 while it is unavailable.
+The Docker image and Compose stack use `/api/ready` for health checks. When the
+frontend and backend are served through the checked-in nginx proxy, leave
+`CORS_ALLOWED_ORIGINS` empty; set an explicit allowlist only for a separate
+frontend origin.
 
 ## Frontend Deployment Steps
 

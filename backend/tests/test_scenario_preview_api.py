@@ -306,7 +306,7 @@ def test_stricter_broadband_threshold_changes_modeled_status(client):
     payload = response.get_json()
     assert payload["summary"]["status_changed_regions"] == 1
     assert payload["summary"]["worsened_count"] == 1
-    assert payload["regions"][0]["scenario_status"] == "LIMITED_TELEHEALTH"
+    assert payload["regions"][0]["scenario_status"] == "COMMUNITY_ANCHOR"
     assert "score_changed_regions" not in payload["summary"]
     assert payload["regions"][0]["healthcare_need_score"] >= 0
     assert "need_score_delta" not in payload["regions"][0]

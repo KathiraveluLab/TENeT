@@ -192,6 +192,7 @@ export default function Sidebar({
                 value={query}
                 onChange={setQuery}
                 onSelectRegion={onSelectRegion}
+                season={season}
             />
 
             {showCatTools && (

@@ -66,9 +66,11 @@ export interface RegionSummary {
 export interface RegionSummaryResponse {
     regions: RegionSummary[];
     count: number;
+    season: Season;
 }
 
 export interface RegionSearchParams {
+    season?: Season;
     q?: string;
     name?: string;
     tier?: CatTier | `${CatTier}` | null;
@@ -99,6 +101,7 @@ export interface SeasonScenario {
     active_season: Season;
     season_display: string;
     road_quality: string;
+    transport_mode: 'air' | 'road' | 'water' | 'unknown';
     assumption: string;
 }
 
@@ -157,9 +160,12 @@ export function fetchBoundaries(signal?: AbortSignal): Promise<BoundaryCollectio
 /**
  * Fetch lightweight community summaries for sidebar navigation.
  */
-export async function fetchRegionSummary(signal?: AbortSignal): Promise<RegionSummary[]> {
+export async function fetchRegionSummary(
+    season: Season = 'year_round',
+    signal?: AbortSignal,
+): Promise<RegionSummary[]> {
     const data = await fetchJson<RegionSummaryResponse>(
-        `${API_BASE}/regions/summary`,
+        withQuery(`${API_BASE}/regions/summary`, { season }),
         { signal },
         'Failed to fetch region summary',
     );

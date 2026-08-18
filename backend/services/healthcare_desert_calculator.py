@@ -88,7 +88,7 @@ class HealthcareDesertCalculator:
                 return 40
             return 50
 
-        mode = transport_mode if transport_mode in {"road", "water", "air"} else "road"
+        mode = transport_mode if transport_mode in {"road", "water", "air"} else "unknown"
         friction = get_road_friction(road_quality, season) if mode == "road" else 1.0
         adjusted_travel_time = travel_time_minutes * friction
 
@@ -99,6 +99,21 @@ class HealthcareDesertCalculator:
         availability_penalty = (1.0 - modifier) * 30
         base_transport_score = min(100, (adjusted_travel_time / 240) * 100)
         return min(100, base_transport_score + availability_penalty)
+
+    @staticmethod
+    def resolve_transport_mode(region: Optional[CATRegion], data_point: Optional[CATDataPoint]) -> str:
+        """Return the first declared usable access mode for a community."""
+        raw_modes = ""
+        if region and region.properties:
+            raw_modes = str(region.properties.get("primary_access_modes", ""))
+        if not raw_modes and data_point:
+            raw_modes = str(data_point.access_type or "")
+
+        for mode in raw_modes.lower().replace(";", ",").split(","):
+            normalized = mode.strip()
+            if normalized in {"road", "water", "air"}:
+                return normalized
+        return "unknown"
 
     @staticmethod
     def _region_center(db: Session, region_code: str) -> Optional[Tuple[float, float]]:
@@ -244,12 +259,19 @@ class HealthcareDesertCalculator:
         data_point = db.query(CATDataPoint).filter(
             CATDataPoint.region_code == region_code
         ).first()
+        region = db.query(CATRegion).filter(
+            CATRegion.region_code == region_code
+        ).first()
+        transport_mode = HealthcareDesertCalculator.resolve_transport_mode(
+            region,
+            data_point,
+        )
         
         transport_score = HealthcareDesertCalculator.score_transport_component(
             data_point.travel_time_minutes if data_point else None,
             season,
             road_quality,
-            "road",
+            transport_mode,
         )
         
         # Calculate weighted score
@@ -272,6 +294,7 @@ class HealthcareDesertCalculator:
                 'active_season': season,
                 'season_display': get_season_display_name(season),
                 'road_quality': road_quality,
+                'transport_mode': transport_mode,
                 'assumption': 'User-selected seasonal scenario for planning purposes. '
                              'Actual conditions may vary.'
             },

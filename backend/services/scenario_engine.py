@@ -7,11 +7,7 @@ returns a modeled preview of how readiness status would change. Healthcare
 need remains a factual score and is included as context, not recalculated from
 policy thresholds.
 
-Reuses:
-    - ResearchProfileService (income, broadband, ookla lookups)
-    - DataQualityService (confidence evaluation)
-    - HealthcareDesertCalculator (distance + density scoring)
-    - ISP pricing configuration
+Reuses the canonical telehealth classifier and cached factual inputs.
 
 Status ranking (worst → best):
     DATA_UNAVAILABLE < CRITICAL_GAP < LIMITED_TELEHEALTH < COMMUNITY_ANCHOR < TELEHEALTH_READY
@@ -24,11 +20,14 @@ from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-from services.data_quality_service import normalize_confidence, split_gap_flags
-from services.healthcare_desert_calculator import HealthcareDesertCalculator
-from services.isp_config import get_internet_cost, get_affordability_threshold
 from services.scenario_input_cache import ScenarioInputCache
 from services.season_constants import SEASON_YEAR_ROUND, VALID_SEASONS
+from services.telehealth_classification import (
+    TelehealthInputs,
+    TelehealthThresholds,
+    baseline_thresholds,
+    classify_telehealth,
+)
 
 
 # ── Status ranking ──────────────────────────────────────────────────────────
@@ -41,23 +40,15 @@ STATUS_RANK: Dict[str, int] = {
     "TELEHEALTH_READY": 4,
 }
 
-STATUS_DISPLAY = {
-    "TELEHEALTH_READY": "Telehealth Ready",
-    "COMMUNITY_ANCHOR": "Community Anchor",
-    "LIMITED_TELEHEALTH": "Limited Telehealth",
-    "CRITICAL_GAP": "Critical Gap",
-    "DATA_UNAVAILABLE": "Data Unavailable",
-}
-
-
 # ── Default baseline thresholds ─────────────────────────────────────────────
 
+_CANONICAL_BASELINE = baseline_thresholds()
 BASELINE_THRESHOLDS = {
-    "min_download_mbps": 25,
-    "min_upload_mbps": 3,
-    "max_latency_ms": 150,
+    "min_download_mbps": _CANONICAL_BASELINE.min_download_mbps,
+    "min_upload_mbps": _CANONICAL_BASELINE.min_upload_mbps,
+    "max_latency_ms": _CANONICAL_BASELINE.max_latency_ms,
     "clinic_proximity_km": None,  # use existing access-mode logic
-    "affordability_burden_pct": get_affordability_threshold(),
+    "affordability_burden_pct": _CANONICAL_BASELINE.affordability_burden_pct,
 }
 
 _NULLABLE_THRESHOLD_KEYS = {"max_latency_ms", "clinic_proximity_km"}
@@ -169,7 +160,6 @@ class ScenarioEngine:
             entry = ScenarioEngine._evaluate_cached_input(
                 scenario_input=scenario_input,
                 merged_thresholds=merged,
-                is_baseline_equivalent=is_baseline_equivalent,
             )
             results.append(entry)
 
@@ -209,22 +199,13 @@ class ScenarioEngine:
         *,
         scenario_input: dict,
         merged_thresholds: dict,
-        is_baseline_equivalent: bool,
     ) -> dict:
         baseline_status = scenario_input["baseline_status"]
         healthcare_need_score = scenario_input["healthcare_need_score"]
-
-        if is_baseline_equivalent:
-            scenario = {
-                "status": baseline_status,
-                "reason_codes": ["BASELINE_EQUIVALENT"],
-                "explanation": "Baseline thresholds applied; modeled status matches the current classification.",
-            }
-        else:
-            scenario = ScenarioEngine._scenario_status_from_input(
-                scenario_input=scenario_input,
-                merged_thresholds=merged_thresholds,
-            )
+        scenario = ScenarioEngine._scenario_status_from_input(
+            scenario_input=scenario_input,
+            merged_thresholds=merged_thresholds,
+        )
 
         scenario_status = scenario["status"]
         delta = _status_delta(baseline_status, scenario_status)
@@ -252,131 +233,40 @@ class ScenarioEngine:
         scenario_input: dict,
         merged_thresholds: dict,
     ) -> dict:
-        reason_codes: List[str] = []
-        explanation_parts: List[str] = []
-
-        if scenario_input["lat"] is None or scenario_input["lon"] is None:
-            return {
-                "status": "DATA_UNAVAILABLE",
-                "reason_codes": ["MISSING_COORDINATES"],
-                "explanation": "Region has no geolocation data.",
-            }
-
-        min_download = merged_thresholds.get("min_download_mbps", 25)
-        min_upload = merged_thresholds.get("min_upload_mbps", 3)
-        max_latency = merged_thresholds.get("max_latency_ms", 150)
-        download_mbps = scenario_input.get("ookla_download_mbps")
-        upload_mbps = scenario_input.get("ookla_upload_mbps")
-        latency_ms = scenario_input.get("ookla_latency_ms")
-        fcc_coverage = scenario_input.get("fcc_coverage_pct")
-
-        meets_broadband = False
-        if download_mbps is not None:
-            if download_mbps >= min_download:
-                if upload_mbps is None or upload_mbps >= min_upload:
-                    if max_latency is None or latency_ms is None or latency_ms <= max_latency:
-                        meets_broadband = True
-                        reason_codes.append("MEETS_BROADBAND")
-                        explanation_parts.append(
-                            f"Broadband meets {min_download:g}/{min_upload:g} Mbps threshold"
-                        )
-                    else:
-                        reason_codes.append("HIGH_LATENCY")
-                        explanation_parts.append(
-                            f"Latency {latency_ms:.0f}ms exceeds {max_latency:g}ms"
-                        )
-                else:
-                    reason_codes.append("LOW_UPLOAD")
-                    explanation_parts.append(
-                        f"Upload {upload_mbps:.1f} Mbps below {min_upload:g} Mbps"
-                    )
-            else:
-                reason_codes.append("LOW_DOWNLOAD")
-                explanation_parts.append(
-                    f"Download {download_mbps:.1f} Mbps below {min_download:g} Mbps"
-                )
-        elif fcc_coverage is not None and fcc_coverage >= 70:
-            if min_download <= 25 and min_upload <= 3:
-                meets_broadband = True
-                reason_codes.append("MEETS_BROADBAND_FCC")
-                explanation_parts.append("FCC coverage supports broadband threshold")
-            else:
-                reason_codes.append("FCC_BELOW_SCENARIO_THRESHOLD")
-                explanation_parts.append("FCC data doesn't cover higher scenario thresholds")
-        else:
-            reason_codes.append("NO_BROADBAND_DATA")
-            explanation_parts.append("No measured broadband data available")
-
-        aff_threshold = merged_thresholds.get("affordability_burden_pct", 2.0)
-        burden_pct = scenario_input.get("burden_pct")
-        internet_cost = scenario_input.get("monthly_internet_cost")
-        has_income_data = burden_pct is not None
-        is_affordable = False
-
-        if has_income_data:
-            is_affordable = bool(
-                burden_pct < aff_threshold
-                and internet_cost is not None
-                and internet_cost < 400.0
-            )
-            if is_affordable:
-                reason_codes.append("AFFORDABLE")
-                explanation_parts.append(
-                    f"Internet burden {burden_pct:.1f}% below {aff_threshold:g}%"
-                )
-            else:
-                reason_codes.append("UNAFFORDABLE")
-                explanation_parts.append(
-                    f"Internet burden {burden_pct:.1f}% exceeds {aff_threshold:g}%"
-                )
-        else:
-            internet_cost = 450.0
-            reason_codes.append("NO_INCOME_DATA")
-            explanation_parts.append("No income data to assess affordability")
-
-        clinic_threshold_km = merged_thresholds.get("clinic_proximity_km")
-        distance_threshold_km = (
-            scenario_input["distance_threshold_km"]
-            if clinic_threshold_km is None
-            else float(clinic_threshold_km)
+        thresholds = TelehealthThresholds(
+            min_download_mbps=float(merged_thresholds["min_download_mbps"]),
+            min_upload_mbps=float(merged_thresholds["min_upload_mbps"]),
+            max_latency_ms=(
+                float(merged_thresholds["max_latency_ms"])
+                if merged_thresholds["max_latency_ms"] is not None else None
+            ),
+            clinic_proximity_km=(
+                float(merged_thresholds["clinic_proximity_km"])
+                if merged_thresholds["clinic_proximity_km"] is not None else None
+            ),
+            affordability_burden_pct=float(
+                merged_thresholds["affordability_burden_pct"]
+            ),
         )
-        nearest_distance = scenario_input.get("nearest_clinic_distance_km")
-        has_nearby_clinic = (
-            nearest_distance is not None
-            and nearest_distance <= distance_threshold_km
+        classification = classify_telehealth(
+            TelehealthInputs(
+                latitude=scenario_input.get("lat"),
+                longitude=scenario_input.get("lon"),
+                access_modes=scenario_input.get("access_modes", ""),
+                ookla_download_mbps=scenario_input.get("ookla_download_mbps"),
+                ookla_upload_mbps=scenario_input.get("ookla_upload_mbps"),
+                ookla_latency_ms=scenario_input.get("ookla_latency_ms"),
+                fcc_coverage_pct=scenario_input.get("fcc_coverage_pct"),
+                median_income=scenario_input.get("median_income"),
+                monthly_internet_cost=scenario_input.get("monthly_internet_cost"),
+                burden_pct=scenario_input.get("burden_pct"),
+                nearest_clinic_distance_km=scenario_input.get("nearest_clinic_distance_km"),
+                clinic_data_available=scenario_input.get("clinic_data_available", False),
+            ),
+            thresholds,
         )
-        if has_nearby_clinic:
-            reason_codes.append("ACCESSIBLE_CARE")
-            explanation_parts.append(f"Clinic within {distance_threshold_km:.0f}km")
-        else:
-            reason_codes.append("NO_NEARBY_CLINIC")
-            explanation_parts.append(f"No clinic within {distance_threshold_km:.0f}km")
-
-        is_extreme_cost = internet_cost is not None and internet_cost >= 400
-
-        if not has_income_data:
-            if is_extreme_cost:
-                status = "COMMUNITY_ANCHOR" if has_nearby_clinic else "CRITICAL_GAP"
-            elif has_nearby_clinic:
-                status = "COMMUNITY_ANCHOR"
-            else:
-                status = "DATA_UNAVAILABLE"
-        elif meets_broadband and is_affordable:
-            status = "TELEHEALTH_READY"
-        elif is_affordable:
-            if "NO_BROADBAND_DATA" in reason_codes:
-                status = "DATA_UNAVAILABLE"
-            elif has_nearby_clinic:
-                status = "LIMITED_TELEHEALTH"
-            else:
-                status = "CRITICAL_GAP"
-        elif has_nearby_clinic:
-            status = "COMMUNITY_ANCHOR"
-        else:
-            status = "CRITICAL_GAP"
-
         return {
-            "status": status,
-            "reason_codes": reason_codes,
-            "explanation": "; ".join(explanation_parts) if explanation_parts else "No assessment available.",
+            "status": classification.status,
+            "reason_codes": list(classification.reason_codes),
+            "explanation": classification.explanation,
         }
