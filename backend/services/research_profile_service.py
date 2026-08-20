@@ -89,7 +89,12 @@ class ResearchProfileService:
             facility_count,
             desert_score,
         )
-        connectivity = ResearchProfileService._connectivity_payload(broadband, ookla)
+        connectivity = ResearchProfileService._connectivity_payload(
+            broadband,
+            ookla,
+            affordability.pop("isp_name", None),
+        )
+        access_modes = (region.properties or {}).get("primary_access_modes", "")
         telehealth = ResearchProfileService._telehealth_payload(
             telehealth_context.classification,
             season,
@@ -112,6 +117,11 @@ class ResearchProfileService:
                 "lat": _round(region.centroid_lat, 6),
                 "lon": _round(region.centroid_lon, 6),
                 "region": _region_group(region),
+                "population": (
+                    region.population
+                    if region.population is not None
+                    else getattr(income, "population", None)
+                ),
                 "cat_tier": region.tier_level if region.tier_level is not None else None,
                 "data_confidence": quality["data_confidence"],
                 "has_data_gap": quality["has_data_gap"],
@@ -245,7 +255,7 @@ class ResearchProfileService:
         return nearest
 
     @staticmethod
-    def _connectivity_payload(broadband, ookla) -> dict:
+    def _connectivity_payload(broadband, ookla, isp_name=None) -> dict:
         download_mbps = _round(ookla.avg_d_kbps / 1000, 2) if ookla and ookla.avg_d_kbps is not None else None
         upload_mbps = _round(ookla.avg_u_kbps / 1000, 2) if ookla and ookla.avg_u_kbps is not None else None
         latency_ms = _round(ookla.avg_lat_ms, 1) if ookla and ookla.avg_lat_ms is not None else None
@@ -265,7 +275,7 @@ class ResearchProfileService:
             "ookla_upload_mbps": upload_mbps,
             "latency_ms": latency_ms,
             "reliability_label": reliability,
-            "isp_name": broadband.primary_access if broadband else None,
+            "isp_name": isp_name,
             "data_source": broadband.data_source if broadband else None,
         }
 
@@ -292,6 +302,7 @@ class ResearchProfileService:
             "burden_pct": _round(burden_pct, 2),
             "threshold_pct": threshold,
             "status": status,
+            "isp_name": isp_name,
         }
 
     @staticmethod
