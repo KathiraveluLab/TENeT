@@ -232,3 +232,81 @@ def test_scenario_preview_excludes_geometry(client):
     assert response.status_code == 200
     region = response.get_json()["regions"][0]
     assert "geometry" not in region
+
+
+@pytest.mark.parametrize("body", ['"not-an-object"', '[]', 'null'])
+def test_scenario_preview_rejects_non_object_json(client, body):
+    response = client.post(
+        "/api/cat/scenarios/preview",
+        data=body,
+        content_type="application/json",
+    )
+
+    assert response.status_code == 400
+    assert "JSON object" in response.get_json()["error"]
+
+
+def test_scenario_preview_rejects_boolean_threshold(client):
+    response = post_preview(client, {
+        "thresholds": {"min_download_mbps": True},
+    })
+
+    assert response.status_code == 400
+    assert "min_download_mbps" in response.get_json()["error"]
+
+
+def test_scenario_preview_rejects_invalid_season(client):
+    response = post_preview(client, {
+        "season": "monsoon",
+        "thresholds": {},
+    })
+
+    assert response.status_code == 400
+    assert "season" in response.get_json()["error"]
+
+
+def test_scenario_preview_rejects_empty_or_unknown_region_codes(client):
+    empty = post_preview(client, {"thresholds": {}, "region_codes": []})
+    unknown = post_preview(client, {
+        "thresholds": {},
+        "region_codes": ["AK-NOT-REAL"],
+    })
+
+    assert empty.status_code == 400
+    assert unknown.status_code == 400
+    assert unknown.get_json()["unknown_region_codes"] == ["AK-NOT-REAL"]
+
+
+def test_scenario_preview_rejects_unsupported_mode(client):
+    response = post_preview(client, {
+        "mode": "save",
+        "thresholds": {},
+    })
+
+    assert response.status_code == 400
+    assert "mode" in response.get_json()["error"]
+
+
+def test_scenario_preview_rejects_unsupported_threshold_fields(client):
+    response = post_preview(client, {
+        "thresholds": {"made_up_threshold": 42},
+    })
+
+    assert response.status_code == 400
+    assert "made_up_threshold" in response.get_json()["error"]
+
+
+def test_stricter_broadband_threshold_changes_modeled_status(client):
+    response = post_preview(client, {
+        "thresholds": {"min_download_mbps": 100},
+        "region_codes": ["AK-READY"],
+    })
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["summary"]["status_changed_regions"] == 1
+    assert payload["summary"]["worsened_count"] == 1
+    assert payload["regions"][0]["scenario_status"] == "COMMUNITY_ANCHOR"
+    assert "score_changed_regions" not in payload["summary"]
+    assert payload["regions"][0]["healthcare_need_score"] >= 0
+    assert "need_score_delta" not in payload["regions"][0]

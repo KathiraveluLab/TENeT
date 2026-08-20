@@ -149,12 +149,13 @@ class ScenarioInputCache:
         inputs = telehealth_context.inputs
         broadband = telehealth_context.broadband
         facility_distances = cls._facility_distances(facilities, score_lat, score_lon)
-        baseline_need_score = cls._need_score(
+        healthcare_need_score = cls._need_score(
             facility_distances=facility_distances,
             site_count=site_count,
             has_specialists=has_specialists,
             first_data_point=first_data_point,
             season=season,
+            access_modes=inputs.access_modes,
         )
 
         missing_fields: List[str] = []
@@ -170,7 +171,7 @@ class ScenarioInputCache:
             "lon": float(display_lon) if display_lon is not None else None,
             "access_modes": inputs.access_modes,
             "baseline_status": telehealth_context.classification.status,
-            "baseline_need_score": baseline_need_score,
+            "healthcare_need_score": healthcare_need_score,
             "nearest_clinic_distance_km": inputs.nearest_clinic_distance_km,
             "distance_threshold_km": telehealth_context.classification.clinic_threshold_km,
             "clinic_data_available": inputs.clinic_data_available,
@@ -225,6 +226,7 @@ class ScenarioInputCache:
         has_specialists: bool,
         first_data_point: Optional[CATDataPoint],
         season: str,
+        access_modes: str = "",
         road_quality: str = ROAD_QUALITY_LOCAL,
     ) -> float:
         if season not in VALID_SEASONS:
@@ -243,7 +245,7 @@ class ScenarioInputCache:
             first_data_point.travel_time_minutes if first_data_point else None,
             season,
             road_quality,
-            "road",
+            ScenarioInputCache._transport_mode(access_modes),
         )
 
         necessity_score = float(
@@ -253,3 +255,11 @@ class ScenarioInputCache:
             + 0.20 * transport_score
         )
         return round(necessity_score, 1)
+
+    @staticmethod
+    def _transport_mode(access_modes: str) -> str:
+        for mode in str(access_modes or "").lower().replace(";", ",").split(","):
+            normalized = mode.strip()
+            if normalized in {"air", "road", "water"}:
+                return normalized
+        return "unknown"

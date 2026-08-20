@@ -108,10 +108,10 @@ const ScenarioMarker = memo(function ScenarioMarker({
                             </>
                         )}
 
-                        <span className="scenario-popup__label">Need Score</span>
+                        <span className="scenario-popup__label">Healthcare Need</span>
                         <strong>
-                            {Number.isFinite(region.scenario_need_score)
-                                ? region.scenario_need_score
+                            {Number.isFinite(region.healthcare_need_score)
+                                ? region.healthcare_need_score
                                 : 'Data unavailable'}
                         </strong>
                     </div>
@@ -229,18 +229,10 @@ export function ScenarioSidebarCard({ region }: ScenarioSidebarCardProps) {
                     {getTelehealthStatusLabel(region.scenario_status)}
                 </strong>
 
-                <span className="scenario-sidebar-card__label">Need Score Delta</span>
-                <strong style={{
-                    color: !Number.isFinite(region.need_score_delta)
-                        ? '#94a3b8'
-                        : region.need_score_delta < 0
-                            ? '#22c55e'
-                            : region.need_score_delta > 0
-                                ? '#ef4444'
-                                : '#94a3b8',
-                }}>
-                    {Number.isFinite(region.need_score_delta)
-                        ? `${region.need_score_delta > 0 ? '+' : ''}${region.need_score_delta}`
+                <span className="scenario-sidebar-card__label">Healthcare Need</span>
+                <strong style={{ color: '#475569' }}>
+                    {Number.isFinite(region.healthcare_need_score)
+                        ? region.healthcare_need_score
                         : 'Data unavailable'}
                 </strong>
             </div>
