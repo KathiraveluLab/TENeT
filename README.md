@@ -203,6 +203,3 @@ GitHub Actions runs backend tests, frontend type checks, frontend tests, product
 - Scenario results are modeled estimates, not observed outcomes or predictions.
 - Weather data is not part of the core application workflow.
 
-## Contributing and license
-
-Read [CONTRIBUTING.md](./CONTRIBUTING.md) for local workflow and pull-request expectations. This project is licensed under the [Apache License 2.0](./LICENSE).
