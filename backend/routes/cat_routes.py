@@ -474,8 +474,9 @@ def get_regions_summary():
             'season': season,
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get regions summary")
+        return jsonify({'error': 'An internal error occurred'}), 500
 
     finally:
         db.close()
