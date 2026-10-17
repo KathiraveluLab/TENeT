@@ -2252,6 +2252,7 @@ def scenario_preview():
         return jsonify(result), 200
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        cat_bp.logger.exception("Unhandled error in scenario_preview: %s", e)
+        return jsonify({'error': 'An internal error occurred.'}), 500
     finally:
         db.close()
