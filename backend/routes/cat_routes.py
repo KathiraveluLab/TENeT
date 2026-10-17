@@ -2,7 +2,7 @@
 API routes for Community Access Tier (CAT) data management
 """
 from database.models import CATRegion, CATDataPoint, HealthcareSite, CensusIncome, BroadbandCoverage
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
 import os
 import math
@@ -540,8 +540,9 @@ def get_research_profiles():
             ),
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get research profiles")
+        return jsonify({'error': 'An internal error occurred'}), 500
 
     finally:
         db.close()
@@ -575,8 +576,9 @@ def search_regions():
             'season': season,
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to search regions")
+        return jsonify({'error': 'An internal error occurred'}), 500
 
     finally:
         db.close()
