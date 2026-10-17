@@ -1,0 +1,44 @@
+.metric-tooltip {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+}
+
+.metric-tooltip-trigger {
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-full);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+    cursor: help;
+}
+
+.metric-tooltip-panel {
+    position: fixed;
+    z-index: var(--z-tooltip);
+    width: min(260px, calc(100vw - 24px));
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    box-shadow: var(--shadow-lg);
+    padding: 10px;
+    font-size: 11px;
+    line-height: 1.45;
+    pointer-events: none;
+}
+
+.metric-tooltip-panel strong {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--color-text);
+    font-size: 12px;
+}
+
+.metric-tooltip-panel.above {
+    transform: translateY(-100%);
+}

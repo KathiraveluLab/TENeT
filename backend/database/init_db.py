@@ -9,6 +9,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database.config import init_db, SessionLocal
+from database.models import CATGatingRule, OoklaPerformance
 from database.handlers import (
     CATDataHandler,
     CAT4_MIN_BANDWIDTH_MBPS,
@@ -21,6 +22,9 @@ from database.handlers import (
 
 def create_sample_gating_rules(db):
     """Create sample gating rules for each tier"""
+    db.query(CATGatingRule).delete()
+    db.commit()
+
     rules = [
         {
             'rule_name': 'Tier 1 Basic Access',
@@ -109,24 +113,44 @@ def main():
     finally:
         db.close()
     
-    # Seed healthcare sites
-    print("\n3. Seeding healthcare sites...")
-    try:
-        from database.seed_healthcare_sites import seed_sample_healthcare_sites
-        seed_sample_healthcare_sites()
-    except Exception as e:
-        print(f"   Warning: Could not seed healthcare sites: {e}")
-    
-    # Seed CAT data from preprocessed CSV
-    print("\n4. Seeding CAT regions and data points...")
+    # Seed CAT data from preprocessed CSV first so other datasets can map to regions
+    print("\n3. Seeding CAT regions and data points...")
     try:
         from database.seed_cat_data import seed_cat_data
         seed_cat_data()
     except Exception as e:
         print(f"   Warning: Could not seed CAT data: {e}")
     
+    print("\n4. Seeding healthcare facilities...")
+    try:
+        from database.seed_healthcare_data import seed_healthcare_data
+        seed_healthcare_data()
+    except Exception as e:
+        print(f"   Warning: Could not seed healthcare facilities: {e}")
+
+    print("\n5. Seeding broadband coverage...")
+    try:
+        from database.seed_broadband_data import seed_broadband_data
+        seed_broadband_data()
+    except Exception as e:
+        print(f"   Warning: Could not seed broadband coverage: {e}")
+
+    print("\n6. Seeding sample Census income...")
+    try:
+        from database.seed_census_data import seed_census_data
+        seed_census_data()
+    except Exception as e:
+        print(f"   Warning: Could not seed Census income: {e}")
+
+    print("\n7. Seeding a curated Ookla Open Data sample...")
+    try:
+        from database.seed_ookla_data import seed_ookla_data
+        seed_ookla_data()
+    except Exception as e:
+        print(f"   Warning: Could not seed Ookla performance data: {e}")
+    
     # Get statistics
-    print("\n5. Database Statistics:")
+    print("\n8. Database Statistics:")
     db = SessionLocal()
     try:
         stats = CATDataHandler.get_statistics(db)
@@ -139,6 +163,7 @@ def main():
         print(f"   - Total healthcare sites: {stats.get('total_healthcare_sites', 0)}")
         print(f"   - Hospitals: {stats.get('hospitals', 0)}")
         print(f"   - Clinics: {stats.get('clinics', 0)}")
+        print(f"   - Ookla performance tiles: {db.query(OoklaPerformance).count()}")
     finally:
         db.close()
     
@@ -146,10 +171,9 @@ def main():
     print("✓ Database initialization completed successfully!")
     print("=" * 60)
     print("\nNext steps:")
-    print("1. Upload CSV data: POST /api/cat/upload")
-    print("2. Upload GeoJSON regions: POST /api/cat/upload")
-    print("3. View statistics: GET /api/cat/statistics")
-    print("4. View healthcare sites: GET /api/cat/healthcare-sites")
+    print("1. Start the backend: python app.py")
+    print("2. View statistics: GET /api/cat/statistics")
+    print("3. View healthcare sites: GET /api/cat/healthcare-sites")
     print("\nSample data templates are available in data/samples/")
     print("=" * 60)
 

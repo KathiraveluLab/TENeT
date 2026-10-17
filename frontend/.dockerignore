@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.vite/
+.git/
+.gitignore
+.DS_Store
+*.swp
+*.swo
+Dockerfile
+.dockerignore

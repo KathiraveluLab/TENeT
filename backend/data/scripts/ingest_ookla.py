@@ -18,7 +18,7 @@ import sys
 import math
 import argparse
 from datetime import datetime
-from typing import Tuple
+from typing import Optional, Tuple
 
 # Add parent directory for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))

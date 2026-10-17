@@ -6,6 +6,7 @@ from sqlalchemy import and_, or_
 from typing import List, Optional, Dict
 from datetime import datetime
 import json
+import math
 
 from database.models import CATRegion, CATDataPoint, CATUpload, CATGatingRule
 

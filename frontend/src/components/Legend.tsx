@@ -1,129 +1,146 @@
-import React from 'react';
-import { getNeedColor, getNeedLabel } from '../api/catApi';
+import { useEffect, useId, useRef, useState } from 'react';
+import {
+    CAT_TIERS,
+    CAT_TIER_PRESENTATION,
+    getDesertScorePresentation,
+} from '../domain/metrics';
+import MetricTooltip from './MetricTooltip';
+import Button from './ui/Button';
+import IconButton from './ui/IconButton';
+import './Legend.css';
 
 interface LegendProps {
     totalRegions?: number;
+    position?: 'bottom-right' | 'bottom-left';
 }
 
-// Helper for need description
-const getNeedCapability = (score: number): string => {
-    if (score >= 75) return 'Severe lack of nearby healthcare facilities';
-    if (score >= 50) return 'Limited access to clinics or hospitals';
-    if (score >= 25) return 'Adequate access with some travel distance';
-    return 'Good access to nearby healthcare facilities';
-};
-
-/**
- * Map legend showing CAT tier color coding
- */
-export default function Legend({ totalRegions }: LegendProps) {
+export default function Legend({ totalRegions, position = 'bottom-right' }: LegendProps) {
     const needLevels = [87, 62, 37, 12];
+    const [open, setOpen] = useState(false);
+    const shellRef = useRef<HTMLDivElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const panelId = useId();
+
+    useEffect(() => {
+        if (!open) return;
+
+        const handlePointerDown = (event: PointerEvent) => {
+            if (!shellRef.current?.contains(event.target as Node)) setOpen(false);
+        };
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            setOpen(false);
+            triggerRef.current?.focus();
+        };
+
+        document.addEventListener('pointerdown', handlePointerDown);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('pointerdown', handlePointerDown);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [open]);
 
     return (
-        <div style={{
-            position: 'absolute',
-            bottom: '80px',
-            right: '20px',
-            zIndex: 1000,
-            minWidth: '220px',
-            // Glassmorphism
-            background: 'rgba(255, 255, 255, 0.92)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            padding: '16px 18px',
-            borderRadius: '12px',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            boxShadow: '0 8px 32px rgba(31, 38, 135, 0.12)',
-            fontSize: '12px',
-        }}>
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '12px',
-                paddingBottom: '10px',
-                borderBottom: '1px solid rgba(0, 0, 0, 0.08)'
-            }}>
-                <h4 style={{
-                    margin: 0,
-                    color: '#0f172a',
-                    fontSize: '14px',
-                    fontWeight: '700',
-                    letterSpacing: '-0.02em'
-                }}>
-                    Telehealth Need
-                </h4>
-                <span style={{ fontSize: '10px', color: '#64748b', fontWeight: '500' }}>Score (0-100)</span>
-            </div>
+        <div
+            ref={shellRef}
+            className={`legend-popover ${position === 'bottom-left' ? 'legend-popover--left' : ''}`}
+        >
+            <Button
+                ref={triggerRef}
+                size="small"
+                className="legend-trigger"
+                aria-label={open ? 'Close discovery legend' : 'Open discovery legend'}
+                aria-expanded={open}
+                aria-controls={panelId}
+                onClick={() => setOpen(value => !value)}
+            >
+                Legend
+            </Button>
 
-            {needLevels.map(score => (
-                <div
-                    key={score}
-                    style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        marginBottom: '8px',
-                        gap: '10px'
-                    }}
-                >
-                    <div style={{
-                        width: '12px',
-                        height: '12px',
-                        borderRadius: '50%',
-                        backgroundColor: getNeedColor(score),
-                        flexShrink: 0,
-                        marginTop: '3px',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.15)'
-                    }} />
+            <div
+                id={panelId}
+                className="legend-panel"
+                role="region"
+                aria-label="Discovery legend"
+                hidden={!open}
+            >
+                <div className="legend-header">
                     <div>
-                        <div style={{ color: '#1e293b', fontWeight: '500' }}>
-                            {getNeedLabel(score)}
+                        <h4>Discovery Legend</h4>
+                        <span>Plain-language guide</span>
+                    </div>
+                    <IconButton
+                        icon="×"
+                        size="small"
+                        aria-label="Close discovery legend"
+                        onClick={() => {
+                            setOpen(false);
+                            triggerRef.current?.focus();
+                        }}
+                    />
+                </div>
+
+                <div className="legend-section-title">
+                    Healthcare Desert Score
+                    <MetricTooltip term="Healthcare Desert Score">
+                        A 0-100 need score. Higher means the community has farther or weaker access to nearby healthcare.
+                    </MetricTooltip>
+                </div>
+
+                {needLevels.map(score => {
+                    const presentation = getDesertScorePresentation(score);
+                    return (
+                        <div key={score} className="legend-row">
+                            <span
+                                className="legend-dot"
+                                style={{ backgroundColor: presentation.color }}
+                                aria-hidden="true"
+                            />
+                            <div>
+                                <div className="legend-row-label">{presentation.label}</div>
+                                <div className="legend-row-note">{presentation.description}</div>
+                            </div>
                         </div>
-                        <div style={{ color: '#64748b', fontSize: '10px' }}>
-                            {getNeedCapability(score)}
-                        </div>
+                    );
+                })}
+
+                <div className="legend-section">
+                    <div className="legend-section-title">
+                        CAT Tiers
+                        <MetricTooltip term="CAT Tier">
+                            Community Access Tier summarizes how isolated a community is for practical care access and transport.
+                        </MetricTooltip>
+                    </div>
+                    <div className="legend-tier-list">
+                        {CAT_TIERS.map(tier => (
+                            <div key={tier}>
+                                <strong>Tier {tier}:</strong> {CAT_TIER_PRESENTATION[tier].shortDescription}
+                            </div>
+                        ))}
                     </div>
                 </div>
-            ))}
 
-            {totalRegions !== undefined && (
-                <div style={{
-                    marginTop: '10px',
-                    paddingTop: '8px',
-                    borderTop: '1px solid #e5e7eb',
-                    fontSize: '10px',
-                    color: '#64748b',
-                    display: 'flex',
-                    justifyContent: 'space-between'
-                }}>
-                    <span>Communities</span>
-                    <strong style={{ color: '#334155' }}>{totalRegions}</strong>
-                </div>
-            )}
+                {totalRegions !== undefined && (
+                    <div className="legend-footer-row">
+                        <span>Communities</span>
+                        <strong>{totalRegions}</strong>
+                    </div>
+                )}
 
-            {/* Color scale indicator */}
-            <div style={{
-                marginTop: '10px',
-                paddingTop: '8px',
-                borderTop: '1px solid #e5e7eb',
-            }}>
-                <div style={{
-                    height: '6px',
-                    borderRadius: '3px',
-                    background: `linear-gradient(to right, ${getNeedColor(12)}, ${getNeedColor(37)}, ${getNeedColor(62)}, ${getNeedColor(87)})`,
-                    marginBottom: '4px',
-                }} />
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    fontSize: '9px',
-                    color: '#94a3b8',
-                }}>
-                    <span>Low Need</span>
-                    <span>High Need</span>
+                <div className="legend-scale">
+                    <div
+                        className="legend-gradient"
+                        style={{
+                            background: `linear-gradient(to right, ${needLevels.slice().reverse().map(score => getDesertScorePresentation(score).color).join(', ')})`,
+                        }}
+                    />
+                    <div className="legend-scale-labels">
+                        <span>Low Need</span>
+                        <span>High Need</span>
+                    </div>
                 </div>
             </div>
         </div>
     );
 }
-

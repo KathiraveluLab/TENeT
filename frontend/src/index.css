@@ -1,0 +1,206 @@
+/* TENeT shared design tokens
+ *
+ * The semantic tokens are the preferred API for new UI. The aliases near the
+ * end of :root keep existing screens working while they are migrated.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Neutral surfaces */
+  --color-canvas: #f4f7fa;
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f8fafc;
+  --color-surface-muted: #eef2f6;
+  --color-surface-overlay: rgba(255, 255, 255, 0.94);
+
+  /* Text */
+  --color-text: #172033;
+  --color-text-secondary: #536176;
+  --color-text-muted: #64748b;
+  --color-text-inverse: #ffffff;
+  --color-text-link: #1d4ed8;
+
+  /* Borders */
+  --color-border: #d8e0e8;
+  --color-border-strong: #b8c4d0;
+  --color-border-subtle: #e8edf2;
+
+  /* Brand and interaction */
+  --color-primary: #1d4ed8;
+  --color-primary-hover: #1e40af;
+  --color-primary-active: #1e3a8a;
+  --color-primary-subtle: #eff6ff;
+  --color-danger: #b42318;
+  --color-danger-hover: #912018;
+  --color-danger-subtle: #fef3f2;
+
+  /* Operational status colors */
+  --color-status-ready: #15803d;
+  --color-status-ready-subtle: #f0fdf4;
+  --color-status-anchor: #b45309;
+  --color-status-anchor-subtle: #fffbeb;
+  --color-status-gap: #b42318;
+  --color-status-gap-subtle: #fef3f2;
+  --color-status-limited: #6d28d9;
+  --color-status-limited-subtle: #f5f3ff;
+  --color-status-info: #0369a1;
+  --color-status-info-subtle: #f0f9ff;
+  --color-status-unknown: #64748b;
+  --color-status-unknown-subtle: #f1f5f9;
+
+  /* Typography */
+  --font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-xs: 0.75rem;
+  --font-sm: 0.875rem;
+  --font-base: 1rem;
+  --font-lg: 1.125rem;
+  --font-xl: 1.25rem;
+  --font-2xl: 1.5rem;
+
+  /* Spacing (4px base) */
+  --spacing-0: 0;
+  --spacing-1: 0.25rem;
+  --spacing-2: 0.5rem;
+  --spacing-3: 0.75rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-8: 2rem;
+  --spacing-10: 2.5rem;
+  --spacing-12: 3rem;
+  --spacing-16: 4rem;
+
+  /* Shape */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+
+  /* Elevation */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 6px 18px rgba(15, 23, 42, 0.1);
+  --shadow-lg: 0 16px 36px rgba(15, 23, 42, 0.14);
+
+  /* Controls and motion */
+  --control-height-sm: 2rem;
+  --control-height: 2.5rem;
+  --control-height-lg: 2.75rem;
+  --control-icon-size-sm: 2rem;
+  --control-icon-size: 2.5rem;
+  --focus-ring-color: rgba(37, 99, 235, 0.28);
+  --focus-ring: 0 0 0 3px var(--focus-ring-color);
+  --transition-fast: 150ms ease;
+
+  /* Layer order — matches actual overlay stacking across the app */
+  --z-map-controls: 1000;
+  --z-overlay: 1100;
+  --z-toast: 1150;
+  --z-sidebar: 1200;
+  --z-popover: 1500;
+  --z-tooltip: 2500;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  overflow: hidden;
+  background: var(--color-canvas);
+  color: var(--color-text);
+  font-family: var(--font-family);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+p {
+  color: var(--color-text-secondary);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  background: none;
+}
+
+button:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+:where(button, input, select, textarea, a):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: #dbeafe;
+  color: var(--color-text);
+}
+
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-full);
+  background: #c1cad4;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #98a6b6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

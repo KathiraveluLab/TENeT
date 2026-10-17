@@ -1,188 +1,205 @@
-# TENeT - Telehealth Effectiveness & Necessity Tracker
+# TENeT — Telehealth Effectiveness & Necessity Tracker
 
-> **No Alaskan family should be left in a healthcare desert simply because of where they live.**
+TENeT is an interactive decision-support platform for understanding where telehealth can work in Alaska—and where people face the greatest barriers to care. It brings together community access, broadband availability and affordability, measured network performance, healthcare infrastructure, and seasonal travel conditions in one map-based workspace.
 
-TENeT is an interactive map-based tool that shows - community by community - where telehealth can actually work in Alaska and where it can't. It pulls together real data on roads, broadband, healthcare facilities, and affordability, then adjusts everything for Alaska's brutal seasonal swings so decision-makers get the full picture.
+It is built for public-sector planners, healthcare organizations, broadband providers, researchers, and community advocates who need to prioritize telehealth investment with transparent, place-level evidence.
 
-Built for **state administrators, healthcare planners, ISPs, and researchers** who need honest answers to two questions:
+## What TENeT provides
 
-1. **Where does telehealth actually reach the people who need it most?**
-2. **Where should we expand access next?**
+- A statewide map of Alaska communities, with season-aware access context.
+- Community search, filtering, sorting, selection, and pinning for comparison.
+- Community Access Tier (CAT) and telehealth-status views.
+- **Gap Hunter**, which displays observed Ookla network-performance data and highlights connectivity gaps.
+- An affordability view that relates estimated internet costs to local income.
+- Research profiles that combine access, connectivity, healthcare, affordability, and data-quality signals for a community.
+- Downloadable PDF community reports and shareable map URLs.
+- A statewide insights dashboard covering telehealth status, healthcare, performance, affordability, and data quality.
+- **Scenario Mode** for testing broadband, latency, clinic-proximity, and affordability assumptions without changing baseline data.
 
----
-
-## Why This Exists
-
-Alaska has over 400 scattered communities. Many are fly-in only. Roads freeze. Rivers close. Broadband coverage that looks great on an FCC map often doesn't match reality on the ground. Hospitals can be hundreds of miles away.
-
-TENeT connects all these dots into a single view so you can see which communities are well-served, which are struggling, and which are in genuine crisis - without digging through a dozen spreadsheets.
-
----
-
-## What It Does
-
-| Feature | What you see on the map |
-|---------|------------------------|
-| **Community Access Tiers (CAT)** | Every community is color-coded by its Telehealth Need Score (0-100) - a composite of healthcare access gaps, broadband quality, transport limitations, and seasonal effects |
-| **Healthcare Desert Score (0–100)** | How far people are from clinics, how many providers exist nearby, whether specialists are reachable, and how transport disruptions make things worse |
-| **Broadband Reality Check** | Side-by-side comparison of FCC-claimed speeds vs. Ookla-measured speeds - exposing the real connectivity gap |
-| **Internet Affordability** | Monthly broadband cost as a percentage of local household income - because 25 Mbps means nothing if no one can afford it |
-| **Seasonal Adjustment** | Toggle between summer and winter to see how access changes when roads freeze and rivers shut down |
-
----
-
-## Tech Stack
-
-| Layer | What we use |
-|-------|-------------|
-| **Frontend** | React 18 · TypeScript · Leaflet · Vite |
-| **Backend** | Flask 3.0 · Python |
-| **Database** | SQLite · SQLAlchemy ORM |
-| **Maps** | OpenStreetMap tiles via Leaflet |
-
----
-
-## Project Structure
-
-```
-TENeT/
-├── frontend/                    → React app (the interactive Alaska map)
-│   └── src/
-│       ├── api/                 → Talks to the backend
-│       ├── components/          → Map layers, legends, popups, controls
-│       └── types/               → TypeScript definitions
-│
-└── backend/                     → Flask API server (port 5001)
-    ├── routes/                  → API endpoints (regions, performance, affordability)
-    ├── services/                → Core logic (desert scoring, season adjustments)
-    ├── database/                → Models, seeders, DB config
-    ├── config/                  → ISP pricing & thresholds
-    └── data/
-        ├── raw/                 → Original source datasets
-        ├── processed_data/      → Cleaned CSVs ready for the database
-        └── scripts/             → Data preprocessing pipelines
-```
-
----
-
-## Getting Started
+## Quick start
 
 ### Prerequisites
 
-| Tool | Version |
-|------|---------|
-| Python | 3.9 or higher |
-| Node.js | 18 or higher |
-| npm | comes with Node.js |
+- [Docker Desktop](https://docs.docker.com/get-docker/) with Docker Compose v2
+- Git
 
-### 1. Clone the repo and switch to the development branch
+### Run the full stack
 
 ```bash
 git clone https://github.com/KathiraveluLab/TENeT.git
 cd TENeT
-git checkout experimental-dakshhhhh16
+git checkout dev
+
+cp .env.example .env
+make dev
 ```
 
-> **Note:** All active development lives on the `experimental-dakshhhhh16` branch. The `main` branch may not have the latest features.
+`make dev` builds the containers, creates and seeds the local SQLite database when needed, then starts both services.
 
-### 2. Start the backend
+Open:
 
-```bash
-cd backend
-pip3 install -r requirements.txt
-python3 app.py
+- Frontend: http://localhost:5173
+- Backend health check: http://localhost:5001/api/health
+- Backend readiness check: http://localhost:5001/api/ready
+
+To stop the application, run `make stop`.
+
+## How to use the application
+
+1. Start on the map and use the left sidebar to find a community by name or refine the list by access tier, telehealth status, healthcare need, or data confidence.
+2. Select a community to inspect its evidence, including access conditions, affordability, healthcare proximity, and data-quality notes.
+3. Pin up to three communities to compare their research profiles side by side.
+4. Switch between map views:
+   - **CAT** shows community access tiers and baseline telehealth context.
+   - **Gap Hunter** shows observed Ookla performance measurements and service gaps.
+   - **Affordability** focuses on estimated internet burden and access conditions.
+   - **Scenario Mode** shows modeled classifications under user-selected assumptions.
+5. Open **Statewide Insights** for aggregate evidence and links back to the relevant map view or community.
+6. Download a PDF report or copy the shareable URL to preserve the current map state, selected community, season, pins, and scenario settings.
+
+## Interpreting the evidence
+
+TENeT keeps baseline evidence and modeled analysis separate.
+
+### Baseline telehealth status
+
+Baseline classifications are calculated from the project's canonical telehealth-classification service. A community may be shown as:
+
+| Status | Meaning |
+| --- | --- |
+| Telehealth Ready | Video-capable broadband and affordable home access meet the baseline inputs. |
+| Community Anchor | Home access is not ready, but a nearby clinic provides a care-access safety net. |
+| Critical Gap | Home access is not ready and no clinic is accessible within the applicable threshold. |
+| Data Unavailable | Required classification inputs are missing. |
+
+Community Access Tiers describe transport and service-access conditions:
+
+| Tier | Meaning |
+| --- | --- |
+| 1 | Full multimodal access |
+| 2 | Dual-mode access |
+| 3 | Limited access |
+| 4 | Extreme or no direct access |
+
+Season selection adjusts the transport context used throughout the map, sidebar, summaries, and classification views.
+
+### Observed performance vs. scenarios
+
+**Gap Hunter** is an observed-data view. It uses Ookla measurements and should not be read as a simulated result.
+
+**Scenario Mode** is a planning tool. It lets users adjust download, upload, latency, clinic-proximity, and affordability thresholds, then compares the resulting modeled status with the baseline. It does not modify database records, report measured infrastructure changes, or replace observed data.
+
+## Data and methodology
+
+The local seed workflow combines checked-in project data for:
+
+- Community access and transport profiles
+- Healthcare facilities and healthcare-access calculations
+- Broadband coverage and data-gap indicators
+- Local Census income records for affordability analysis
+- A small offline sample of real Ookla Open Data tiles for useful first-run network-performance context
+
+The checked-in Ookla sample keeps a fresh, offline installation useful. For broader performance coverage, ingest an appropriate Ookla dataset with `backend/data/scripts/ingest_ookla.py`, then reseed or refresh the database as needed.
+
+Data availability is part of the product: missing or low-confidence inputs are shown explicitly rather than treated as evidence of access or need.
+
+## Architecture
+
+- **Frontend:** React, TypeScript, Vite, React Leaflet, and Leaflet
+- **Backend:** Flask, SQLAlchemy, Gunicorn, and SQLite
+- **Operations:** Docker, Docker Compose, nginx, and GitHub Actions
+- **Testing:** pytest, Vitest/React Testing Library, and Playwright
+
+The frontend is served by nginx in the Docker stack and proxies `/api/cat` to the Flask backend. The backend exposes liveness and database-readiness health checks, while the local database is seeded deterministically from tracked data.
+
+## Repository layout
+
+```text
+TENeT/
+├── frontend/                 React application, map UI, reports, and E2E tests
+├── backend/
+│   ├── routes/               CAT and network-performance API routes
+│   ├── services/             Classification, profiles, scenarios, and data logic
+│   ├── database/             Models, initialization, and seeders
+│   ├── data/                 Tracked inputs, samples, and ingestion scripts
+│   └── tests/                Backend unit and API tests
+├── docker-compose.yml        Local multi-container stack
+├── Makefile                  Development, test, and maintenance commands
+├── CONTRIBUTING.md           Contribution workflow
+├── TESTING.md                Test strategy and checks
+└── DEPLOY.md                 Deployment guidance
 ```
 
-The API will be live at **http://localhost:5001**. You should see:
+## API overview
 
-```
-Database initialized successfully
-Starting TENeT Backend on http://localhost:5001
-```
+All application endpoints, except health checks, are under `/api/cat`.
 
-### 3. Start the frontend (in a new terminal)
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/health` | Process liveness check |
+| `GET /api/ready` | Database-readiness check |
+| `GET /api/cat/regions` | Community access-tier data, optionally by season or tier |
+| `GET /api/cat/regions/summary` | Lightweight community summaries for the sidebar |
+| `GET /api/cat/regions/search` | Filtered community discovery |
+| `GET /api/cat/regions/<region_code>/research-profile` | Consolidated community research profile |
+| `GET /api/cat/regions/research-profiles` | Profiles for pinned-community comparison |
+| `GET /api/cat/telehealth-status/all` | Statewide baseline telehealth classifications |
+| `GET /api/cat/performance` | Observed Ookla performance tiles |
+| `GET /api/cat/performance/gaps` | Network service-gap analysis |
+| `GET /api/cat/performance/affordability` | Broadband affordability analysis |
+| `GET /api/cat/healthcare/summary` | Healthcare infrastructure summary |
+| `POST /api/cat/scenarios/preview` | Non-persistent scenario analysis |
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+Explore the frontend API clients in `frontend/src/api/` and the backend route implementations in `backend/routes/` for request parameters and response shapes.
 
-The app will be live at **http://localhost:5173**. Open it in your browser and the Alaska map loads automatically.
+## Development commands
 
-### 4. Verify it works
+| Command | Description |
+| --- | --- |
+| `make dev` | Build, seed if necessary, and start the full application |
+| `make stop` | Stop the running stack |
+| `make build` | Rebuild images without cache |
+| `make seed` | Initialize and seed the SQLite database |
+| `make reset-db` | Remove the local database and seed it again |
+| `make test` | Run backend and frontend test suites |
+| `make backend-test` | Run pytest in the backend container |
+| `make frontend-test` | Run the Vitest suite |
+| `make frontend-typecheck` | Run TypeScript checks |
+| `make frontend-build` | Build the production frontend |
+| `make docker-build` | Build backend and frontend images |
+| `make e2e` | Run Playwright smoke tests against a running app |
+| `make smoke` | Check Compose config, frontend build, and core live API routes |
+| `make logs` | Tail Compose service logs |
+| `make clean` | Remove local containers, volumes, and images |
 
-Open **http://localhost:5001/api/health** in your browser. You should see:
+Run `make help` to list the available targets. `make clean` and `make reset-db` remove local Docker or SQLite state; use them only when that reset is intended.
 
-```json
-{ "status": "ok", "message": "TENeT Backend is running" }
-```
+## Configuration
 
----
+Copy `.env.example` to `.env` before starting the stack. Common options are:
 
-## Key API Endpoints
+| Variable | Default | Description |
+| --- | --- | --- |
+| `BACKEND_PORT` | `5001` | Backend host port |
+| `FRONTEND_PORT` | `5173` | Frontend host port |
+| `DB_PATH` | `/app/data/tenet.db` | SQLite path inside the backend container |
+| `FLASK_DEBUG` | `0` | Enable only for local debugging |
+| `CORS_ALLOWED_ORIGINS` | empty | Comma-separated allowed cross-origin frontend URLs |
+| `VITE_API_BASE_URL` | `/api/cat` | API base embedded in the frontend build |
+| `WEB_CONCURRENCY` | `2` | Gunicorn worker count |
+| `GUNICORN_THREADS` | `4` | Threads per Gunicorn worker |
 
-| Endpoint | What it returns |
-|----------|-----------------|
-| `GET /api/cat/regions?season=summer` | All communities with tier levels, adjusted for season |
-| `GET /api/cat/telehealth-priority` | Telehealth priority rankings per community |
-| `GET /api/cat/performance` | Measured broadband speeds (Ookla data) |
-| `GET /api/cat/affordability` | Internet cost burden per community |
-| `GET /api/health` | Backend health check |
+For the checked-in Docker and nginx setup, leave `VITE_API_BASE_URL` at `/api/cat` and leave `CORS_ALLOWED_ORIGINS` empty. Set an explicit CORS allowlist only when the frontend is served from a different origin.
 
----
+## Quality and deployment
 
-## Data Sources
+GitHub Actions runs backend tests, frontend type checks, frontend tests, production builds, Docker build validation, and Playwright smoke coverage for pull requests. See [TESTING.md](./TESTING.md) for the full test strategy and [DEPLOY.md](./DEPLOY.md) for production deployment, readiness checks, and rollback guidance.
 
-| Dataset | Source | What it covers |
-|---------|--------|----------------|
-| Transportation | Alaska DOT&PF | 421 communities - road, air, and water access profiles |
-| Broadband | FCC National Broadband Map | 354 communities - coverage claims, ISP data |
-| Broadband (measured) | Ookla Speedtest | Real-world download/upload speeds and latency |
-| Healthcare | OpenStreetMap (Overpass Turbo) | 325 facilities - hospitals, clinics, pharmacies |
-| Affordability | ZCTA Census income + ISP pricing | Cost burden as % of household income |
+## Limitations
 
----
-
-## How Scoring Works
-
-### Healthcare Desert Score (0–100)
-
-| Range | Meaning |
-|-------|---------|
-| 0–30 | Good access - clinics are nearby, multiple providers |
-| 31–50 | Moderate challenges - some distance or limited specialists |
-| 51–70 | Significant desert - far from facilities, few options |
-| 71–100 | Severe desert - high telehealth priority, urgent need |
-
-The score factors in distance to the nearest clinic, provider density, specialist availability, and seasonal transport friction.
-
-### Community Access Tiers (CAT)
-
-Each community is assigned a transport tier (1-4) based on available access modes (road, air, water). This tier is one input into the overall Telehealth Need Score - it is not the score itself.
-
-| Tier | Transport Access Mode |
-|------|----------------------|
-| 1 | Full multimodal access - road plus at least one other mode |
-| 2 | Dual mode without year-round road (e.g. air + water) |
-| 3 | Single mode only (air only, road only, or water only) |
-| 4 | No direct scheduled access - charter or seasonal only |
-
-The transport tier feeds into the Telehealth Need Score alongside healthcare desert metrics, broadband quality, and affordability. The seasonal toggle adjusts the score by increasing the transport penalty for communities where winter cuts off road or water routes.
-
----
-
-## Upcoming Features
-
-- **Docker Setup** - One-command launch with `docker-compose`
-- **Sidebar Search** - Find any community by name, fly-to on map
-- **PDF Reports** - One-click downloadable summaries for grant applications
-- **Region Comparison** - Compare 2–3 communities side by side
-- **What-If Sliders** - Model "what happens if broadband improves here?"
-- **Shareable URLs** - Bookmark and share specific map views
-- **CI/CD Pipeline** - Automated tests via GitHub Actions
-- **Cloud Deployment** - Public URL for direct stakeholder access
-
----
-
+- TENeT is a planning and decision-support tool; it is not a clinical service or a substitute for local community consultation.
+- Public-demo data is seeded into SQLite and should be treated as read-only.
+- Network coverage and performance are incomplete where measurements are absent; missing data is not proof of adequate service.
+- Scenario results are modeled estimates, not observed outcomes or predictions.
+- Weather data is not part of the core application workflow.
 

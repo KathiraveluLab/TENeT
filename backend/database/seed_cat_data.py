@@ -19,9 +19,14 @@ def load_transport_profiles():
     Load community transport profiles from preprocessed CSV.
     Creates CATRegion and CATDataPoint entries for each community.
     """
-    csv_path = os.path.join(
+    data_dir = os.path.join(
         os.path.dirname(os.path.dirname(__file__)),
-        'data', 'processed_data', 'clean_transport_profiles_1.csv'
+        'data', 'processed_data'
+    )
+    fixed_csv_path = os.path.join(data_dir, 'clean_transport_profiles_fixed.csv')
+    csv_path = fixed_csv_path if os.path.exists(fixed_csv_path) else os.path.join(
+        data_dir,
+        'clean_transport_profiles_1.csv'
     )
     
     if not os.path.exists(csv_path):
@@ -33,6 +38,10 @@ def load_transport_profiles():
     data_points_created = 0
     
     try:
+        db.query(CATDataPoint).delete()
+        db.query(CATUpload).delete()
+        db.commit()
+
         # First, create a seed upload record
         seed_upload = CATUpload(
             filename='clean_transport_profiles_1.csv',
@@ -74,8 +83,22 @@ def load_transport_profiles():
                     CATRegion.region_code == region_code
                 ).first()
                 
-                if not existing_region:
-                    # Create CATRegion
+                if existing_region:
+                    region = existing_region
+                    region.region_name = community.title()
+                    region.tier_level = cat_tier
+                    region.centroid_lat = latitude
+                    region.centroid_lon = longitude
+                    region.access_score = access_score
+                    region.properties = {
+                        'tier_justification': row.get('tier_justification', ''),
+                        'primary_access_modes': row.get('primary_access_modes', ''),
+                        'has_airport': row.get('has_airport', 'False').lower() == 'true',
+                        'has_road_access': row.get('has_road_access', 'False').lower() == 'true',
+                        'has_water_access': row.get('has_water_access', 'False').lower() == 'true',
+                        'coastal': row.get('coastal', 'False').lower() == 'true'
+                    }
+                else:
                     region = CATRegion(
                         region_code=region_code,
                         region_name=community.title(),
@@ -95,26 +118,26 @@ def load_transport_profiles():
                     db.add(region)
                     db.flush()  # Get the ID
                     regions_created += 1
-                    
-                    # Create CATDataPoint
-                    data_point = CATDataPoint(
-                        upload_id=upload_id,
-                        region_id=region.id,
-                        region_code=region_code,
-                        latitude=latitude,
-                        longitude=longitude,
-                        location_name=community.title(),
-                        access_type=row.get('primary_access_modes', 'unknown'),
-                        access_quality=access_score,
-                        data_metadata={
-                            'harbordock': row.get('harbordock', 'False').lower() == 'true',
-                            'stateferry': row.get('stateferry', 'False').lower() == 'true',
-                            'cargobarge': row.get('cargobarge', 'False').lower() == 'true',
-                            'data_collection_date': row.get('data_collection_date', '')
-                        }
-                    )
-                    db.add(data_point)
-                    data_points_created += 1
+
+                # Create CATDataPoint for this seed run
+                data_point = CATDataPoint(
+                    upload_id=upload_id,
+                    region_id=region.id,
+                    region_code=region_code,
+                    latitude=latitude,
+                    longitude=longitude,
+                    location_name=community.title(),
+                    access_type=row.get('primary_access_modes', 'unknown'),
+                    access_quality=access_score,
+                    data_metadata={
+                        'harbordock': row.get('harbordock', 'False').lower() == 'true',
+                        'stateferry': row.get('stateferry', 'False').lower() == 'true',
+                        'cargobarge': row.get('cargobarge', 'False').lower() == 'true',
+                        'data_collection_date': row.get('data_collection_date', '')
+                    }
+                )
+                db.add(data_point)
+                data_points_created += 1
         
         # Update the upload record with final count
         seed_upload.records_processed = data_points_created

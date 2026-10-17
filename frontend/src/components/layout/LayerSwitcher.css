@@ -1,0 +1,96 @@
+.layer-switcher {
+  position: absolute;
+  top: var(--spacing-4);
+  left: 60px;
+  z-index: var(--z-overlay);
+  min-width: 278px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-overlay);
+  padding: var(--spacing-2);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.layer-switcher__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  padding: 0 var(--spacing-1) var(--spacing-2);
+  color: var(--color-text-muted);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.layer-switcher__header strong {
+  color: var(--color-status-limited);
+  font-size: 0.625rem;
+}
+
+.layer-switcher__options {
+  display: grid;
+  grid-template-columns: auto 1fr 1.25fr;
+  gap: 2px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  padding: 2px;
+}
+
+.layer-switcher__option {
+  min-height: var(--control-height-sm);
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-md) - 2px);
+  color: var(--color-text-secondary);
+  padding: 0 var(--spacing-3);
+  font-size: var(--font-xs);
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.layer-switcher__option:hover:not(.is-active) {
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--color-text);
+}
+
+.layer-switcher__option.is-active {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  box-shadow: var(--shadow-xs);
+}
+
+.layer-switcher__option:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+@media (max-width: 1200px) {
+  .layer-switcher {
+    top: 90px;
+    right: var(--spacing-4);
+    left: auto;
+  }
+}
+
+@media (max-width: 700px) {
+  .layer-switcher {
+    top: 126px;
+    right: var(--spacing-3);
+    left: var(--spacing-3);
+    min-width: 0;
+  }
+
+  .layer-switcher__options {
+    grid-template-columns: auto 1fr 1.25fr;
+  }
+
+  .layer-switcher__option {
+    padding-inline: var(--spacing-2);
+  }
+}

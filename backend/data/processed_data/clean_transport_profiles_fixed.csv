@@ -26,7 +26,7 @@ arctic,True,False,False,air,66.5625,-145.3194,False,3,40,Single mode access (air
 atka,True,False,False,air,52.1967,-174.2006,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 atmautluak,True,False,False,air,60.8617,-162.2725,False,3,40,Single mode access (air) - limited transport options,False,False,True,2025-12-20
 atqasuk,True,False,False,air,70.4811,-157.4208,False,3,40,Single mode access (air) - limited transport options,False,False,False,2025-12-20
-attu,False,False,False,no_direct_access,52.9233,172.9117,True,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,False,2025-12-20
+attu,False,False,False,no_direct_access,52.9233,-187.0883,True,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,False,2025-12-20
 ayakulik,False,False,False,no_direct_access,57.1667,-154.55,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,False,2025-12-20
 badger,False,True,False,road,64.8069,-147.5339,False,3,35,Single mode access (road) - limited transport options,False,False,False,2025-12-20
 bear creek,True,True,False,"air,road",60.1647,-149.3961,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
@@ -103,7 +103,7 @@ dry creek,False,True,False,road,63.75,-145.0,False,3,35,Single mode access (road
 dyea,False,True,False,road,59.5083,-135.3667,False,3,35,Single mode access (road) - limited transport options,False,False,True,2025-12-20
 eagle,True,True,False,"air,road",64.7878,-141.2003,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,True,2025-12-20
 eagle river,True,True,False,"air,road",61.3214,-149.5683,False,1,75,"Full multimodal access (air,road) including road connectivity",False,False,False,2025-12-20
-eareckson,False,False,False,no_direct_access,52.7128,174.1136,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,True,2025-12-20
+eareckson,False,False,False,no_direct_access,52.7128,-185.8864,True,4,0,No direct scheduled access - requires charter or seasonal transport,False,False,True,2025-12-20
 edna bay,False,False,False,no_direct_access,55.9467,-133.6622,True,4,0,No direct scheduled access - requires charter or seasonal transport,True,False,False,2025-12-20
 eek,True,False,False,air,60.2178,-162.0261,False,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20
 egegik,True,False,False,air,58.2156,-157.3758,True,3,40,Single mode access (air) - limited transport options,True,False,True,2025-12-20

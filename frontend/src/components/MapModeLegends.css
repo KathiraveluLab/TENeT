@@ -1,0 +1,120 @@
+.affordability-legend,
+.scenario-legend {
+  position: absolute;
+  bottom: var(--spacing-6);
+  left: var(--spacing-4);
+  z-index: var(--z-overlay);
+}
+
+.telehealth-access-popup {
+  min-width: 210px;
+  max-width: 236px;
+  color: var(--color-text);
+  font-size: 12px;
+}
+
+.telehealth-access-popup__title {
+  margin: 0 0 2px;
+  color: var(--color-text);
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.telehealth-access-popup__code {
+  margin-bottom: 9px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.telehealth-access-popup__status {
+  margin-bottom: 10px;
+}
+
+.telehealth-access-popup__button {
+  width: 100%;
+}
+
+.affordability-legend {
+  min-width: 220px;
+  padding: 16px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-overlay);
+  box-shadow: var(--shadow-md);
+  font-size: 12px;
+  backdrop-filter: blur(12px);
+}
+
+.affordability-legend__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.affordability-legend__title {
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.affordability-legend__kicker,
+.affordability-legend__count,
+.affordability-legend__note {
+  color: var(--color-text-muted);
+  font-size: 10px;
+}
+
+.affordability-legend__kicker {
+  font-weight: 500;
+}
+
+.affordability-legend__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.affordability-legend__swatch {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  margin-top: 3px;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-xs);
+}
+
+.affordability-legend__content {
+  flex: 1;
+}
+
+.affordability-legend__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.affordability-legend__label {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.affordability-legend__count {
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .affordability-legend,
+  .scenario-legend {
+    bottom: calc(46vh + var(--spacing-5));
+    bottom: calc(46dvh + var(--spacing-5));
+    left: var(--spacing-3);
+    max-height: 38vh;
+    overflow: auto;
+  }
+}

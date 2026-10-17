@@ -1,8 +1,8 @@
 """
 API routes for Community Access Tier (CAT) data management
 """
-from database.models import CATRegion, HealthcareSite, CensusIncome
-from flask import Blueprint, request, jsonify
+from database.models import CATRegion, CATDataPoint, HealthcareSite, CensusIncome, BroadbandCoverage
+from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
 import os
 import math
@@ -10,7 +10,10 @@ import json
 from database.config import SessionLocal
 from database.handlers import CATDataHandler
 from services.data_importer import CATDataImporter
-from services.healthcare_desert_calculator import HealthcareDesertCalculator
+from services.healthcare_desert_calculator import HealthcareDesertCalculator, haversine_km as _haversine_km
+from services.isp_config import ISP_CONFIG as _ISP_CONFIG, get_internet_cost as _get_regional_internet_cost
+from services.research_profile_service import ResearchProfileService
+from services.telehealth_classification import TelehealthClassificationService
 from services.season_constants import (
     SEASON_SUMMER, SEASON_WINTER, SEASON_YEAR_ROUND, VALID_SEASONS, 
     ROAD_QUALITY_LOCAL, VALID_ROAD_QUALITIES,
@@ -33,6 +36,348 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def _to_float_or_none(value):
+    return float(value) if value is not None else None
+
+
+def _normalize_filter_value(value):
+    return str(value or '').strip().lower()
+
+
+def _region_group(region):
+    properties = region.properties or {}
+    return (
+        properties.get('region')
+        or properties.get('economic_region')
+        or properties.get('area')
+        or 'unknown'
+    )
+
+
+def _broadband_for_regions(db, region_codes):
+    if not region_codes:
+        return {}
+
+    records = db.query(BroadbandCoverage).filter(
+        BroadbandCoverage.region_code.in_(region_codes)
+    ).all()
+
+    lookup = {}
+    for record in records:
+        if record.region_code and record.region_code not in lookup:
+            lookup[record.region_code] = record
+    return lookup
+
+
+def _has_broadband_data_gap(record):
+    if record is None:
+        return True
+    return bool((record.data_gaps or '').strip())
+
+
+def _data_confidence(record):
+    if record is None:
+        return 'missing'
+    return (record.confidence or 'unknown').lower()
+
+
+def _build_telehealth_context(db, regions):
+    contexts = TelehealthClassificationService.classify_regions(db, regions)
+    return {
+        code: {
+            'telehealth_status': context.classification.status,
+            'affordability_status': context.classification.affordability_status,
+        }
+        for code, context in contexts.items()
+    }
+
+
+def _build_desert_score_lookup(db, regions, season=SEASON_YEAR_ROUND):
+    region_codes = [region.region_code for region in regions if region.region_code]
+    if not region_codes:
+        return {}
+
+    data_points = db.query(CATDataPoint).filter(
+        CATDataPoint.region_code.in_(region_codes)
+    ).all()
+    points_by_region = {}
+    for point in data_points:
+        points_by_region.setdefault(point.region_code, []).append(point)
+
+    sites = db.query(HealthcareSite).all()
+    active_sites = [
+        site for site in sites
+        if site.is_active and site.latitude is not None and site.longitude is not None
+    ]
+
+    sites_by_region = {}
+    specialist_regions = set()
+    for site in sites:
+        if not site.region_code:
+            continue
+        sites_by_region[site.region_code] = sites_by_region.get(site.region_code, 0) + 1
+        if site.has_specialists:
+            specialist_regions.add(site.region_code)
+
+    score_lookup = {}
+    clinic_types = {'clinic', 'health_center', 'community_health_center'}
+
+    for region in regions:
+        if region.centroid_lat is None or region.centroid_lon is None:
+            score_lookup[region.region_code] = None
+            continue
+
+        region_points = points_by_region.get(region.region_code, [])
+        if region_points:
+            center_lat = sum(point.latitude for point in region_points) / len(region_points)
+            center_lon = sum(point.longitude for point in region_points) / len(region_points)
+            travel_time = region_points[0].travel_time_minutes
+        else:
+            center_lat = region.centroid_lat
+            center_lon = region.centroid_lon
+            travel_time = None
+
+        if active_sites:
+            clinic_dist = float('inf')
+            hospital_dist = float('inf')
+
+            for site in active_sites:
+                distance = _haversine_km(center_lat, center_lon, site.latitude, site.longitude)
+
+                site_type = (site.site_type or '').lower()
+                if site_type in clinic_types:
+                    clinic_dist = min(clinic_dist, distance)
+                if site_type == 'hospital':
+                    hospital_dist = min(hospital_dist, distance)
+
+            clinic_dist = 999 if clinic_dist == float('inf') else clinic_dist
+            hospital_dist = 999 if hospital_dist == float('inf') else hospital_dist
+        else:
+            clinic_dist = 999
+            hospital_dist = 999
+
+        clinic_score = HealthcareDesertCalculator.score_distance_component(clinic_dist)
+        hospital_score = min(100.0, (hospital_dist / 500.0) * 100.0)
+        distance_score = (0.6 * hospital_score) + (0.4 * clinic_score)
+        density_score = HealthcareDesertCalculator.score_density_component(
+            sites_by_region.get(region.region_code, 0)
+        )
+        specialist_score = HealthcareDesertCalculator.score_specialist_component(
+            region.region_code in specialist_regions
+        )
+        transport_mode = HealthcareDesertCalculator.resolve_transport_mode(
+            region,
+            region_points[0] if region_points else None,
+        )
+        transport_score = HealthcareDesertCalculator.score_transport_component(
+            travel_time,
+            season=season,
+            transport_mode=transport_mode,
+        )
+
+        score_lookup[region.region_code] = round(float(
+            0.50 * distance_score +
+            0.15 * density_score +
+            0.15 * specialist_score +
+            0.20 * transport_score
+        ), 2)
+
+    return score_lookup
+
+
+def _build_region_summary(db, regions, season=SEASON_YEAR_ROUND):
+    broadband_lookup = _broadband_for_regions(
+        db,
+        [region.region_code for region in regions if region.region_code]
+    )
+    telehealth_lookup = _build_telehealth_context(db, regions)
+    desert_score_lookup = _build_desert_score_lookup(db, regions, season)
+
+    summaries = []
+    for region in regions:
+        broadband = broadband_lookup.get(region.region_code)
+        telehealth = telehealth_lookup.get(region.region_code, {})
+        adjusted_tier, _, _ = _calculate_seasonal_tier(
+            region.tier_level,
+            region.access_score if region.access_score is not None else 50,
+            region.properties,
+            season,
+        )
+        summaries.append({
+            'id': region.id,
+            'region_code': region.region_code,
+            'name': region.region_name,
+            'lat': _to_float_or_none(region.centroid_lat),
+            'lon': _to_float_or_none(region.centroid_lon),
+            'cat_tier': adjusted_tier if region.tier_level is not None else None,
+            'telehealth_status': telehealth.get('telehealth_status', 'DATA_UNAVAILABLE'),
+            'desert_score': desert_score_lookup.get(region.region_code),
+            'affordability_status': telehealth.get('affordability_status', 'unknown'),
+            'data_confidence': _data_confidence(broadband),
+            'has_data_gap': _has_broadband_data_gap(broadband),
+            'region': _region_group(region),
+        })
+
+    return summaries
+
+
+def _parse_bool_filter(value):
+    normalized = _normalize_filter_value(value)
+    if normalized in {'true', '1', 'yes', 'missing', 'gap', 'gaps'}:
+        return True
+    if normalized in {'false', '0', 'no', 'complete', 'available'}:
+        return False
+    return None
+
+
+def _parse_desert_expression(value):
+    text = str(value or '').strip()
+    if not text:
+        return None
+
+    operator = None
+    if text[:2] in {'>=', '<='}:
+        operator = text[:2]
+        text = text[2:].strip()
+    elif text[:1] in {'>', '<'}:
+        operator = text[:1]
+        text = text[1:].strip()
+
+    try:
+        score = float(text)
+    except ValueError:
+        return None
+
+    return operator or 'range', score
+
+
+def _parse_region_search_args(args):
+    filters = {
+        'name': args.get('name') or '',
+        'tier': args.get('tier'),
+        'status': args.get('status'),
+        'desert_min': args.get('desert_min'),
+        'desert_max': args.get('desert_max'),
+        'data_gap': args.get('data_gap'),
+        'region': args.get('region'),
+    }
+
+    plain_terms = []
+    q = args.get('q') or ''
+    for token in q.split():
+        key, separator, value = token.partition(':')
+        key = key.lower()
+
+        if separator and key == 'tier':
+            filters['tier'] = value
+        elif separator and key == 'status':
+            filters['status'] = value
+        elif separator and key == 'data':
+            filters['data_gap'] = value
+        elif separator and key == 'desert':
+            parsed = _parse_desert_expression(value)
+            if parsed:
+                operator, score = parsed
+                if operator in {'>', '>='}:
+                    filters['desert_min'] = score
+                elif operator in {'<', '<='}:
+                    filters['desert_max'] = score
+        elif separator and key == 'region':
+            filters['region'] = value
+        else:
+            plain_terms.append(token)
+
+    if plain_terms:
+        filters['name'] = ' '.join(
+            term for term in [filters['name'], ' '.join(plain_terms)]
+            if term
+        )
+
+    return filters
+
+
+def _matches_status_filter(value, status_filter):
+    if not status_filter:
+        return True
+
+    normalized_status = _normalize_filter_value(value).replace('_', '')
+    normalized_filter = _normalize_filter_value(status_filter).replace('_', '')
+    allowed = {
+        'telehealthready',
+        'communityanchor',
+        'criticalgap',
+        'critical',
+        'dataunavailable',
+        'missing',
+        'unknown',
+    }
+    if normalized_filter not in allowed:
+        return True
+
+    return normalized_filter in normalized_status or normalized_status in normalized_filter
+
+
+def _filter_region_summaries(summaries, filters):
+    filtered = list(summaries)
+
+    name_filter = _normalize_filter_value(filters.get('name'))
+    if name_filter:
+        filtered = [
+            item for item in filtered
+            if name_filter in _normalize_filter_value(item.get('name'))
+            or name_filter in _normalize_filter_value(item.get('region_code'))
+        ]
+
+    try:
+        tier_filter = int(filters.get('tier')) if filters.get('tier') not in (None, '') else None
+    except (TypeError, ValueError):
+        tier_filter = None
+    if tier_filter in {1, 2, 3, 4}:
+        filtered = [item for item in filtered if item.get('cat_tier') == tier_filter]
+
+    status_filter = filters.get('status')
+    filtered = [
+        item for item in filtered
+        if _matches_status_filter(item.get('telehealth_status'), status_filter)
+    ]
+
+    try:
+        desert_min = float(filters.get('desert_min')) if filters.get('desert_min') not in (None, '') else None
+    except (TypeError, ValueError):
+        desert_min = None
+    if desert_min is not None:
+        filtered = [
+            item for item in filtered
+            if item.get('desert_score') is not None and item.get('desert_score') >= desert_min
+        ]
+
+    try:
+        desert_max = float(filters.get('desert_max')) if filters.get('desert_max') not in (None, '') else None
+    except (TypeError, ValueError):
+        desert_max = None
+    if desert_max is not None:
+        filtered = [
+            item for item in filtered
+            if item.get('desert_score') is not None and item.get('desert_score') <= desert_max
+        ]
+
+    data_gap_filter = _parse_bool_filter(filters.get('data_gap'))
+    if data_gap_filter is not None:
+        filtered = [
+            item for item in filtered
+            if item.get('has_data_gap') is data_gap_filter
+        ]
+
+    region_filter = _normalize_filter_value(filters.get('region'))
+    if region_filter:
+        filtered = [
+            item for item in filtered
+            if region_filter in _normalize_filter_value(item.get('region'))
+        ]
+
+    return filtered
 
 
 # Region endpoints
@@ -106,6 +451,141 @@ def get_regions():
         db.close()
 
 
+@cat_bp.route('/regions/summary', methods=['GET'])
+def get_regions_summary():
+    """
+    Return lightweight community records for sidebar lists.
+
+    This endpoint intentionally excludes geometry, GeoJSON, and popup detail
+    payloads so the frontend can populate navigation without downloading map
+    boundaries.
+    """
+    db = SessionLocal()
+    try:
+        season = request.args.get('season', SEASON_YEAR_ROUND)
+        if season not in VALID_SEASONS:
+            season = SEASON_YEAR_ROUND
+        regions = db.query(CATRegion).order_by(CATRegion.region_name).all()
+        summaries = _build_region_summary(db, regions, season)
+
+        return jsonify({
+            'regions': summaries,
+            'count': len(summaries),
+            'season': season,
+        }), 200
+
+    except Exception:
+        current_app.logger.exception("Failed to get regions summary")
+        return jsonify({'error': 'An internal error occurred'}), 500
+
+    finally:
+        db.close()
+
+
+@cat_bp.route('/regions/<region_code>/research-profile', methods=['GET'])
+def get_research_profile(region_code):
+    """Return the shared research profile for one community."""
+    db = SessionLocal()
+    try:
+        profile = ResearchProfileService.get_profile(
+            db,
+            region_code,
+            request.args.get('season', SEASON_YEAR_ROUND),
+        )
+        if profile is None:
+            return jsonify({
+                'error': 'Community not found',
+                'region_code': region_code,
+            }), 404
+
+        return jsonify(profile), 200
+
+    except Exception:
+        current_app.logger.exception("Failed to get research profile")
+        return jsonify({'error': 'An internal error occurred'}), 500
+
+    finally:
+        db.close()
+
+
+@cat_bp.route('/regions/research-profiles', methods=['GET'])
+def get_research_profiles():
+    """Return shared research profiles for 2-3 pinned communities."""
+    raw_codes = request.args.get('codes', '')
+    codes = []
+    for code in raw_codes.split(','):
+        normalized = code.strip()
+        if normalized and normalized not in codes:
+            codes.append(normalized)
+
+    if not codes:
+        return jsonify({
+            'error': 'codes query parameter is required',
+            'profiles': [],
+            'count': 0,
+            'missing_codes': [],
+        }), 400
+
+    db = SessionLocal()
+    try:
+        profiles, missing_codes = ResearchProfileService.get_profiles(
+            db,
+            codes[:3],
+            request.args.get('season', SEASON_YEAR_ROUND),
+        )
+        return jsonify({
+            'profiles': profiles,
+            'count': len(profiles),
+            'missing_codes': missing_codes,
+            'season': ResearchProfileService.normalize_season(
+                request.args.get('season', SEASON_YEAR_ROUND)
+            ),
+        }), 200
+
+    except Exception:
+        current_app.logger.exception("Failed to get research profiles")
+        return jsonify({'error': 'An internal error occurred'}), 500
+
+    finally:
+        db.close()
+
+
+@cat_bp.route('/regions/search', methods=['GET'])
+def search_regions():
+    """
+    Search lightweight community summaries for sidebar discovery.
+
+    Supports query params:
+        q/name, tier, status, desert_min, desert_max, data_gap, region
+
+    q also accepts compact filters like:
+        tier:4 status:critical desert:>70 data:missing Bethel
+    """
+    db = SessionLocal()
+    try:
+        season = request.args.get('season', SEASON_YEAR_ROUND)
+        if season not in VALID_SEASONS:
+            season = SEASON_YEAR_ROUND
+        filters = _parse_region_search_args(request.args)
+        regions = db.query(CATRegion).order_by(CATRegion.region_name).all()
+        summaries = _build_region_summary(db, regions, season)
+        filtered = _filter_region_summaries(summaries, filters)
+
+        return jsonify({
+            'regions': filtered,
+            'count': len(filtered),
+            'filters': filters,
+            'season': season,
+        }), 200
+
+    except Exception:
+        current_app.logger.exception("Failed to search regions")
+        return jsonify({'error': 'An internal error occurred'}), 500
+
+    finally:
+        db.close()
+
+
 def _calculate_seasonal_tier(base_tier: int, base_score: float, properties: dict, season: str):
     """
     Calculate season-adjusted CAT tier and access score.
@@ -142,20 +622,24 @@ def _calculate_seasonal_tier(base_tier: int, base_score: float, properties: dict
         
         # Water is mostly unavailable in winter
         if has_water and not has_air:
-            tier_penalty += 1
             score_penalty += 25
             restricted_modes.append('water (frozen)')
         elif has_water:
             score_penalty += 10
             restricted_modes.append('water (limited)')
         
-        # Seasonal roads are unavailable
+        # Seasonal roads are harder, and if water freezes and they have no air, they rely solely on roads (Tier 3 max)
         if has_road:
             score_penalty += 5  # Roads harder but not impossible
+            if not has_air:
+                tier_penalty = max(tier_penalty, 3 - base_tier)
         
-        # No air = significant penalty
-        if not has_air and base_tier < 4:
-            tier_penalty += 1
+        # If a community has no road and no air, they are completely isolated in winter (water freezes)
+        elif not has_air:
+            tier_penalty = max(tier_penalty, 4 - base_tier)
+            
+        # No air = significant penalty for all tiers
+        if not has_air:
             score_penalty += 20
         
         adjusted_tier = min(4, int(base_tier) + int(tier_penalty))
@@ -462,9 +946,6 @@ def get_boundaries():
         
         with open(BOUNDARIES_FILE, 'r') as f:
             geojson = json.load(f)
-        
-        # Optionally simplify geometry for performance (client can request full detail)
-        simplify = request.args.get('simplify', 'false').lower() == 'true'
         
         return jsonify(geojson), 200
         
@@ -1135,65 +1616,6 @@ def get_data_gaps_summary():
 # AFFORDABILITY & SAFETY NET ENDPOINTS
 # =============================================================================
 
-# Load ISP pricing config
-def _load_isp_config():
-    """Load ISP pricing from config file."""
-    config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'isp_pricing.json')
-    try:
-        with open(config_path, 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {
-            'isp_pricing': {'fastwyre': {'cost': 350}},
-            'zcta_mappings': {'gci_urban': [], 'extreme_rural': []},
-            'thresholds': {'affordability_burden_pct': 2.0}
-        }
-
-_ISP_CONFIG = _load_isp_config()
-
-
-def _get_regional_internet_cost(zcta: str) -> tuple:
-    """Get internet cost for a ZCTA based on regional ISP availability."""
-    try:
-        gmap = _ISP_CONFIG.get('zcta_mappings', {})
-        if not isinstance(gmap, dict):
-            gmap = {}
-        gu_list = gmap.get('gci_urban', [])
-        er_list = gmap.get('extreme_rural', [])
-        gci_urban = set(gu_list if isinstance(gu_list, list) else [])
-        extreme_rural = set(er_list if isinstance(er_list, list) else [])
-    except Exception:
-        gci_urban = set()
-        extreme_rural = set()
-        
-    pricing = _ISP_CONFIG.get('isp_pricing', {})
-    if not isinstance(pricing, dict):
-        pricing = {}
-        
-    if zcta in extreme_rural:
-        p = pricing.get('extreme_rural', {'cost': 450.0, 'name': 'Extreme Rural'})
-        if not isinstance(p, dict): p = {'cost': 450.0, 'name': 'Extreme Rural'}
-        return (float(p.get('cost', 450.0)), str(p.get('name', 'Extreme Rural')))
-    elif zcta in gci_urban:
-        p = pricing.get('gci', {'cost': 125.0, 'name': 'GCI'})
-        if not isinstance(p, dict): p = {'cost': 125.0, 'name': 'GCI'}
-        return (float(p.get('cost', 125.0)), str(p.get('name', 'GCI')))
-    else:
-        p = pricing.get('fastwyre', {'cost': 350.0, 'name': 'FastWyre'})
-        if not isinstance(p, dict): p = {'cost': 350.0, 'name': 'FastWyre'}
-        return (float(p.get('cost', 350.0)), str(p.get('name', 'FastWyre')))
-
-
-def _haversine_km(lat1, lon1, lat2, lon2):
-    """Calculate distance between two points in kilometers."""
-    R = 6371  # Earth radius in km
-    lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
-    a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
-    return R * 2 * math.asin(math.sqrt(a))
-
-
 @cat_bp.route('/regions/<region_code>/affordability', methods=['GET'])
 def get_region_affordability(region_code):
     """
@@ -1383,151 +1805,41 @@ def get_region_telehealth_status(region_code):
     """
     Get composite telehealth access status for a region.
     
-    Combines affordability and clinic proximity into a single classification:
-    - TELEHEALTH_READY (Green): Affordable home internet
-    - COMMUNITY_ANCHOR (Yellow/Amber): Unaffordable home, but clinic nearby
-    - CRITICAL_GAP (Red): Unaffordable home AND no nearby clinic
-    - DATA_UNAVAILABLE (Gray): Cannot determine (missing income data)
+    Uses the canonical Ookla/FCC, affordability, and clinic-access classifier.
     """
     db = SessionLocal()
     try:
         region = CATDataHandler.get_region_by_code(db, region_code)
-        if not region or not region.centroid_lat:
+        if not region:
             return jsonify({'error': 'Region not found'}), 404
-        
-        # === STEP 1: Check Affordability ===
-        lat_range, lon_range = 0.5, 1.0
-        candidates = db.query(CensusIncome).filter(
-            CensusIncome.median_income.isnot(None),
-            CensusIncome.median_income > 0,
-            CensusIncome.centroid_lat.between(region.centroid_lat - lat_range, region.centroid_lat + lat_range),
-            CensusIncome.centroid_lon.between(region.centroid_lon - lon_range, region.centroid_lon + lon_range)
-        ).all()
-        
-        best_zcta = None
-        min_dist = float('inf')
-        for c in candidates:
-            if c.centroid_lat and c.centroid_lon:
-                dist = _haversine_km(region.centroid_lat, region.centroid_lon, c.centroid_lat, c.centroid_lon)
-                if dist < min_dist:
-                    min_dist = dist
-                    best_zcta = c
-        
-        has_income_data = best_zcta is not None
-        is_affordable = False
-        burden_pct = None
-        internet_cost = None
-        
-        if has_income_data and best_zcta is not None:
-            assert best_zcta is not None
-            zcta_str = str(best_zcta.zcta) if hasattr(best_zcta, 'zcta') and best_zcta.zcta else ""
-            internet_cost, isp_name = _get_regional_internet_cost(zcta_str)
-            med_inc = float(getattr(best_zcta, 'median_income', 0) or 0)
-            monthly_income = med_inc / 12.0
-            burden_pct = float((internet_cost / monthly_income) * 100.0) if monthly_income > 0 else 100.0
-            
-            t_conf = _ISP_CONFIG.get('thresholds', {})
-            t_val = t_conf.get('affordability_burden_pct', 2.0) if isinstance(t_conf, dict) else 2.0
-            threshold = float(t_val) if isinstance(t_val, (int, float)) else 2.0
-            
-            # Absolute cost threshold: $400+/mo is inherently unaffordable regardless of income
-            absolute_cost_threshold = 400.0
-            is_affordable = bool(burden_pct < threshold) and bool(internet_cost < absolute_cost_threshold)
-        else:
-            # No income data - check if cost is extreme rural ($450+)
-            # Get cost based on region location
-            region_zcta = region.properties.get('zcta') if region.properties else None
-            if region_zcta:
-                internet_cost, isp_name = _get_regional_internet_cost(region_zcta)
-            else:
-                # Default to fastwyre for unknown areas
-                internet_cost = 450
-                isp_name = 'FastWyre'
-        
-        # === STEP 2: Check Clinic Proximity ===
-        properties = region.properties or {}
-        access_modes = properties.get('primary_access_modes', '')
-        distance_threshold_km = 10 if 'road' in access_modes.lower() else 50
-        
-        facilities = db.query(HealthcareSite).filter(
-            HealthcareSite.is_active == True,
-            HealthcareSite.latitude.isnot(None)
-        ).all()
-        
-        nearest_clinic = None
-        nearest_distance = float('inf')
-        for f in facilities:
-            if f.site_type in ['clinic', 'hospital', 'health_center']:
-                dist = _haversine_km(region.centroid_lat, region.centroid_lon, f.latitude, f.longitude)
-                if dist < nearest_distance:
-                    nearest_distance = dist
-                    nearest_clinic = f
-        
-        has_nearby_clinic = nearest_distance <= distance_threshold_km
-        
-        # === STEP 3: Composite Classification ===
-        # Check for extreme cost first (>$400/mo is automatically unaffordable)
-        is_extreme_cost = internet_cost and internet_cost >= 400
-        
-        if not has_income_data:
-            # Cannot determine affordability by percentage
-            if is_extreme_cost:
-                # Extreme rural pricing - definitely unaffordable
-                if has_nearby_clinic:
-                    status = 'COMMUNITY_ANCHOR'
-                    color = '#f59e0b'  # Amber
-                    label = 'Community Anchor'
-                    description = f'Extreme cost (${internet_cost}/mo); clinic provides safety net'
-                else:
-                    status = 'CRITICAL_GAP'
-                    color = '#ef4444'  # Red
-                    label = 'Critical Gap'
-                    description = f'Extreme cost (${internet_cost}/mo) AND no nearby clinic'
-            elif has_nearby_clinic:
-                status = 'COMMUNITY_ANCHOR'
-                color = '#f59e0b'  # Amber
-                label = 'Community Anchor'
-                description = 'Income data unavailable; clinic provides safety net'
-            else:
-                status = 'DATA_UNAVAILABLE'
-                color = '#6b7280'  # Gray
-                label = 'Data Gap'
-                description = 'Cannot assess - no income data and no nearby clinic'
-        elif is_affordable:
-            status = 'TELEHEALTH_READY'
-            color = '#22c55e'  # Green
-            label = 'Telehealth Ready'
-            description = f'Home internet affordable ({burden_pct:.1f}% of income)'
-        elif has_nearby_clinic:
-            status = 'COMMUNITY_ANCHOR'
-            color = '#f59e0b'  # Amber/Yellow
-            label = 'Community Anchor'
-            description = f'Home internet unaffordable ({burden_pct:.1f}%), but clinic {nearest_distance:.1f}km away'
-        else:
-            status = 'CRITICAL_GAP'
-            color = '#ef4444'  # Red
-            label = 'Critical Gap'
-            description = f'Home internet unaffordable ({burden_pct:.1f}%) AND no clinic within {distance_threshold_km}km'
-        
+        context = TelehealthClassificationService.classify_region(db, region)
+        inputs = context.inputs
+        classification = context.classification
         return jsonify({
             'region_code': region_code,
             'region_name': region.region_name,
-            'status': status,
-            'color': color,
-            'label': label,
-            'description': description,
+            'status': classification.status,
+            'color': classification.color,
+            'label': classification.label,
+            'description': classification.explanation,
             'affordability': {
-                'has_data': has_income_data,
-                'is_affordable': is_affordable,
-                'burden_pct': float(f"{burden_pct:.2f}") if burden_pct else None,
-                'internet_cost': internet_cost
+                'has_data': classification.affordability_status != 'unknown',
+                'is_affordable': (
+                    classification.affordability_status == 'affordable'
+                    if classification.affordability_status != 'unknown' else None
+                ),
+                'burden_pct': round(inputs.burden_pct, 2) if inputs.burden_pct is not None else None,
+                'internet_cost': inputs.monthly_internet_cost,
             },
             'clinic_proximity': {
-                'has_nearby': has_nearby_clinic,
-                'nearest_name': nearest_clinic.name if nearest_clinic else None,
-                'nearest_distance_km': float(f"{nearest_distance:.1f}") if nearest_clinic else None,
-                'threshold_km': distance_threshold_km
-            }
+                'has_nearby': classification.clinic_supported,
+                'nearest_name': context.nearest_clinic.name if context.nearest_clinic else None,
+                'nearest_distance_km': (
+                    round(inputs.nearest_clinic_distance_km, 1)
+                    if inputs.nearest_clinic_distance_km is not None else None
+                ),
+                'threshold_km': classification.clinic_threshold_km,
+            },
         }), 200
         
     except Exception as e:
@@ -1545,124 +1857,42 @@ def get_all_telehealth_status():
     db = SessionLocal()
     try:
         regions = db.query(CATRegion).all()
-        
-        # Pre-fetch all census and healthcare data for efficiency
-        all_census = db.query(CensusIncome).filter(
-            CensusIncome.median_income.isnot(None),
-            CensusIncome.median_income > 0
-        ).all()
-        
-        all_facilities = db.query(HealthcareSite).filter(
-            HealthcareSite.is_active == True,
-            HealthcareSite.latitude.isnot(None)
-        ).all()
-        
-        # Filter to clinics/hospitals only
-        clinics = [f for f in all_facilities if f.site_type in ['clinic', 'hospital', 'health_center']]
-        
+        contexts = TelehealthClassificationService.classify_regions(db, regions)
         results = []
-        summary = {'telehealth_ready': 0, 'community_anchor': 0, 'critical_gap': 0, 'data_unavailable': 0}
-        
+        summary = {
+            'telehealth_ready': 0,
+            'community_anchor': 0,
+            'limited_telehealth': 0,
+            'critical_gap': 0,
+            'data_unavailable': 0,
+        }
+
         for region in regions:
-            if not region.centroid_lat or not region.centroid_lon:
-                continue
-            
-            # Find nearest ZCTA with income
-            best_zcta = None
-            min_dist = float('inf')
-            for c in all_census:
-                if c.centroid_lat and c.centroid_lon:
-                    dist = _haversine_km(region.centroid_lat, region.centroid_lon, c.centroid_lat, c.centroid_lon)
-                    if dist < min_dist and dist < 55:  # 55km threshold
-                        min_dist = dist
-                        best_zcta = c
-            
-            has_income_data = best_zcta is not None
-            is_affordable = False
-            burden_pct = None
-            internet_cost = None
-            median_income = None
-            isp_name = 'Unknown'
-            
-            if has_income_data and best_zcta is not None:
-                assert best_zcta is not None
-                internet_cost, isp_name = _get_regional_internet_cost(str(getattr(best_zcta, 'zcta', '')))
-                median_income = float(getattr(best_zcta, 'median_income', 0) or 0)
-                monthly_income = median_income / 12.0
-                burden_pct = float((internet_cost / monthly_income) * 100.0) if monthly_income > 0 else 100.0
-                
-                t_conf = _ISP_CONFIG.get('thresholds', {})
-                t_val = t_conf.get('affordability_burden_pct', 2.0) if isinstance(t_conf, dict) else 2.0
-                threshold = float(t_val) if isinstance(t_val, (int, float)) else 2.0
-                
-                is_affordable = bool(burden_pct < threshold) and bool(internet_cost < 400.0)
-            else:
-                internet_cost = 450  # Default fastwyre
-                isp_name = 'FastWyre (est.)'
-            
-            # Find nearest clinic
-            properties = region.properties or {}
-            access_modes = properties.get('primary_access_modes', '')
-            distance_threshold_km = 10 if 'road' in access_modes.lower() else 50
-            
-            nearest_distance = float('inf')
-            nearest_clinic_name = None
-            for f in clinics:
-                dist = _haversine_km(region.centroid_lat, region.centroid_lon, f.latitude, f.longitude)
-                if dist < nearest_distance:
-                    nearest_distance = dist
-                    nearest_clinic_name = f.name
-            
-            has_nearby_clinic = nearest_distance <= distance_threshold_km
-            is_extreme_cost = internet_cost and internet_cost >= 400
-            
-            # Classification + Recommendation
-            if not has_income_data:
-                if is_extreme_cost:
-                    # $450+/mo is inherently unaffordable - mark as such even without income data
-                    if has_nearby_clinic:
-                        status, color = 'COMMUNITY_ANCHOR', '#f59e0b'
-                        recommendation = f'Extreme cost (${internet_cost}/mo) - use community clinic for telehealth'
-                    else:
-                        status, color = 'CRITICAL_GAP', '#ef4444'
-                        recommendation = f'UNAFFORDABLE (${internet_cost}/mo) + No clinic access - urgent intervention needed'
-                elif has_nearby_clinic:
-                    status, color = 'COMMUNITY_ANCHOR', '#f59e0b'
-                    recommendation = 'Use community clinic for telehealth access'
-                else:
-                    status, color = 'DATA_UNAVAILABLE', '#6b7280'
-                    recommendation = 'Collect income data to assess affordability'
-            elif is_affordable:
-                status, color = 'TELEHEALTH_READY', '#22c55e'
-                recommendation = 'Home-based telehealth is viable'
-            elif has_nearby_clinic:
-                status, color = 'COMMUNITY_ANCHOR', '#f59e0b'
-                recommendation = 'Use community clinic for telehealth access'
-            else:
-                status, color = 'CRITICAL_GAP', '#ef4444'
-                recommendation = f'UNAFFORDABLE ({burden_pct:.1f}% burden) + No clinic - urgent intervention needed'
-            
-            # Update summary
-            summary[status.lower()] = summary.get(status.lower(), 0) + 1
-            
+            context = contexts[region.region_code]
+            inputs = context.inputs
+            classification = context.classification
+            summary[classification.status.lower()] += 1
             results.append({
                 'region_code': region.region_code,
                 'region_name': region.region_name,
                 'lat': region.centroid_lat,
                 'lon': region.centroid_lon,
-                'status': status,
-                'color': color,
-                'internet_cost': internet_cost,
-                'isp_name': isp_name,
-                'burden_pct': float(f"{burden_pct:.1f}") if burden_pct else None,
-                'median_income': median_income,
-                'has_nearby_clinic': has_nearby_clinic,
-                'nearest_clinic_name': nearest_clinic_name,
-                'nearest_clinic_km': float(f"{nearest_distance:.1f}") if nearest_distance != float('inf') else None,
-                'access_mode': access_modes or 'unknown',
-                'recommendation': recommendation
+                'status': classification.status,
+                'color': classification.color,
+                'internet_cost': inputs.monthly_internet_cost,
+                'isp_name': context.isp_name or 'Unknown',
+                'burden_pct': round(inputs.burden_pct, 1) if inputs.burden_pct is not None else None,
+                'median_income': inputs.median_income,
+                'has_nearby_clinic': classification.clinic_supported,
+                'nearest_clinic_name': context.nearest_clinic.name if context.nearest_clinic else None,
+                'nearest_clinic_km': (
+                    round(inputs.nearest_clinic_distance_km, 1)
+                    if inputs.nearest_clinic_distance_km is not None else None
+                ),
+                'access_mode': inputs.access_modes or 'unknown',
+                'recommendation': classification.explanation,
             })
-        
+
         return jsonify({
             'regions': results,
             'count': len(results),
@@ -1904,3 +2134,127 @@ def get_healthcare_summary():
     finally:
         db.close()
 
+
+# =============================================================================
+# SCENARIO ANALYSIS
+# =============================================================================
+
+@cat_bp.route('/scenarios/preview', methods=['POST'])
+def scenario_preview():
+    """
+    What-if scenario analysis.
+
+    Accepts user-defined thresholds and returns modeled telehealth readiness
+    for all (or selected) communities.  Does NOT modify baseline data.
+
+    Request body:
+        mode: "preview"
+        season: "year_round" | "summer" | "winter"
+        thresholds:
+            min_download_mbps: number
+            min_upload_mbps: number
+            max_latency_ms: number | null
+            clinic_proximity_km: number | null
+            affordability_burden_pct: number
+        region_codes: list[str] | null
+
+    Returns scenario summary, per-region status, and deltas vs baseline.
+    """
+    from services.scenario_engine import ScenarioEngine
+
+    db = SessionLocal()
+    try:
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return jsonify({'error': 'request body must be a JSON object'}), 400
+
+        mode = body.get('mode', 'preview')
+        if mode != 'preview':
+            return jsonify({'error': 'mode must be "preview"'}), 400
+
+        season = body.get('season', SEASON_YEAR_ROUND)
+        if season not in VALID_SEASONS:
+            return jsonify({
+                'error': f'season must be one of: {", ".join(VALID_SEASONS)}'
+            }), 400
+
+        thresholds_raw = body.get('thresholds', {})
+        region_codes = body.get('region_codes')
+        if not isinstance(thresholds_raw, dict):
+            return jsonify({'error': 'thresholds must be an object'}), 400
+
+        threshold_keys = {
+            'min_download_mbps',
+            'min_upload_mbps',
+            'max_latency_ms',
+            'clinic_proximity_km',
+            'affordability_burden_pct',
+        }
+        unsupported_keys = sorted(set(thresholds_raw) - threshold_keys)
+        if unsupported_keys:
+            return jsonify({
+                'error': f'unsupported threshold fields: {", ".join(unsupported_keys)}'
+            }), 400
+
+        if region_codes is not None:
+            if (
+                not isinstance(region_codes, list)
+                or not region_codes
+                or not all(isinstance(code, str) and code.strip() for code in region_codes)
+            ):
+                return jsonify({
+                    'error': 'region_codes must be a non-empty list of strings or null'
+                }), 400
+            region_codes = list(dict.fromkeys(code.strip() for code in region_codes))
+            known_codes = {
+                code for code, in db.query(CATRegion.region_code).filter(
+                    CATRegion.region_code.in_(region_codes)
+                ).all()
+            }
+            unknown_codes = [code for code in region_codes if code not in known_codes]
+            if unknown_codes:
+                return jsonify({
+                    'error': 'one or more communities were not found',
+                    'unknown_region_codes': unknown_codes,
+                }), 400
+
+        # Coerce provided threshold values to proper types. Omitted keys should
+        # remain omitted so ScenarioEngine can apply baseline defaults.
+        thresholds = {}
+        for key in ('min_download_mbps', 'min_upload_mbps', 'max_latency_ms',
+                     'clinic_proximity_km', 'affordability_burden_pct'):
+            if key not in thresholds_raw:
+                continue
+            value = thresholds_raw.get(key)
+            if value is not None:
+                if isinstance(value, bool) or not isinstance(value, (int, float)):
+                    return jsonify({
+                        'error': f'Invalid value for {key}: {value!r}'
+                    }), 400
+                thresholds[key] = float(value)
+            elif key not in ('max_latency_ms', 'clinic_proximity_km'):
+                return jsonify({
+                    'error': f'{key} cannot be null'
+                }), 400
+            else:
+                thresholds[key] = None
+
+        # Validate
+        error = ScenarioEngine.validate_thresholds(thresholds)
+        if error:
+            return jsonify({'error': error}), 400
+
+        result = ScenarioEngine.preview(
+            db,
+            thresholds=thresholds,
+            season=season,
+            region_codes=region_codes,
+        )
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        cat_bp.logger.exception("Unhandled error in scenario_preview: %s", e)
+        return jsonify({'error': 'An internal error occurred.'}), 500
+    finally:
+        db.close()
