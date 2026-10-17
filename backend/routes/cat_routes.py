@@ -499,8 +499,9 @@ def get_research_profile(region_code):
 
         return jsonify(profile), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get research profile")
+        return jsonify({'error': 'An internal error occurred'}), 500
 
     finally:
         db.close()
