@@ -27,31 +27,33 @@ vi.mock('html2canvas', () => ({
 
 vi.mock('jspdf', () => {
     return {
-        default: vi.fn().mockImplementation(() => ({
-            addImage: addImageMock,
-            addPage: addPageMock,
-            getNumberOfPages: vi.fn(() => addPageMock.mock.calls.length + 1),
-            line: vi.fn(),
-            rect: vi.fn(),
-            roundedRect: vi.fn(),
-            save: saveMock,
-            setPage: setPageMock,
-            setDrawColor: vi.fn(),
-            setFillColor: vi.fn(),
-            setFont: vi.fn(),
-            setFontSize: vi.fn(),
-            setLineWidth: vi.fn(),
-            setTextColor: vi.fn(),
-            splitTextToSize: splitTextMock,
-            getTextWidth: vi.fn((value: string) => String(value).length),
-            text: vi.fn((value: string | string[]) => {
-                if (Array.isArray(value)) {
-                    textCalls.push(...value.map(String));
-                } else {
-                    textCalls.push(String(value));
-                }
-            }),
-        })),
+        default: vi.fn().mockImplementation(function () {
+            return {
+                addImage: addImageMock,
+                addPage: addPageMock,
+                getNumberOfPages: vi.fn(() => addPageMock.mock.calls.length + 1),
+                line: vi.fn(),
+                rect: vi.fn(),
+                roundedRect: vi.fn(),
+                save: saveMock,
+                setPage: setPageMock,
+                setDrawColor: vi.fn(),
+                setFillColor: vi.fn(),
+                setFont: vi.fn(),
+                setFontSize: vi.fn(),
+                setLineWidth: vi.fn(),
+                setTextColor: vi.fn(),
+                splitTextToSize: splitTextMock,
+                getTextWidth: vi.fn((value: string) => String(value).length),
+                text: vi.fn((value: string | string[]) => {
+                    if (Array.isArray(value)) {
+                        textCalls.push(...value.map(String));
+                    } else {
+                        textCalls.push(String(value));
+                    }
+                }),
+            };
+        }),
     };
 });
 

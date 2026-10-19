@@ -1,5 +1,5 @@
 # Development stage
-FROM node:20-alpine AS dev
+FROM node:22-alpine AS dev
 
 WORKDIR /app
 ARG VITE_API_BASE_URL=/api/cat
@@ -15,7 +15,7 @@ EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 # Production build
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 ARG VITE_API_BASE_URL=/api/cat
