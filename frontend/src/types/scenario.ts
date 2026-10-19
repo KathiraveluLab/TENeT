@@ -73,26 +73,35 @@ export interface ScenarioPreset {
 export const SCENARIO_PRESETS: ScenarioPreset[] = [
     {
         id: 'fcc',
-        label: 'Baseline (25/3 Mbps)',
+        label: 'FCC Standard (25/3 Mbps)',
         thresholds: {
             min_download_mbps: 25,
             min_upload_mbps: 3,
+            max_latency_ms: 150,
             affordability_burden_pct: 2,
+            clinic_proximity_km: null,
         },
     },
     {
         id: 'equity',
-        label: 'Broadband Equity Goal',
+        label: 'Broadband Equity Goal (100/20 Mbps)',
         thresholds: {
             min_download_mbps: 100,
             min_upload_mbps: 20,
+            max_latency_ms: 100,
+            affordability_burden_pct: 2,
+            clinic_proximity_km: null,
         },
     },
     {
         id: 'clinic_access',
-        label: 'Universal Clinic Access',
+        label: 'Universal Clinic Access (15 km)',
         thresholds: {
-            clinic_proximity_km: 25,
+            min_download_mbps: 25,
+            min_upload_mbps: 3,
+            max_latency_ms: 150,
+            affordability_burden_pct: 2,
+            clinic_proximity_km: 15,
         },
     },
 ];
