@@ -144,32 +144,32 @@ export default function SelectedRegionPanel({
                 />
                 <DetailRow
                     label={<>Telehealth need<MetricTooltip term="Telehealth Need">Interprets healthcare desert score: below 25 adequate, 25-49 moderate, 50-74 high, and 75-100 critical.</MetricTooltip></>}
-                    value={telehealthNeedLabel(profile?.healthcare.desert_score ?? region.desert_score)}
+                    value={telehealthNeedLabel(profile?.healthcare?.desert_score ?? region.desert_score)}
                 />
                 <DetailRow label="Region" value={formatMissing(region.region)} />
             </DetailSection>
 
             <DetailSection title="Connectivity">
-                <DetailRow label="Download speed" value={profile ? formatResearchValue(profile.connectivity.ookla_download_mbps, { suffix: ' Mbps', digits: 1 }) : profileFallback} />
-                <DetailRow label="Upload speed" value={profile ? formatResearchValue(profile.connectivity.ookla_upload_mbps, { suffix: ' Mbps', digits: 1 }) : profileFallback} />
-                <DetailRow label="Latency" value={profile ? formatResearchValue(profile.connectivity.latency_ms, { suffix: ' ms', digits: 0 }) : profileFallback} />
+                <DetailRow label="Download speed" value={profile?.connectivity ? formatResearchValue(profile.connectivity.ookla_download_mbps, { suffix: ' Mbps', digits: 1 }) : profileFallback} />
+                <DetailRow label="Upload speed" value={profile?.connectivity ? formatResearchValue(profile.connectivity.ookla_upload_mbps, { suffix: ' Mbps', digits: 1 }) : profileFallback} />
+                <DetailRow label="Latency" value={profile?.connectivity ? formatResearchValue(profile.connectivity.latency_ms, { suffix: ' ms', digits: 0 }) : profileFallback} />
             </DetailSection>
 
             <DetailSection title="Affordability">
                 <DetailRow
                     label={<>Status<MetricTooltip term="Affordability Burden">Whether monthly internet cost is affordable relative to income data.</MetricTooltip></>}
-                    value={formatStatus(profile?.affordability.status ?? region.affordability_status)}
+                    value={formatStatus(profile?.affordability?.status ?? region.affordability_status)}
                 />
-                <DetailRow label="Cost burden" value={profile ? formatResearchValue(profile.affordability.burden_pct, { suffix: '%', digits: 2 }) : profileFallback} />
+                <DetailRow label="Cost burden" value={profile?.affordability ? formatResearchValue(profile.affordability.burden_pct, { suffix: '%', digits: 2 }) : profileFallback} />
             </DetailSection>
 
             <DetailSection title="Healthcare">
                 <DetailRow
                     label={<>Desert score<MetricTooltip term="Healthcare Desert Score">Higher scores mean greater need for telehealth due to healthcare access barriers.</MetricTooltip></>}
-                    value={formatResearchValue(profile?.healthcare.desert_score ?? region.desert_score, { digits: 1 })}
+                    value={formatResearchValue(profile?.healthcare?.desert_score ?? region.desert_score, { digits: 1 })}
                 />
-                <DetailRow label="Nearest care" value={profile ? formatResearchValue(profile.healthcare.nearest_facility_name) : profileFallback} />
-                <DetailRow label="Facility distance" value={profile ? formatResearchValue(profile.healthcare.nearest_facility_distance_km, { suffix: ' km', digits: 1 }) : profileFallback} />
+                <DetailRow label="Nearest care" value={profile?.healthcare ? formatResearchValue(profile.healthcare.nearest_facility_name) : profileFallback} />
+                <DetailRow label="Facility distance" value={profile?.healthcare ? formatResearchValue(profile.healthcare.nearest_facility_distance_km, { suffix: ' km', digits: 1 }) : profileFallback} />
             </DetailSection>
 
             <DetailSection title="Data confidence">
