@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 
 import routes.cat_routes as cat_routes
@@ -30,17 +32,23 @@ def client():
     (cat_routes, "/api/cat/healthcare/summary"),
     (performance_routes, "/api/cat/performance"),
 ])
-def test_database_errors_do_not_expose_details(client, monkeypatch, module, path):
+def test_database_errors_do_not_expose_details(
+    client, monkeypatch, caplog, module, path
+):
     monkeypatch.setattr(module, "SessionLocal", FailingSession)
 
-    response = client.get(path)
+    with caplog.at_level(logging.ERROR):
+        response = client.get(path)
 
     assert response.status_code == 500
     assert response.get_json() == GENERIC_ERROR
     assert PRIVATE_DETAIL not in response.get_data(as_text=True)
+    assert PRIVATE_DETAIL in caplog.text
 
 
-def test_scenario_preview_errors_do_not_expose_details(client, monkeypatch):
+def test_scenario_preview_errors_do_not_expose_details(
+    client, monkeypatch, caplog
+):
     from services.scenario_engine import ScenarioEngine
 
     def failing_preview(*args, **kwargs):
@@ -48,18 +56,20 @@ def test_scenario_preview_errors_do_not_expose_details(client, monkeypatch):
 
     monkeypatch.setattr(ScenarioEngine, "preview", failing_preview)
 
-    response = client.post("/api/cat/scenarios/preview", json={
-        "mode": "preview",
-        "season": "year_round",
-        "thresholds": {
-            "min_download_mbps": 25,
-            "min_upload_mbps": 3,
-            "max_latency_ms": 150,
-            "clinic_proximity_km": None,
-            "affordability_burden_pct": 2,
-        },
-    })
+    with caplog.at_level(logging.ERROR):
+        response = client.post("/api/cat/scenarios/preview", json={
+            "mode": "preview",
+            "season": "year_round",
+            "thresholds": {
+                "min_download_mbps": 25,
+                "min_upload_mbps": 3,
+                "max_latency_ms": 150,
+                "clinic_proximity_km": None,
+                "affordability_burden_pct": 2,
+            },
+        })
 
     assert response.status_code == 500
     assert response.get_json() == GENERIC_ERROR
     assert PRIVATE_DETAIL not in response.get_data(as_text=True)
+    assert PRIVATE_DETAIL in caplog.text
