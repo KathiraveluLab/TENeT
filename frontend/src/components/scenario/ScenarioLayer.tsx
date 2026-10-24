@@ -25,7 +25,7 @@ import {
     setMarkerMetadata,
     type MarkerClusterLike,
 } from '../../utils/markerUtils';
-import MarkerClusterGroup from 'react-leaflet-cluster';
+import MarkerClusterGroup from '../map/MarkerClusterGroup';
 import Button from '../ui/Button';
 import StatusBadge from '../ui/StatusBadge';
 import '../MapModeLegends.css';

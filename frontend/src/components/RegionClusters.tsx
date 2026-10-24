@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import MarkerClusterGroup from 'react-leaflet-cluster';
+import MarkerClusterGroup from './map/MarkerClusterGroup';
 import L from 'leaflet';
 import { CATRegion, Season } from '../api/catApi';
 import { getDesertScorePresentation } from '../domain/metrics';

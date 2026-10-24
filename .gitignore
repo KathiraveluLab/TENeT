@@ -235,3 +235,15 @@ Thumbs.db
 *.swo
 *~
 .agents/
+
+# Design artifacts
+_paper
+_bmad
+
+# AI Agent files
+.claude
+.codex
+.cursor
+.vscode
+.agent
+.gemini

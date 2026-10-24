@@ -108,6 +108,15 @@ export default function ScenarioPanel({
                 step={1}
                 onChange={v => setThreshold('min_upload_mbps', v)}
             />
+            <ThresholdSlider
+                label="Max latency"
+                unit="ms"
+                value={thresholds.max_latency_ms ?? 150}
+                min={20}
+                max={300}
+                step={5}
+                onChange={v => setThreshold('max_latency_ms', v)}
+            />
 
             {/* Clinic Proximity */}
             <div className="scenario-panel__section-title">Clinic Proximity</div>

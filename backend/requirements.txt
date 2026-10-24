@@ -3,12 +3,12 @@ flask-cors==6.0.0
 gunicorn==23.0.0
 python-dotenv==1.2.2
 pandas==2.1.4
-pyarrow==21.0.0
+pyarrow==23.0.1
 sqlalchemy==2.0.23
-geopandas==0.14.2
+geopandas==1.1.2
 shapely==2.0.2
 reverse_geocoder==1.5.1
-pytest==8.3.4
+pytest==9.0.3
 flake8==7.1.1
 # Note: psycopg2-binary and geoalchemy2 removed for SQLite
 # Will be added back when migrating to PostgreSQL

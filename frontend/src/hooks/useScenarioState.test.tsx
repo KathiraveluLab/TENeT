@@ -45,4 +45,47 @@ describe('useScenarioState', () => {
         expect(result.current.thresholds).toEqual(BASELINE_THRESHOLDS);
         expect(result.current.activePreset).toBeNull();
     });
+
+    it('applies scenario presets in research parity with the paper', () => {
+        const { result } = renderHook(() => useScenarioState('year_round'));
+
+        // Broadband Equity Goal
+        act(() => {
+            result.current.applyPreset('equity');
+        });
+        expect(result.current.activePreset).toBe('equity');
+        expect(result.current.thresholds).toEqual({
+            min_download_mbps: 100,
+            min_upload_mbps: 20,
+            max_latency_ms: 100,
+            affordability_burden_pct: 2,
+            clinic_proximity_km: null,
+        });
+
+        // Universal Clinic Access
+        act(() => {
+            result.current.applyPreset('clinic_access');
+        });
+        expect(result.current.activePreset).toBe('clinic_access');
+        expect(result.current.thresholds).toEqual({
+            min_download_mbps: 25,
+            min_upload_mbps: 3,
+            max_latency_ms: 150,
+            affordability_burden_pct: 2,
+            clinic_proximity_km: 15,
+        });
+
+        // FCC Standard
+        act(() => {
+            result.current.applyPreset('fcc');
+        });
+        expect(result.current.activePreset).toBe('fcc');
+        expect(result.current.thresholds).toEqual({
+            min_download_mbps: 25,
+            min_upload_mbps: 3,
+            max_latency_ms: 150,
+            affordability_burden_pct: 2,
+            clinic_proximity_km: null,
+        });
+    });
 });
