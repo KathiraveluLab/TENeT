@@ -249,8 +249,8 @@ TENeT has two distinct concepts that are often confused:
 
 #### 1. CAT Classification (Static)
 - **What**: A pre-computed tier (1-4) assigned to each community
-- **When**: During data import from CSV files
-- **Based on**: Transportation modes, infrastructure, population
+- **When**: Calculated during preprocessing (`calculate_cat_tier()` in `preprocess_transport.py`), then copied from the CSV into the database at import
+- **Based on**: Available transport modes (air, road, water)
 - **Stored**: `CATRegion.tier_level`
 - **Example**: A remote fly-in community might be classified as Tier 4
 - **Purpose**: High-level categorization of access levels

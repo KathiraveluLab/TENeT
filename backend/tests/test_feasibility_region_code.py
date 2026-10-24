@@ -5,29 +5,14 @@ from app import app
 from database.models import CATDataPoint
 from database.models import CATRegion
 from database.models import CATGatingRule, CATUpload
-from database.config import SessionLocal
 
 @pytest.fixture
-def client():
-
-    """create a Flask test client here """
-
+def client(db_session):
+    """Flask test client. Depends on the shared db_session from conftest.py
+    so the tables exist before the endpoint runs."""
     app.config['TESTING'] = True
     with app.test_client() as client:
         yield client
-
-@pytest.fixture
-def db_session():
-
-    """create a database session for testing heree"""
-
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.rollback()
-        db.close()
-
 
 class TestFeasibilityEndpoint:
     

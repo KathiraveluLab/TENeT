@@ -412,3 +412,16 @@ class TestCatGating:
         assert any(f['rule'] == 'Low Priority Rule (stricter)' for f in result['failed_rules'])
 
 
+    def test_get_active_gating_rules_orders_by_priority_desc(self, db_session):
+        """Rules inserted out of order must come back highest priority first."""
+        
+        for name, priority in [('Low', 1), ('High', 3), ('Mid', 2)]:
+            db_session.add(CATGatingRule(
+                rule_name=name, tier_level=1, priority=priority,
+                min_access_score=60.0, is_active=True
+            ))
+        db_session.commit()
+    
+        rules = CATDataHandler.get_active_gating_rules(db_session, tier_level=1)
+    
+        assert [r.rule_name for r in rules] == ['High', 'Mid', 'Low']
