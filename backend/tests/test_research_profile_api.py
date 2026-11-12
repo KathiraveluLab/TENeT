@@ -239,3 +239,86 @@ def test_research_profile_applies_seasonal_cat_tier_and_excludes_pharmacies(db_s
     assert payload["region"]["cat_tier"] == 3
     assert payload["connectivity"]["fcc_coverage_25mbps_pct"] == 85.0
     assert payload["healthcare"]["nearest_facility_name"] == "Clinical Center"
+
+
+def test_batch_research_profiles_matches_single_profiles_with_one_classification_pass(client, monkeypatch):
+    from services.telehealth_classification import TelehealthClassificationService
+
+    single_ready = client.get("/api/cat/regions/AK-READY/research-profile?season=winter").get_json()
+    single_gaps = client.get("/api/cat/regions/AK-GAPS/research-profile?season=winter").get_json()
+
+    classify_calls = []
+    original_classify_regions = TelehealthClassificationService.classify_regions
+
+    def spy_classify_regions(db, regions):
+        classify_calls.append(len(regions))
+        return original_classify_regions(db, regions)
+
+    monkeypatch.setattr(TelehealthClassificationService, "classify_regions", staticmethod(spy_classify_regions))
+
+    batch_response = client.get("/api/cat/regions/research-profiles?codes=AK-READY,AK-GAPS&season=winter")
+
+    assert batch_response.status_code == 200
+    payload = batch_response.get_json()
+    assert classify_calls == [2]
+
+    for profile in (*payload["profiles"], single_ready, single_gaps):
+        assert isinstance(profile["methodology"].pop("generated_at"), str)
+
+    assert payload["profiles"] == [single_ready, single_gaps]
+
+
+def test_telehealth_cache_refreshes_automatically_after_ookla_and_income_commits(client, db_session):
+    from services.telehealth_classification import TelehealthClassificationService
+
+    TelehealthClassificationService.clear_caches()
+
+    # Warm all-regions cache before inserting a new community and nearby Ookla/income rows.
+    initial_summary = client.get("/api/cat/regions/summary")
+    assert initial_summary.status_code == 200
+
+    db_session.add(
+        CATRegion(
+            region_code="AK-WARM-UPDATE",
+            region_name="Warm Update Village",
+            tier_level=2,
+            centroid_lat=64.84,
+            centroid_lon=-147.72,
+            properties={"region": "Interior", "primary_access_modes": "road"},
+        )
+    )
+    db_session.add(
+        CensusIncome(
+            zcta="99701",
+            median_income=85000,
+            population=31000,
+            acs_year=2022,
+            centroid_lat=64.84,
+            centroid_lon=-147.72,
+        )
+    )
+    db_session.add(
+        OoklaPerformance(
+            quadkey="warm-update-tile",
+            avg_d_kbps=65000,
+            avg_u_kbps=15000,
+            avg_lat_ms=32,
+            tests=12,
+            devices=6,
+            year=2025,
+            quarter=4,
+            centroid_lat=64.841,
+            centroid_lon=-147.721,
+        )
+    )
+    db_session.commit()
+
+    refreshed_profile = client.get("/api/cat/regions/AK-WARM-UPDATE/research-profile")
+    assert refreshed_profile.status_code == 200
+    profile_json = refreshed_profile.get_json()
+    assert profile_json["connectivity"]["ookla_download_mbps"] == 65.0
+    assert profile_json["affordability"]["median_income"] == 85000
+
+    refreshed_summary = client.get("/api/cat/regions/summary")
+    assert refreshed_summary.status_code == 200
+    assert any(r["region_code"] == "AK-WARM-UPDATE" for r in refreshed_summary.get_json()["regions"])

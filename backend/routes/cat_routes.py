@@ -3,6 +3,7 @@ API routes for Community Access Tier (CAT) data management
 """
 from database.models import CATRegion, CATDataPoint, HealthcareSite, CensusIncome, BroadbandCoverage
 from flask import Blueprint, request, jsonify, current_app
+from sqlalchemy.orm import defer
 from werkzeug.utils import secure_filename
 import os
 import json
@@ -110,18 +111,31 @@ def _build_desert_score_lookup(db, regions, season=SEASON_YEAR_ROUND):
     if not region_codes:
         return {}
 
-    data_points = db.query(CATDataPoint).filter(
+    data_points = db.query(
+        CATDataPoint.region_code,
+        CATDataPoint.latitude,
+        CATDataPoint.longitude,
+        CATDataPoint.travel_time_minutes,
+        CATDataPoint.access_type,
+    ).filter(
         CATDataPoint.region_code.in_(region_codes)
     ).all()
     points_by_region = {}
     for point in data_points:
         points_by_region.setdefault(point.region_code, []).append(point)
 
-    sites = db.query(HealthcareSite).all()
-    active_sites = [
-        site for site in sites
-        if site.is_active and site.latitude is not None and site.longitude is not None
-    ]
+    sites = db.query(
+        HealthcareSite.region_code,
+        HealthcareSite.is_active,
+        HealthcareSite.has_specialists,
+        HealthcareSite.latitude,
+        HealthcareSite.longitude,
+        HealthcareSite.site_type,
+    ).filter(
+        HealthcareSite.latitude.isnot(None),
+        HealthcareSite.longitude.isnot(None),
+    ).all()
+    active_sites = [site for site in sites if site.is_active]
 
     sites_by_region = {}
     specialist_regions = set()
@@ -478,7 +492,9 @@ def get_regions_summary():
         season = request.args.get('season', SEASON_YEAR_ROUND)
         if season not in VALID_SEASONS:
             season = SEASON_YEAR_ROUND
-        regions = db.query(CATRegion).order_by(CATRegion.region_name).all()
+        regions = db.query(CATRegion).options(
+            defer(CATRegion.geometry)
+        ).order_by(CATRegion.region_name).all()
         summaries = _build_region_summary(db, regions, season)
 
         return jsonify({
@@ -580,7 +596,9 @@ def search_regions():
         if season not in VALID_SEASONS:
             season = SEASON_YEAR_ROUND
         filters = _parse_region_search_args(request.args)
-        regions = db.query(CATRegion).order_by(CATRegion.region_name).all()
+        regions = db.query(CATRegion).options(
+            defer(CATRegion.geometry)
+        ).order_by(CATRegion.region_name).all()
         summaries = _build_region_summary(db, regions, season)
         filtered = _filter_region_summaries(summaries, filters)
 
@@ -1548,7 +1566,7 @@ def get_data_gaps_summary():
         }
 
         # Multi-dataset join completeness across CAT communities
-        regions = db.query(CATRegion).all()
+        regions = db.query(CATRegion).options(defer(CATRegion.geometry)).all()
         total_communities = len(regions)
         if regions:
             contexts = TelehealthClassificationService.classify_regions(db, regions)
@@ -1850,7 +1868,7 @@ def get_all_telehealth_status():
     """
     db = SessionLocal()
     try:
-        regions = db.query(CATRegion).all()
+        regions = db.query(CATRegion).options(defer(CATRegion.geometry)).all()
         contexts = TelehealthClassificationService.classify_regions(db, regions)
         results = []
         summary = {

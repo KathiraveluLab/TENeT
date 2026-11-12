@@ -2,6 +2,7 @@
 API routes for Ookla Performance data (Measured Network Performance Layer)
 """
 from flask import Blueprint, request, jsonify
+from sqlalchemy import and_, case, func
 from database.config import SessionLocal
 from database.models import OoklaPerformance, BroadbandCoverage, CATRegion, CensusIncome
 from services.isp_config import (
@@ -453,22 +454,69 @@ def get_performance_summary():
             }), 200
 
         year, quarter = latest
-
-        tiles = db.query(OoklaPerformance).filter(
+        period_filter = and_(
             OoklaPerformance.year == year,
-            OoklaPerformance.quarter == quarter
-        ).all()
+            OoklaPerformance.quarter == quarter,
+        )
+        valid_speed = and_(
+            OoklaPerformance.avg_d_kbps.isnot(None),
+            OoklaPerformance.avg_d_kbps != 0,
+        )
 
-        speeds = [t.avg_d_kbps for t in tiles if t.avg_d_kbps]
+        agg = db.query(
+            func.count(OoklaPerformance.id).label('total_tiles'),
+            func.sum(case((valid_speed, 1), else_=0)).label('tiles_with_speed_data'),
+            func.coalesce(func.sum(OoklaPerformance.tests), 0).label('total_tests'),
+            func.coalesce(func.sum(OoklaPerformance.devices), 0).label('total_devices'),
+            func.coalesce(func.sum(case((valid_speed, OoklaPerformance.avg_d_kbps), else_=0)), 0).label('speed_sum'),
+            func.max(case((valid_speed, OoklaPerformance.avg_d_kbps))).label('max_kbps'),
+            func.min(case((valid_speed, OoklaPerformance.avg_d_kbps))).label('min_kbps'),
+            func.sum(case((and_(
+                valid_speed,
+                OoklaPerformance.avg_d_kbps >= SPEED_EXCELLENT,
+            ), 1), else_=0)).label('excellent'),
+            func.sum(case((and_(
+                valid_speed,
+                OoklaPerformance.avg_d_kbps >= SPEED_GOOD,
+                OoklaPerformance.avg_d_kbps < SPEED_EXCELLENT,
+            ), 1), else_=0)).label('good'),
+            func.sum(case((and_(
+                valid_speed,
+                OoklaPerformance.avg_d_kbps >= SPEED_POOR,
+                OoklaPerformance.avg_d_kbps < SPEED_GOOD,
+            ), 1), else_=0)).label('moderate'),
+            func.sum(case((and_(
+                valid_speed,
+                OoklaPerformance.avg_d_kbps >= SPEED_CRITICAL,
+                OoklaPerformance.avg_d_kbps < SPEED_POOR,
+            ), 1), else_=0)).label('poor'),
+            func.sum(case((and_(
+                valid_speed,
+                OoklaPerformance.avg_d_kbps < SPEED_CRITICAL,
+            ), 1), else_=0)).label('critical'),
+        ).filter(period_filter).one()
 
-        # Speed distribution
+        total_tiles = int(agg.total_tiles or 0)
+        speed_count = int(agg.tiles_with_speed_data or 0)
+
         distribution = {
-            'excellent': sum(1 for s in speeds if s >= SPEED_EXCELLENT),
-            'good': sum(1 for s in speeds if SPEED_GOOD <= s < SPEED_EXCELLENT),
-            'moderate': sum(1 for s in speeds if SPEED_POOR <= s < SPEED_GOOD),
-            'poor': sum(1 for s in speeds if SPEED_CRITICAL <= s < SPEED_POOR),
-            'critical': sum(1 for s in speeds if s < SPEED_CRITICAL)
+            'excellent': int(agg.excellent or 0),
+            'good': int(agg.good or 0),
+            'moderate': int(agg.moderate or 0),
+            'poor': int(agg.poor or 0),
+            'critical': int(agg.critical or 0),
         }
+
+        median_kbps = None
+        if speed_count:
+            median_row = db.query(OoklaPerformance.avg_d_kbps).filter(
+                period_filter,
+                valid_speed,
+            ).order_by(
+                OoklaPerformance.avg_d_kbps.asc()
+            ).offset(speed_count // 2).limit(1).first()
+            if median_row is not None:
+                median_kbps = median_row[0]
 
         return jsonify({
             'has_data': True,
@@ -478,21 +526,27 @@ def get_performance_summary():
                 'label': f'Q{quarter} {year}'
             },
             'coverage': {
-                'total_tiles': len(tiles),
-                'tiles_with_speed_data': len(speeds),
-                'total_tests': sum(t.tests or 0 for t in tiles),
-                'total_devices': sum(t.devices or 0 for t in tiles)
+                'total_tiles': total_tiles,
+                'tiles_with_speed_data': speed_count,
+                'total_tests': int(agg.total_tests or 0),
+                'total_devices': int(agg.total_devices or 0),
             },
             'speeds': {
-                'avg_download_mbps': round(sum(speeds) / len(speeds) / 1000, 2) if speeds else None,
-                'max_download_mbps': round(max(speeds) / 1000, 2) if speeds else None,
-                'min_download_mbps': round(min(speeds) / 1000, 2) if speeds else None,
-                'median_download_mbps': round(sorted(speeds)[len(speeds)//2] / 1000, 2) if speeds else None
+                'avg_download_mbps': round(float(agg.speed_sum) / speed_count / 1000, 2) if speed_count else None,
+                'max_download_mbps': (
+                    round(agg.max_kbps / 1000, 2)
+                    if speed_count and agg.max_kbps is not None else None
+                ),
+                'min_download_mbps': (
+                    round(agg.min_kbps / 1000, 2)
+                    if speed_count and agg.min_kbps is not None else None
+                ),
+                'median_download_mbps': round(median_kbps / 1000, 2) if median_kbps is not None else None,
             },
             'distribution': distribution,
             'telehealth_viable_pct': round(
-                (distribution['excellent'] + distribution['good']) / len(speeds) * 100, 1
-            ) if speeds else 0
+                (distribution['excellent'] + distribution['good']) / speed_count * 100, 1
+            ) if speed_count else 0
         }), 200
 
     except Exception as e:

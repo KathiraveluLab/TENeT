@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import math
 import re
+import threading
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, Iterable, Optional, Tuple
+from typing import Any, Dict, Iterable, Optional, Tuple
 
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from database.models import (
@@ -322,6 +324,44 @@ def _classification(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _OoklaPoint:
+    id: int
+    quadkey: str
+    avg_d_kbps: Optional[int]
+    avg_u_kbps: Optional[int]
+    avg_lat_ms: Optional[float]
+    centroid_lat: float
+    centroid_lon: float
+    year: int
+    quarter: int
+
+
+@dataclass(frozen=True, slots=True)
+class _IncomePoint:
+    id: int
+    zcta: str
+    median_income: float
+    population: Optional[int]
+    centroid_lat: float
+    centroid_lon: float
+    acs_year: int
+    data_source: Optional[str]
+
+
+@dataclass(frozen=True, slots=True)
+class _ClinicPoint:
+    id: int
+    name: str
+    site_type: str
+    latitude: float
+    longitude: float
+    has_emergency: Optional[bool]
+    has_specialists: Optional[bool]
+    region_code: Optional[str]
+    is_active: Optional[bool]
+
+
 def _bucket_key(lat: float, lon: float) -> Tuple[int, int]:
     return math.floor(lat), math.floor(lon)
 
@@ -349,6 +389,23 @@ def _nearest_record(buckets, lat: float, lon: float, max_km: float):
 class TelehealthClassificationService:
     """Resolve canonical source inputs and classify one or more regions."""
 
+    _cache_lock = threading.RLock()
+    _ookla_bucket_cache: Dict[Tuple[int, str], Tuple[Tuple[Any, ...], Dict[Tuple[int, int], list[_OoklaPoint]]]] = {}
+    _income_bucket_cache: Dict[Tuple[int, str], Tuple[Tuple[Any, ...], Dict[Tuple[int, int], list[_IncomePoint]]]] = {}
+    _clinic_cache: Dict[Tuple[int, str], Tuple[Tuple[Any, ...], list[_ClinicPoint]]] = {}
+
+    @classmethod
+    def clear_caches(cls) -> None:
+        with cls._cache_lock:
+            cls._ookla_bucket_cache.clear()
+            cls._income_bucket_cache.clear()
+            cls._clinic_cache.clear()
+
+    @staticmethod
+    def _cache_key(db: Session) -> Tuple[int, str]:
+        bind = db.get_bind()
+        return id(bind), bind.url.render_as_string(hide_password=True)
+
     @classmethod
     def classify_region(cls, db: Session, region: CATRegion) -> TelehealthRegionContext:
         return cls.classify_regions(db, [region])[region.region_code]
@@ -360,19 +417,27 @@ class TelehealthClassificationService:
         regions: Iterable[CATRegion],
     ) -> Dict[str, TelehealthRegionContext]:
         regions = list(regions)
+        if not regions:
+            return {}
+
         region_codes = [region.region_code for region in regions]
         broadband = cls._broadband_lookup(db, region_codes)
-        income_buckets = cls._income_buckets(db)
-        ookla_buckets = cls._latest_ookla_buckets(db)
-        clinics = db.query(HealthcareSite).filter(
-            HealthcareSite.is_active == True,
-            HealthcareSite.latitude.isnot(None),
-            HealthcareSite.longitude.isnot(None),
-        ).all()
-        clinics = [
-            site for site in clinics
-            if (site.site_type or "").lower() in TELEHEALTH_CLINIC_SITE_TYPES
+        valid_regions = [
+            region for region in regions
+            if region.centroid_lat is not None and region.centroid_lon is not None
         ]
+
+        if valid_regions:
+            income_buckets = cls._income_buckets(db)
+            if len(valid_regions) <= 8 and not cls._has_warm_ookla_cache(db):
+                ookla_buckets = cls._query_ookla_buckets_for_regions(db, valid_regions)
+            else:
+                ookla_buckets = cls._latest_ookla_buckets(db)
+            clinics = cls._active_clinics(db)
+        else:
+            income_buckets = {}
+            ookla_buckets = {}
+            clinics = []
 
         contexts: Dict[str, TelehealthRegionContext] = {}
         for region in regions:
@@ -464,37 +529,267 @@ class TelehealthClassificationService:
                 lookup[record.region_code] = record
         return lookup
 
-    @staticmethod
-    def _income_buckets(db: Session):
+    @classmethod
+    def _active_clinics(cls, db: Session) -> list[_ClinicPoint]:
+        key = cls._cache_key(db)
+        sig = db.query(
+            func.count(HealthcareSite.id),
+            func.coalesce(func.min(HealthcareSite.id), 0),
+            func.coalesce(func.max(HealthcareSite.id), 0),
+            func.coalesce(func.sum(HealthcareSite.latitude), 0.0),
+        ).filter(
+            HealthcareSite.is_active == True,
+            HealthcareSite.latitude.isnot(None),
+            HealthcareSite.longitude.isnot(None),
+        ).one()
+        signature = tuple(sig)
+
+        with cls._cache_lock:
+            cached = cls._clinic_cache.get(key)
+            if cached is not None and cached[0] == signature:
+                return cached[1]
+
+        rows = db.query(
+            HealthcareSite.id,
+            HealthcareSite.name,
+            HealthcareSite.site_type,
+            HealthcareSite.latitude,
+            HealthcareSite.longitude,
+            HealthcareSite.has_emergency,
+            HealthcareSite.has_specialists,
+            HealthcareSite.region_code,
+            HealthcareSite.is_active,
+        ).filter(
+            HealthcareSite.is_active == True,
+            HealthcareSite.latitude.isnot(None),
+            HealthcareSite.longitude.isnot(None),
+        ).all()
+        clinics = [
+            _ClinicPoint(
+                id=row.id,
+                name=row.name,
+                site_type=row.site_type,
+                latitude=float(row.latitude),
+                longitude=float(row.longitude),
+                has_emergency=row.has_emergency,
+                has_specialists=row.has_specialists,
+                region_code=row.region_code,
+                is_active=row.is_active,
+            )
+            for row in rows
+            if (row.site_type or "").lower() in TELEHEALTH_CLINIC_SITE_TYPES
+        ]
+        with cls._cache_lock:
+            cls._clinic_cache[key] = (signature, clinics)
+        return clinics
+
+    @classmethod
+    def _income_buckets(cls, db: Session):
+        key = cls._cache_key(db)
+        sig = db.query(
+            func.count(CensusIncome.id),
+            func.coalesce(func.min(CensusIncome.id), 0),
+            func.coalesce(func.max(CensusIncome.id), 0),
+            func.coalesce(func.sum(CensusIncome.median_income), 0.0),
+            func.coalesce(func.sum(CensusIncome.centroid_lat), 0.0),
+        ).filter(
+            CensusIncome.median_income.isnot(None),
+            CensusIncome.median_income > 0,
+            CensusIncome.centroid_lat.isnot(None),
+            CensusIncome.centroid_lon.isnot(None),
+        ).one()
+        signature = tuple(sig)
+
+        with cls._cache_lock:
+            cached = cls._income_bucket_cache.get(key)
+            if cached is not None and cached[0] == signature:
+                return cached[1]
+
         buckets = defaultdict(list)
-        records = db.query(CensusIncome).filter(
+        rows = db.query(
+            CensusIncome.id,
+            CensusIncome.zcta,
+            CensusIncome.median_income,
+            CensusIncome.population,
+            CensusIncome.centroid_lat,
+            CensusIncome.centroid_lon,
+            CensusIncome.acs_year,
+            CensusIncome.data_source,
+        ).filter(
             CensusIncome.median_income.isnot(None),
             CensusIncome.median_income > 0,
             CensusIncome.centroid_lat.isnot(None),
             CensusIncome.centroid_lon.isnot(None),
         ).all()
-        for record in records:
-            buckets[_bucket_key(float(record.centroid_lat), float(record.centroid_lon))].append(record)
-        return buckets
+        for row in rows:
+            point = _IncomePoint(
+                id=row.id,
+                zcta=row.zcta,
+                median_income=float(row.median_income),
+                population=row.population,
+                centroid_lat=float(row.centroid_lat),
+                centroid_lon=float(row.centroid_lon),
+                acs_year=row.acs_year,
+                data_source=row.data_source,
+            )
+            buckets[_bucket_key(point.centroid_lat, point.centroid_lon)].append(point)
+        result = dict(buckets)
+        with cls._cache_lock:
+            cls._income_bucket_cache[key] = (signature, result)
+        return result
+
+    @classmethod
+    def _has_warm_ookla_cache(cls, db: Session) -> bool:
+        key = cls._cache_key(db)
+        with cls._cache_lock:
+            return key in cls._ookla_bucket_cache
 
     @staticmethod
-    def _latest_ookla_buckets(db: Session):
-        latest = db.query(
+    def _latest_ookla_period(db: Session):
+        return db.query(
             OoklaPerformance.year,
             OoklaPerformance.quarter,
-        ).distinct().order_by(
+        ).order_by(
             OoklaPerformance.year.desc(),
             OoklaPerformance.quarter.desc(),
         ).first()
-        buckets = defaultdict(list)
+
+    @classmethod
+    def _query_ookla_buckets_for_regions(
+        cls,
+        db: Session,
+        regions: Iterable[CATRegion],
+    ):
+        latest = cls._latest_ookla_period(db)
         if latest is None:
-            return buckets
-        records = db.query(OoklaPerformance).filter(
+            return {}
+
+        spatial_filters = []
+        lat_delta = MAX_OOKLA_MATCH_KM / 110.5
+        for region in regions:
+            lat = float(region.centroid_lat)
+            lon = float(region.centroid_lon)
+            min_lat = lat - lat_delta
+            max_lat = lat + lat_delta
+            furthest_lat = min(89.9, max(abs(min_lat), abs(max_lat)))
+            lon_delta = MAX_OOKLA_MATCH_KM / (110.5 * max(math.cos(math.radians(furthest_lat)), 0.1))
+            min_lon = lon - lon_delta
+            max_lon = lon + lon_delta
+
+            if min_lon < -180.0:
+                lon_clause = or_(
+                    OoklaPerformance.centroid_lon.between(-180.0, max_lon),
+                    OoklaPerformance.centroid_lon >= (min_lon + 360.0),
+                )
+            elif max_lon > 180.0:
+                lon_clause = or_(
+                    OoklaPerformance.centroid_lon.between(min_lon, 180.0),
+                    OoklaPerformance.centroid_lon <= (max_lon - 360.0),
+                )
+            else:
+                lon_clause = OoklaPerformance.centroid_lon.between(min_lon, max_lon)
+
+            spatial_filters.append(
+                and_(
+                    OoklaPerformance.centroid_lat.between(min_lat, max_lat),
+                    lon_clause,
+                )
+            )
+
+        if not spatial_filters:
+            return {}
+
+        rows = db.query(
+            OoklaPerformance.id,
+            OoklaPerformance.quadkey,
+            OoklaPerformance.avg_d_kbps,
+            OoklaPerformance.avg_u_kbps,
+            OoklaPerformance.avg_lat_ms,
+            OoklaPerformance.centroid_lat,
+            OoklaPerformance.centroid_lon,
+            OoklaPerformance.year,
+            OoklaPerformance.quarter,
+        ).filter(
+            OoklaPerformance.year == latest.year,
+            OoklaPerformance.quarter == latest.quarter,
+            OoklaPerformance.centroid_lat.isnot(None),
+            OoklaPerformance.centroid_lon.isnot(None),
+            or_(*spatial_filters),
+        ).all()
+
+        buckets = defaultdict(list)
+        for row in rows:
+            point = _OoklaPoint(
+                id=row.id,
+                quadkey=row.quadkey,
+                avg_d_kbps=row.avg_d_kbps,
+                avg_u_kbps=row.avg_u_kbps,
+                avg_lat_ms=row.avg_lat_ms,
+                centroid_lat=float(row.centroid_lat),
+                centroid_lon=float(row.centroid_lon),
+                year=row.year,
+                quarter=row.quarter,
+            )
+            buckets[_bucket_key(point.centroid_lat, point.centroid_lon)].append(point)
+        return dict(buckets)
+
+    @classmethod
+    def _latest_ookla_buckets(cls, db: Session):
+        latest = cls._latest_ookla_period(db)
+        if latest is None:
+            return {}
+
+        key = cls._cache_key(db)
+        agg = db.query(
+            func.count(OoklaPerformance.id),
+            func.coalesce(func.min(OoklaPerformance.id), 0),
+            func.coalesce(func.max(OoklaPerformance.id), 0),
+            func.coalesce(func.sum(OoklaPerformance.avg_d_kbps), 0),
+            func.coalesce(func.sum(OoklaPerformance.tests), 0),
+        ).filter(
+            OoklaPerformance.year == latest.year,
+            OoklaPerformance.quarter == latest.quarter,
+            OoklaPerformance.centroid_lat.isnot(None),
+            OoklaPerformance.centroid_lon.isnot(None),
+        ).one()
+        signature = (latest.year, latest.quarter, *agg)
+
+        with cls._cache_lock:
+            cached = cls._ookla_bucket_cache.get(key)
+            if cached is not None and cached[0] == signature:
+                return cached[1]
+
+        buckets = defaultdict(list)
+        rows = db.query(
+            OoklaPerformance.id,
+            OoklaPerformance.quadkey,
+            OoklaPerformance.avg_d_kbps,
+            OoklaPerformance.avg_u_kbps,
+            OoklaPerformance.avg_lat_ms,
+            OoklaPerformance.centroid_lat,
+            OoklaPerformance.centroid_lon,
+            OoklaPerformance.year,
+            OoklaPerformance.quarter,
+        ).filter(
             OoklaPerformance.year == latest.year,
             OoklaPerformance.quarter == latest.quarter,
             OoklaPerformance.centroid_lat.isnot(None),
             OoklaPerformance.centroid_lon.isnot(None),
         ).all()
-        for record in records:
-            buckets[_bucket_key(float(record.centroid_lat), float(record.centroid_lon))].append(record)
-        return buckets
+        for row in rows:
+            point = _OoklaPoint(
+                id=row.id,
+                quadkey=row.quadkey,
+                avg_d_kbps=row.avg_d_kbps,
+                avg_u_kbps=row.avg_u_kbps,
+                avg_lat_ms=row.avg_lat_ms,
+                centroid_lat=float(row.centroid_lat),
+                centroid_lon=float(row.centroid_lon),
+                year=row.year,
+                quarter=row.quarter,
+            )
+            buckets[_bucket_key(point.centroid_lat, point.centroid_lon)].append(point)
+        result = dict(buckets)
+        with cls._cache_lock:
+            cls._ookla_bucket_cache[key] = (signature, result)
+        return result
