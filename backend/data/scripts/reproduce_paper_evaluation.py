@@ -989,7 +989,7 @@ def render_latex_tables(results: Dict[str, Any]) -> str:
                 r"Starlink LEO Cost Substitution (\$120/mo fixed)\textsuperscript{\dag} & "
                 f"{leo_st.get('TELEHEALTH_READY', 0)} & {leo_st.get('COMMUNITY_ANCHOR', 0)} & "
                 f"{leo_st.get('LIMITED_TELEHEALTH', 0)} & {leo_st.get('CRITICAL_GAP', 0)} & "
-                f"{leo_unavail} & --- \\\\"
+                f"{leo_unavail} & N/A \\\\"
             ),
             r"\hline",
             r"\end{tabulary}",
