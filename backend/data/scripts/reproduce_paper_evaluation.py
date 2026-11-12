@@ -110,6 +110,16 @@ POLICY_SCENARIOS: List[Tuple[str, str, Dict[str, Any]]] = [
 ]
 
 
+def interpolated_percentile(ordered: Sequence[float], prob: float) -> float:
+    """Compute linear-interpolated percentile from a pre-sorted non-empty sequence."""
+    idx = (len(ordered) - 1) * prob
+    lo = math.floor(idx)
+    hi = math.ceil(idx)
+    if lo == hi:
+        return ordered[int(idx)]
+    return ordered[lo] * (hi - idx) + ordered[hi] * (idx - lo)
+
+
 def quantiles(values: Sequence[float]) -> Optional[Dict[str, Any]]:
     """Compute summary statistics and linear-interpolated quartiles."""
     if not values:
@@ -117,21 +127,13 @@ def quantiles(values: Sequence[float]) -> Optional[Dict[str, Any]]:
     ordered = sorted(float(v) for v in values)
     count = len(ordered)
 
-    def _percentile(prob: float) -> float:
-        idx = (count - 1) * prob
-        lo = math.floor(idx)
-        hi = math.ceil(idx)
-        if lo == hi:
-            return ordered[int(idx)]
-        return ordered[lo] * (hi - idx) + ordered[hi] * (idx - lo)
-
     return {
         "n": count,
         "mean": round(statistics.mean(ordered), 2),
         "sd": round(statistics.stdev(ordered), 2) if count > 1 else 0.0,
-        "median": round(_percentile(0.5), 2),
-        "q1": round(_percentile(0.25), 2),
-        "q3": round(_percentile(0.75), 2),
+        "median": round(interpolated_percentile(ordered, 0.5), 2),
+        "q1": round(interpolated_percentile(ordered, 0.25), 2),
+        "q3": round(interpolated_percentile(ordered, 0.75), 2),
         "min": round(ordered[0], 2),
         "max": round(ordered[-1], 2),
     }
@@ -654,13 +656,12 @@ def _measure_endpoint(
         timings.append(elapsed_ms)
 
     ordered = sorted(timings)
-    p95_idx = int(0.95 * (len(ordered) - 1))
     return {
         "endpoint": name,
         "runs": len(ordered),
         "mean_ms": round(statistics.mean(ordered), 2),
         "median_ms": round(statistics.median(ordered), 2),
-        "p95_ms": round(ordered[p95_idx], 2),
+        "p95_ms": round(interpolated_percentile(ordered, 0.95), 2),
         "min_ms": round(ordered[0], 2),
         "max_ms": round(ordered[-1], 2),
     }

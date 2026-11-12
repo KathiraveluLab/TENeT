@@ -296,6 +296,8 @@ def test_evaluate_all_with_benchmarks_and_cli_outputs(populated_db, repro, tmp_p
     assert "/scenarios/preview (warm)" in endpoints
     assert "/regions/AK-TEST-ROAD/research-profile" in endpoints
     assert "/regions/research-profiles (3 pins)" in endpoints
+    assert all(ep["p95_ms"] >= ep["median_ms"] for ep in bench["endpoints"])
+    assert repro.interpolated_percentile([10.0, 20.0], 0.95) == pytest.approx(19.5)
 
     tex = repro.render_latex_tables(results)
     assert "Benchmarks skipped" not in tex
@@ -325,4 +327,3 @@ def test_evaluate_all_with_benchmarks_and_cli_outputs(populated_db, repro, tmp_p
     assert parsed["latency_benchmarks"] is None
     assert parsed["dataset_metrics"]["inventory"]["cat_regions"] == 3
     assert r"\label{tab:tenet_metrics}" in tex_out.read_text(encoding="utf-8")
-

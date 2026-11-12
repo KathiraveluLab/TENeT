@@ -210,7 +210,7 @@ GitHub Actions runs backend `flake8` linting, backend tests, frontend type check
 
 ## Scientific reproducibility
 
-The evaluation suite and cross-endpoint consistency checks are tracked directly in the repository so metrics, policy sensitivity sweeps, and latency benchmarks can be reproduced from any SQLite snapshot:
+The evaluation suite and cross-endpoint consistency checks are tracked directly in the repository so metrics, policy sensitivity sweeps, and latency benchmarks can be reproduced from any seeded SQLite snapshot (for a fresh checkout, run `make dev` first so `backend/data/tenet.db` is initialized and seeded):
 
 1. **Optional full-dataset refresh:** Ingest external Ookla tiles and Census ACS records before reseeding:
 
