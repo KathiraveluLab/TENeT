@@ -976,8 +976,9 @@ def render_latex_tables(results: Dict[str, Any]) -> str:
     ]
     for row in results["scenario_sensitivity"]:
         s = row["summary"]
+        label_tex = row["label"].replace("%", r"\%")
         t4_lines.append(
-            f"{row['label'].replace('%', r'\%')} & {s['telehealth_ready']} & {s['community_anchor']} & "
+            f"{label_tex} & {s['telehealth_ready']} & {s['community_anchor']} & "
             f"{s['limited_telehealth']} & {s['critical_gap']} & {s['data_unavailable']} & "
             f"{s['status_changed_regions']} ({s['improved_count']} / {s['worsened_count']}) \\\\"
         )
