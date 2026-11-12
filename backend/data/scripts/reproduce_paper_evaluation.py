@@ -862,8 +862,12 @@ def render_latex_tables(results: Dict[str, Any]) -> str:
         ),
         r"\label{tab:tenet_metrics}",
         r"\centering",
-        r"\small",
-        r"\begin{tabulary}{\textwidth}{LLL}",
+        r"\footnotesize",
+        (
+            r"\begin{tabular}{@{} >{\raggedright\arraybackslash}p{\dimexpr 0.38\textwidth - 5pt\relax} "
+            r"@{\hspace{8pt}} >{\raggedright\arraybackslash}p{\dimexpr 0.37\textwidth - 6pt\relax} "
+            r"@{\hspace{8pt}} >{\raggedright\arraybackslash}p{\dimexpr 0.25\textwidth - 5pt\relax} @{}}"
+        ),
         r"\hline",
         r"\textbf{Metric} & \textbf{Result} & \textbf{Interpretation}\\\hline",
         f"Communities represented & {n_reg} & Community inventory \\\\",
@@ -941,7 +945,7 @@ def render_latex_tables(results: Dict[str, Any]) -> str:
             f"({bb['communities_missing_fcc_pct']:.2f}\\%) & Data completeness \\\\"
         ),
         r"\hline",
-        r"\end{tabulary}",
+        r"\end{tabular}",
         r"\end{table*}",
     ]
 
@@ -959,12 +963,14 @@ def render_latex_tables(results: Dict[str, Any]) -> str:
         ),
         r"\label{tab:scenario_sensitivity}",
         r"\centering",
-        r"\small",
-        r"\begin{tabulary}{\textwidth}{Lrrrrrr}",
+        r"\footnotesize",
+        r"\setlength{\tabcolsep}{3pt}",
+        r"\begin{tabulary}{\textwidth}{@{}Lrrrrrr@{}}",
         r"\hline",
         (
             r"\textbf{Scenario / Policy Configuration} & \textbf{Ready} & \textbf{Anchor} & "
-            r"\textbf{Limited} & \textbf{Critical} & \textbf{Unavail.} & \textbf{Changed (+ / --)}\\"
+            r"\textbf{Limited} & \textbf{Critical} & \textbf{Unavail.} & "
+            r"\shortstack[r]{\textbf{Changed}\\\textbf{(+ / --)}}\\"
         ),
         r"\hline",
     ]
@@ -1000,26 +1006,37 @@ def render_latex_tables(results: Dict[str, Any]) -> str:
         r"\label{tab:radius_ablation}",
         r"\centering",
         r"\scriptsize",
-        r"\setlength{\tabcolsep}{3.5pt}",
-        r"\begin{tabulary}{\columnwidth}{rRR}",
+        (
+            r"\begin{tabular}{@{} >{\raggedleft\arraybackslash}p{\dimexpr 0.14\columnwidth\relax} "
+            r"@{\hspace{6pt}} >{\raggedleft\arraybackslash}p{\dimexpr 0.43\columnwidth - 6pt\relax} "
+            r"@{\hspace{6pt}} >{\raggedleft\arraybackslash}p{\dimexpr 0.43\columnwidth - 6pt\relax} @{}}"
+        ),
         r"\hline",
         (
-            r"\textbf{Radius} & \textbf{Ookla Match (\%) / Med.\ [Q1, Q3]~km} & "
-            r"\textbf{ACS Match (\%) / Med.\ [Q1, Q3]~km}\\"
+            r"\textbf{Radius} & \shortstack[r]{\textbf{Ookla Match (\%)}\\\textbf{Med.\ [Q1, Q3]~km}} & "
+            r"\shortstack[r]{\textbf{ACS Match (\%)}\\\textbf{Med.\ [Q1, Q3]~km}}\\"
         ),
         r"\hline",
     ]
-    for row in results["spatial_radius_ablation"]:
+    rows_rad = results["spatial_radius_ablation"]
+    for idx_r, row in enumerate(rows_rad):
         o = row["ookla"]
         a = row["acs"]
-        o_str = f"{o['matched']} ({o['pct']:.2f}\\%) / {_format_median_iqr(o['distance_km'])}"
-        a_str = f"{a['matched']} ({a['pct']:.2f}\\%) / {_format_median_iqr(a['distance_km'])}"
+        o_top = f"{o['matched']} ({o['pct']:.2f}\\%)"
+        o_bot = _format_median_iqr(o["distance_km"])
+        a_top = f"{a['matched']} ({a['pct']:.2f}\\%)"
+        a_bot = _format_median_iqr(a["distance_km"])
         if abs(row["radius_km"] - 75.0) < 1e-6:
-            o_str = f"\\textbf{{{o_str}}}"
+            o_cell = f"\\shortstack[r]{{\\textbf{{{o_top}}}\\\\\\textbf{{{o_bot}}}}}"
+        else:
+            o_cell = f"\\shortstack[r]{{{o_top}\\\\{o_bot}}}"
         if abs(row["radius_km"] - 55.0) < 1e-6:
-            a_str = f"\\textbf{{{a_str}}}"
-        t5_lines.append(f"{row['radius_km']:g}~km & {o_str} & {a_str} \\\\")
-    t5_lines.extend([r"\hline", r"\end{tabulary}", r"\end{table}"])
+            a_cell = f"\\shortstack[r]{{\\textbf{{{a_top}}}\\\\\\textbf{{{a_bot}}}}}"
+        else:
+            a_cell = f"\\shortstack[r]{{{a_top}\\\\{a_bot}}}"
+        sep = r" \\[5pt]" if idx_r < len(rows_rad) - 1 else r" \\"
+        t5_lines.append(f"{row['radius_km']:g}~km & {o_cell} & {a_cell}{sep}")
+    t5_lines.extend([r"\hline", r"\end{tabular}", r"\end{table}"])
 
     # Table: Latency benchmark
     t6_lines = [
@@ -1028,23 +1045,37 @@ def render_latex_tables(results: Dict[str, Any]) -> str:
         r"\label{tab:latency_bench}",
         r"\centering",
         r"\scriptsize",
-        r"\setlength{\tabcolsep}{3.5pt}",
-        r"\begin{tabulary}{\columnwidth}{Lrrr}",
+        (
+            r"\begin{tabular}{@{} >{\raggedright\arraybackslash}p{\dimexpr \columnwidth - 95pt\relax} "
+            r"@{\hspace{4pt}} r @{\hspace{4pt}} r @{\hspace{4pt}} r @{}}"
+        ),
         r"\hline",
-        r"\textbf{Endpoint ($n$ runs)} & \textbf{Mean (ms)} & \textbf{Med.\ (ms)} & \textbf{p95 (ms)}\\",
+        (
+            r"\textbf{Endpoint ($n$ runs)} & \shortstack[r]{\textbf{Mean}\\\textbf{(ms)}} & "
+            r"\shortstack[r]{\textbf{Med.}\\\textbf{(ms)}} & \shortstack[r]{\textbf{p95}\\\textbf{(ms)}}\\"
+        ),
         r"\hline",
     ]
     bench = results.get("latency_benchmarks")
     if bench and bench.get("endpoints"):
-        for ep in bench["endpoints"]:
-            name_tex = ep["endpoint"].replace("_", r"\_")
+        eps = bench["endpoints"]
+        for idx_e, ep in enumerate(eps):
+            raw_ep = ep["endpoint"].replace("_", r"\_")
+            if " (" in raw_ep:
+                path_part, tag_part = raw_ep.split(" (", 1)
+                tag_clean = tag_part.rstrip(")")
+                ep_label = f"\\texttt{{{path_part}}}\\newline({tag_clean}, $n={ep['runs']}$)"
+            else:
+                ep_label = f"\\texttt{{{raw_ep}}} ($n={ep['runs']}$)"
+            ep_label = ep_label.replace("/research-profile}", r"}\newline\texttt{/research-profile}")
+            ep_label = ep_label.replace("research-profiles", r"research-}\newline\texttt{profiles")
+            sep = r" \\[3pt]" if idx_e < len(eps) - 1 else r" \\"
             t6_lines.append(
-                f"\\texttt{{{name_tex}}} ($n={ep['runs']}$) & "
-                f"{ep['mean_ms']:,.2f} & {ep['median_ms']:,.2f} & {ep['p95_ms']:,.2f} \\\\"
+                f"{ep_label} & {ep['mean_ms']:,.2f} & {ep['median_ms']:,.2f} & {ep['p95_ms']:,.2f}{sep}"
             )
     else:
         t6_lines.append(r"\multicolumn{4}{c}{Benchmarks skipped (--skip-benchmarks)} \\")
-    t6_lines.extend([r"\hline", r"\end{tabulary}", r"\end{table}"])
+    t6_lines.extend([r"\hline", r"\end{tabular}", r"\end{table}"])
 
     return "\n\n".join(["\n".join(t3_lines), "\n".join(t4_lines), "\n".join(t5_lines), "\n".join(t6_lines)]) + "\n"
 
