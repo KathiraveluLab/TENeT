@@ -1,6 +1,8 @@
 """Unit and regression tests for Census ACS ZCTA ingestion and seeding."""
 
 import io
+import json
+import urllib.error
 from unittest.mock import MagicMock
 
 from data.scripts.ingest_census import (
@@ -33,22 +35,32 @@ def test_parse_acs_numeric_sentinels():
 
 
 def test_fetch_zcta_batch_tolerates_null_and_suppressed_rows(monkeypatch):
-    mock_resp = MagicMock()
-    mock_resp.status_code = 200
-    mock_resp.json.return_value = [
+    payload = [
         ["NAME", "B19013_001E", "B01003_001E", "zip code tabulation area"],
         ["ZCTA5 99501", "70891", "16175", "99501"],
         ["ZCTA5 99545", None, "42", "99545"],
         ["ZCTA5 99720", "-666666666", "178", "99720"],
         ["ZCTA5 98101", "95000", "20000", "98101"],
     ]
-    monkeypatch.setattr("data.scripts.ingest_census.requests.get", lambda *a, **kw: mock_resp)
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.read.return_value = json.dumps(payload).encode("utf-8")
+    mock_cm = MagicMock()
+    mock_cm.__enter__.return_value = mock_resp
+    mock_cm.__exit__.return_value = False
+    monkeypatch.setattr("data.scripts.ingest_census.urllib.request.urlopen", lambda *a, **kw: mock_cm)
 
     records = fetch_zcta_batch(["99501", "99545", "99720", "98101"], api_key="test-key", year=2024)
     assert len(records) == 1
     assert records[0]["zcta"] == "99501"
     assert records[0]["median_income"] == 70891.0
     assert records[0]["population"] == 16175
+
+    def _raise_http_error(*_args, **_kwargs):
+        raise urllib.error.HTTPError("https://api.census.gov/data", 404, "Not Found", {}, None)
+
+    monkeypatch.setattr("data.scripts.ingest_census.urllib.request.urlopen", _raise_http_error)
+    assert fetch_zcta_batch(["99501"], api_key="test-key", year=2024) == []
 
 
 def test_parse_gazetteer_dat_and_place_weighted_centroid():

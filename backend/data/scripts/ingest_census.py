@@ -16,13 +16,15 @@ Supports two data paths:
 import argparse
 import csv
 import io
+import json
 import os
 import sys
 import time
+import urllib.error
+import urllib.parse
+import urllib.request
 import zipfile
 from typing import Dict, Iterable, List, Optional, Tuple
-
-import requests
 
 # Add parent directories to path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -289,6 +291,12 @@ def resolve_zcta_centroid(
     return None
 
 
+def _open_url(url: str, timeout: int = 90):
+    """Open an HTTP(S) URL with a descriptive User-Agent header using stdlib urllib."""
+    req = urllib.request.Request(url, headers={"User-Agent": "TENeT-Census-Ingest/1.0"})
+    return urllib.request.urlopen(req, timeout=timeout)
+
+
 def _read_url_or_cache(
     url: str,
     cache_dir: Optional[str],
@@ -301,9 +309,8 @@ def _read_url_or_cache(
         if os.path.exists(cached):
             with open(cached, "rb") as fh:
                 return fh.read()
-    response = requests.get(url, timeout=timeout)
-    response.raise_for_status()
-    content = response.content
+    with _open_url(url, timeout=timeout) as response:
+        content = response.read()
     if cache_dir:
         os.makedirs(cache_dir, exist_ok=True)
         with open(os.path.join(cache_dir, filename), "wb") as fh:
@@ -318,7 +325,7 @@ def _load_gazetteer_payload(year: int, kind: str, cache_dir: Optional[str]) -> b
         url = f"{CENSUS_GAZETTEER_BASE_URL}/{candidate_year}_Gazetteer/{filename}"
         try:
             return _read_url_or_cache(url, cache_dir, filename, timeout=60)
-        except requests.HTTPError:
+        except urllib.error.HTTPError:
             if candidate_year == 2024:
                 raise
     raise RuntimeError(f"Unable to download {kind} Gazetteer for ACS year {year}")
@@ -335,12 +342,12 @@ def _stream_zcta_place_links(
             with open(ak_cache, "r", encoding="utf-8-sig") as fh:
                 return parse_zcta_place_rel_stream(fh, ak_places)
 
-    with requests.get(ZCTA_PLACE_REL_URL, stream=True, timeout=90) as response:
-        response.raise_for_status()
-        lines = response.iter_lines(decode_unicode=True)
-        header = next(lines)
+    with _open_url(ZCTA_PLACE_REL_URL, timeout=90) as response:
+        text_stream = io.TextIOWrapper(response, encoding="utf-8-sig", errors="replace")
+        header = next(text_stream).rstrip("\r\n")
         ak_lines = [header]
-        for line in lines:
+        for raw_line in text_stream:
+            line = raw_line.rstrip("\r\n")
             if line and line.split("|", 3)[1][:3] in _ALASKA_ZCTA_PREFIXES:
                 ak_lines.append(line)
 
@@ -463,12 +470,14 @@ def fetch_zcta_batch(
         "key": api_key,
     }
 
-    try:
-        response = requests.get(url, params=params, timeout=30)
-        if response.status_code != 200:
-            return []
+    query = urllib.parse.urlencode(params)
+    request_url = f"{url}?{query}"
 
-        data = response.json()
+    try:
+        with _open_url(request_url, timeout=30) as response:
+            if getattr(response, "status", 200) != 200:
+                return []
+            data = json.loads(response.read().decode("utf-8"))
         if not data or len(data) < 2:
             return []
 
@@ -491,6 +500,8 @@ def fetch_zcta_batch(
                 "data_source": f"US Census ACS {year} 5-Year API (B19013/B01003)",
             })
         return records
+    except urllib.error.HTTPError:
+        return []
     except Exception as exc:
         print(f"  Error: {exc}")
         return []
