@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="100%" role="img" aria-label="TENeT Geospatial Planning Workflow Diagram">
+<defs>
+  <style>
+    .hdr { font: 700 12.5px "Segoe UI", Arial, sans-serif; fill: #ffffff; text-anchor: middle; }
+    .bullet { font: 400 11px "Segoe UI", Arial, sans-serif; fill: #1e293b; }
+    .loop { font: italic 11px "Segoe UI", Arial, sans-serif; fill: #9a3412; text-anchor: middle; }
+  </style>
+  <marker id="warrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+    <path d="M 1 1.5 L 8.5 5 L 1 8.5 z" fill="#334155" />
+  </marker>
+  <marker id="oarrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+    <path d="M 1 1.5 L 8.5 5 L 1 8.5 z" fill="#c2410c" />
+  </marker>
+</defs>
+<rect x="1" y="1" width="1198" height="318" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2"/>
+<rect x="18.0" y="24" width="214" height="34" rx="5" fill="#1d4ed8"/>
+<text x="125.0" y="46" class="hdr">1. Context &amp; Mode</text>
+<rect x="18.0" y="62" width="214" height="174" rx="5" fill="#ffffff" stroke="#1d4ed8" stroke-width="1.4"/>
+<text x="30.0" y="92" class="bullet">• Region search or map click</text>
+<text x="30.0" y="128" class="bullet">• Summer / winter / year-round</text>
+<text x="30.0" y="164" class="bullet">• CAT, Gap Hunter, Affordability</text>
+<text x="30.0" y="200" class="bullet">• What-If or Starlink ($120/mo)</text>
+<line x1="232.0" y1="149.0" x2="253.5" y2="149.0" stroke="#334155" stroke-width="1.8" marker-end="url(#warrow)"/>
+<rect x="255.5" y="24" width="214" height="34" rx="5" fill="#0f766e"/>
+<text x="362.5" y="46" class="hdr">2. Spatial Joins</text>
+<rect x="255.5" y="62" width="214" height="174" rx="5" fill="#ffffff" stroke="#0f766e" stroke-width="1.4"/>
+<text x="267.5" y="92" class="bullet">• Centroid &amp; region polygons</text>
+<text x="267.5" y="128" class="bullet">• FCC broadband availability</text>
+<text x="267.5" y="164" class="bullet">• Bounded nearest Ookla tile</text>
+<text x="267.5" y="200" class="bullet">• Haversine sites &amp; ACS income</text>
+<line x1="469.5" y1="149.0" x2="491.0" y2="149.0" stroke="#334155" stroke-width="1.8" marker-end="url(#warrow)"/>
+<rect x="493.0" y="24" width="214" height="34" rx="5" fill="#0e7490"/>
+<text x="600.0" y="46" class="hdr">3. Scoring &amp; Quality</text>
+<rect x="493.0" y="62" width="214" height="174" rx="5" fill="#ffffff" stroke="#0e7490" stroke-width="1.4"/>
+<text x="505.0" y="92" class="bullet">• Season-adjusted HDS (0–100)</text>
+<text x="505.0" y="128" class="bullet">• Burden vs. 2.0% &amp; $400 cap</text>
+<text x="505.0" y="164" class="bullet">• Track missing fields visibly</text>
+<text x="505.0" y="200" class="bullet">• Confidence tier HIGH–MISSING</text>
+<line x1="707.0" y1="149.0" x2="728.5" y2="149.0" stroke="#334155" stroke-width="1.8" marker-end="url(#warrow)"/>
+<rect x="730.5" y="24" width="214" height="34" rx="5" fill="#c2410c"/>
+<text x="837.5" y="46" class="hdr">4. Telehealth Gating</text>
+<rect x="730.5" y="62" width="214" height="174" rx="5" fill="#ffffff" stroke="#c2410c" stroke-width="1.4"/>
+<text x="742.5" y="92" class="bullet">• Video: 25/3 Mbps, ≤150 ms</text>
+<text x="742.5" y="128" class="bullet">• Audio fallback thresholds</text>
+<text x="742.5" y="164" class="bullet">• Clinic fallback (10 / 50 km)</text>
+<text x="742.5" y="200" class="bullet">• Canonical vs. live preview</text>
+<line x1="944.5" y1="149.0" x2="966.0" y2="149.0" stroke="#334155" stroke-width="1.8" marker-end="url(#warrow)"/>
+<rect x="968.0" y="24" width="214" height="34" rx="5" fill="#7e22ce"/>
+<text x="1075.0" y="46" class="hdr">5. Planning Outputs</text>
+<rect x="968.0" y="62" width="214" height="174" rx="5" fill="#ffffff" stroke="#7e22ce" stroke-width="1.4"/>
+<text x="980.0" y="92" class="bullet">• Map colors &amp; impact summary</text>
+<text x="980.0" y="128" class="bullet">• Sidebar &amp; 2–3 pin deltas</text>
+<text x="980.0" y="164" class="bullet">• Statewide Insights views</text>
+<text x="980.0" y="200" class="bullet">• Null-safe PDF &amp; URL state</text>
+<polyline points="1075.0,236 1075.0,278 125.0,278 125.0,239" fill="none" stroke="#c2410c" stroke-width="1.6" stroke-dasharray="6,4" marker-end="url(#oarrow)"/>
+<rect x="275" y="266" width="650" height="22" rx="4" fill="#ffffff"/>
+<text x="600" y="281" class="loop">Interactive What-If &amp; URL Loop: slider/preset/Starlink changes re-query /api/cat/scenarios/preview without altering SQLite</text>
+</svg>

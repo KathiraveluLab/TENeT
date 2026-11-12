@@ -56,6 +56,10 @@ To stop the application, run `make stop`.
 5. Open **Statewide Insights** for aggregate evidence and links back to the relevant map view or community.
 6. Download a PDF report or copy the shareable URL to preserve the current map state, selected community, season, pins, and scenario settings.
 
+### Geospatial planning workflow
+
+![TENeT Geospatial Planning Workflow](docs/diagrams/tenet-geospatial-workflow.svg)
+
 ## Interpreting the evidence
 
 TENeT keeps baseline evidence and modeled analysis separate.
@@ -112,6 +116,8 @@ Data availability is part of the product: missing or low-confidence inputs are s
 
 The frontend is served by nginx in the Docker stack and proxies `/api/` requests to the Flask backend. The backend exposes liveness and database-readiness health checks, while the local database is seeded deterministically from tracked data.
 
+![TENeT System Architecture](docs/diagrams/tenet-architecture.svg)
+
 ## Repository layout
 
 ```text
@@ -123,6 +129,7 @@ TENeT/
 │   ├── database/             Models, initialization, and seeders
 │   ├── data/                 Tracked inputs, samples, and ingestion scripts
 │   └── tests/                Backend unit and API tests
+├── docs/diagrams/            Architecture and geospatial workflow SVG diagrams
 ├── docker-compose.yml        Local multi-container stack
 ├── Makefile                  Development, test, and maintenance commands
 ├── CONTRIBUTING.md           Contribution workflow

@@ -666,12 +666,12 @@ def get_location_name():
 # Regional ISP Pricing Model for Alaska - LOADED FROM CONFIG
 # Config file: backend/config/isp_pricing.json
 #
-# GCI - largest ISP, serves major cities (Anchorage, Fairbanks, Juneau)
-# FastWyre - smaller provider, serves Interior Alaska rural areas
-# Starlink - satellite, available everywhere but requires hardware investment
+# GCI - largest ISP; urban Faster tier is $124.99/mo ($125 anchor), red Unlimited is $189.99/mo
+# FastWyre - Interior Telephone DSL labels span $45-$125/mo (+ $4.95 fee)
+# Starlink - LEO satellite, $120/mo residential (hardware cost excluded)
 #
-# EXTREME INEQUITY EXAMPLE: Fort Yukon pays $450/mo for capped internet
-# while Anchorage pays $125/mo for unlimited
+# UPPER-BOUND STRESS ANCHOR: $450/mo reflects GCI's $314.99/mo capped rural tier
+# with $7.68/GB overages or $450/mo Rural Business Premier vs $125/mo urban anchor.
 
 # Get pricing and thresholds from shared config
 ISP_PRICING = ISP_CONFIG.get('isp_pricing', {})
@@ -699,11 +699,11 @@ def get_affordability():
     """
     Get internet affordability analysis by ZCTA using REGIONAL ISP PRICING.
 
-    Uses realistic pricing based on available ISPs:
-    - GCI (major cities): $125/month unlimited
-    - FastWyre/Rural (Interior Alaska): $450/month capped
-    - Starlink (satellite): $120/month
-    - Extreme Rural (remote villages): $450/month capped
+    Uses configured monthly ISP cost benchmarks anchored to FCC Broadband Facts:
+    - GCI (urban mid-tier reference): $125/month (GCI Faster is $124.99/mo, 800 GB)
+    - FastWyre/Rural (configured upper-bound stress anchor): $450/month
+    - Starlink (LEO satellite): $120/month
+    - Extreme Rural (configured upper-bound stress anchor): $450/month
 
     Returns areas where internet is economically inaccessible (cost >= 2% of income or > $400/mo).
 
