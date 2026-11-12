@@ -257,6 +257,13 @@ export interface DataGapsSummary {
         SATELLITE: number;
         LIMITED: number;
     };
+    dataset_coverage?: {
+        total_communities: number;
+        fcc_broadband: { matched: number; pct: number };
+        ookla_performance: { matched: number; pct: number; window_km: number };
+        acs_income: { matched: number; pct: number; window_km: number };
+        healthcare_sites: { linked: number; pct: number };
+    };
 }
 
 export interface BroadbandResponse {
@@ -684,15 +691,20 @@ export interface CombinedAccessResponse {
  * @param threshold - Affordability threshold as % of income (default: 2.0)
  */
 export async function fetchAffordability(
-    monthlyCost: number = 120,
+    monthlyCost: number | null = 120,
     threshold: number = 2.0,
     signal?: AbortSignal,
 ): Promise<AffordabilityResponse> {
+    const query: Record<string, string | number | boolean> = {
+        threshold,
+    };
+    if (monthlyCost === null) {
+        query.use_regional = true;
+    } else {
+        query.monthly_cost = monthlyCost;
+    }
     return fetchJson(
-        withQuery(`${API_BASE}/performance/affordability`, {
-            monthly_cost: monthlyCost,
-            threshold,
-        }),
+        withQuery(`${API_BASE}/performance/affordability`, query),
         { signal },
         'Failed to fetch affordability data',
     );
@@ -845,6 +857,7 @@ export interface AllTelehealthStatusResponse {
     summary: {
         telehealth_ready: number;
         community_anchor: number;
+        limited_telehealth?: number;
         critical_gap: number;
         data_unavailable: number;
     };

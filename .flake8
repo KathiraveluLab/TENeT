@@ -1,0 +1,14 @@
+[flake8]
+max-line-length = 120
+exclude =
+    venv,
+    data,
+    __pycache__,
+    .pytest_cache
+extend-ignore = E712
+per-file-ignores =
+    backend/database/init_db.py: E402
+    backend/database/seed_*.py: E402
+    backend/tests/conftest.py: E402
+    backend/tests/test_*.py: E402
+

@@ -69,6 +69,50 @@ const dashboardData: DashboardData = {
         telehealth_viability: { YES: 5, NO: 2, UNCERTAIN: 3 },
         primary_access: { WIRED: 7, SATELLITE: 2, LIMITED: 1 },
     },
+    regionSummary: [
+        {
+            id: 1,
+            region_code: 'AK-READY',
+            name: 'Ready Community',
+            lat: 61.2,
+            lon: -149.9,
+            cat_tier: 1,
+            telehealth_status: 'TELEHEALTH_READY',
+            desert_score: 18,
+            affordability_status: 'affordable',
+            data_confidence: 'high',
+            has_data_gap: false,
+            region: 'southcentral',
+        },
+        {
+            id: 2,
+            region_code: 'AK-MODERATE',
+            name: 'Moderate Community',
+            lat: 62.5,
+            lon: -155.0,
+            cat_tier: 3,
+            telehealth_status: 'COMMUNITY_ANCHOR',
+            desert_score: 55,
+            affordability_status: 'affordable',
+            data_confidence: 'medium',
+            has_data_gap: false,
+            region: 'interior',
+        },
+        {
+            id: 3,
+            region_code: 'AK-CRITICAL',
+            name: 'Critical Community',
+            lat: 60.0,
+            lon: -150.0,
+            cat_tier: 4,
+            telehealth_status: 'CRITICAL_GAP',
+            desert_score: 82,
+            affordability_status: 'unaffordable',
+            data_confidence: 'low',
+            has_data_gap: true,
+            region: 'southwest',
+        },
+    ],
     affordability: {
         zones: [],
         count: 10,
@@ -83,7 +127,7 @@ describe('Statewide Insights', () => {
         vi.mocked(useDashboardData).mockReturnValue({
             data: dashboardData,
             sectionErrors: {},
-            availableSectionCount: 6,
+            availableSectionCount: 7,
             hasPartialData: false,
             loading: false,
             error: null,
@@ -99,6 +143,23 @@ describe('Statewide Insights', () => {
         expect(screen.getByText(/not a measure of affordability/i)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Open telehealth access map' })).toBeInTheDocument();
         expect(screen.queryByText('Unaffordable Areas')).not.toBeInTheDocument();
+    });
+
+    it('renders CAT tier, healthcare desert severity, and broadband modality distributions', () => {
+        render(<Dashboard onClose={vi.fn()} />);
+
+        expect(screen.getByRole('heading', { name: 'Community access tiers' })).toBeInTheDocument();
+        expect(screen.getByText('Tier 1: Full Multimodal Access')).toBeInTheDocument();
+        expect(screen.getByText('Tier 4: Extreme/No Direct Access')).toBeInTheDocument();
+
+        expect(screen.getByRole('heading', { name: 'Healthcare desert severity' })).toBeInTheDocument();
+        expect(screen.getByText('Adequate Need (<25)')).toBeInTheDocument();
+        expect(screen.getByText('High Need (50–74.9)')).toBeInTheDocument();
+        expect(screen.getByText('Critical Need (75+)')).toBeInTheDocument();
+
+        expect(screen.getByText('Wired / terrestrial')).toBeInTheDocument();
+        expect(screen.getByText('Satellite-primary')).toBeInTheDocument();
+        expect(screen.getByText('Limited access')).toBeInTheDocument();
     });
 
     it('routes section and community actions back to the map', () => {

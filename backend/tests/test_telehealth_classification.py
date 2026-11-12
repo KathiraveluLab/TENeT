@@ -3,8 +3,10 @@ from dataclasses import replace
 import pytest
 
 from services.telehealth_classification import (
+    STATUS_PRESENTATION,
     TelehealthInputs,
     classify_telehealth,
+    normalize_fcc_pct,
 )
 
 
@@ -86,7 +88,8 @@ def test_missing_broadband_is_explicitly_unavailable(complete_inputs):
     [
         (1.999, 399.99, "TELEHEALTH_READY"),
         (2.0, 399.99, "COMMUNITY_ANCHOR"),
-        (1.0, 400.0, "COMMUNITY_ANCHOR"),
+        (1.0, 400.0, "TELEHEALTH_READY"),
+        (1.0, 400.01, "COMMUNITY_ANCHOR"),
     ],
 )
 def test_affordability_boundaries_are_exclusive(
@@ -215,3 +218,15 @@ def test_missing_measured_upload_does_not_create_video_success(complete_inputs):
     assert result.video_feasible is None
     assert result.status == "LIMITED_TELEHEALTH"
     assert "MISSING_UPLOAD" in result.reason_codes
+
+
+def test_normalize_fcc_pct_scales_fractions_and_preserves_percentages():
+    assert normalize_fcc_pct(None) is None
+    assert normalize_fcc_pct(0.0) == 0.0
+    assert normalize_fcc_pct(0.138814) == 13.88
+    assert normalize_fcc_pct(1.0) == 100.0
+    assert normalize_fcc_pct(75.0) == 75.0
+
+
+def test_limited_telehealth_color_matches_frontend_presentation():
+    assert STATUS_PRESENTATION["LIMITED_TELEHEALTH"][1] == "#eab308"

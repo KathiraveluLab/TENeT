@@ -6,6 +6,7 @@ import {
     fetchDataGapsSummary,
     fetchHealthcareSummary,
     fetchPerformanceSummary,
+    fetchRegionSummary,
     fetchStatistics,
 } from '../api/catApi';
 import { useDashboardData } from './useDashboardData';
@@ -16,11 +17,13 @@ vi.mock('../api/catApi', () => ({
     fetchDataGapsSummary: vi.fn(),
     fetchHealthcareSummary: vi.fn(),
     fetchPerformanceSummary: vi.fn(),
+    fetchRegionSummary: vi.fn(),
     fetchStatistics: vi.fn(),
 }));
 
 const mockedFetchStatistics = vi.mocked(fetchStatistics);
 const mockedFetchTelehealth = vi.mocked(fetchAllTelehealthStatus);
+const mockedFetchRegionSummary = vi.mocked(fetchRegionSummary);
 const mockedFetchHealthcare = vi.mocked(fetchHealthcareSummary);
 const mockedFetchPerformance = vi.mocked(fetchPerformanceSummary);
 const mockedFetchDataGaps = vi.mocked(fetchDataGapsSummary);
@@ -49,6 +52,7 @@ beforeEach(() => {
             data_unavailable: 1,
         },
     });
+    mockedFetchRegionSummary.mockResolvedValue([]);
     mockedFetchHealthcare.mockResolvedValue({
         total_facilities: 2,
         by_type: { hospital: 1, clinic: 1, pharmacy: 0, health_center: 0 },
@@ -93,7 +97,7 @@ describe('useDashboardData', () => {
         expect(result.current.sectionErrors).toEqual({
             performance: 'Performance period unavailable',
         });
-        expect(result.current.availableSectionCount).toBe(5);
+        expect(result.current.availableSectionCount).toBe(6);
         expect(result.current.hasPartialData).toBe(true);
         expect(result.current.error).toBeNull();
     });
@@ -105,6 +109,7 @@ describe('useDashboardData', () => {
         const signal = mockedFetchStatistics.mock.calls[0][0];
         expect(signal).toBeInstanceOf(AbortSignal);
         expect(mockedFetchTelehealth).toHaveBeenCalledWith(signal);
+        expect(mockedFetchRegionSummary).toHaveBeenCalledWith('year_round', signal);
         expect(mockedFetchHealthcare).toHaveBeenCalledWith(signal);
         expect(mockedFetchPerformance).toHaveBeenCalledWith(signal);
         expect(mockedFetchDataGaps).toHaveBeenCalledWith(signal);

@@ -5,12 +5,14 @@ import {
     fetchDataGapsSummary,
     fetchHealthcareSummary,
     fetchPerformanceSummary,
+    fetchRegionSummary,
     fetchStatistics,
     type AffordabilityResponse,
     type AllTelehealthStatusResponse,
     type DataGapsSummary,
     type HealthcareSummary,
     type PerformanceSummary,
+    type RegionSummary,
     type StatisticsResponse,
 } from '../api/catApi';
 import { errorMessage, isAbortError } from '../api/http';
@@ -18,6 +20,7 @@ import { errorMessage, isAbortError } from '../api/http';
 export interface DashboardData {
     statistics: StatisticsResponse | null;
     telehealthStatus: AllTelehealthStatusResponse | null;
+    regionSummary: RegionSummary[] | null;
     healthcare: HealthcareSummary | null;
     performance: PerformanceSummary | null;
     dataGaps: DataGapsSummary | null;
@@ -30,6 +33,7 @@ export type DashboardSectionErrors = Partial<Record<DashboardSection, string>>;
 const EMPTY_DATA: DashboardData = {
     statistics: null,
     telehealthStatus: null,
+    regionSummary: null,
     healthcare: null,
     performance: null,
     dataGaps: null,
@@ -59,6 +63,7 @@ export function useDashboardData() {
                 const results = await Promise.allSettled([
                     fetchStatistics(controller.signal),
                     fetchAllTelehealthStatus(controller.signal),
+                    fetchRegionSummary('year_round', controller.signal),
                     fetchHealthcareSummary(controller.signal),
                     fetchPerformanceSummary(controller.signal),
                     fetchDataGapsSummary(controller.signal),
@@ -70,6 +75,7 @@ export function useDashboardData() {
                 const [
                     statisticsResult,
                     telehealthResult,
+                    regionSummaryResult,
                     healthcareResult,
                     performanceResult,
                     dataGapsResult,
@@ -79,6 +85,7 @@ export function useDashboardData() {
                 const nextData: DashboardData = {
                     statistics: statisticsResult.status === 'fulfilled' ? statisticsResult.value : null,
                     telehealthStatus: telehealthResult.status === 'fulfilled' ? telehealthResult.value : null,
+                    regionSummary: regionSummaryResult.status === 'fulfilled' ? regionSummaryResult.value : null,
                     healthcare: healthcareResult.status === 'fulfilled' ? healthcareResult.value : null,
                     performance: performanceResult.status === 'fulfilled' ? performanceResult.value : null,
                     dataGaps: dataGapsResult.status === 'fulfilled' ? dataGapsResult.value : null,
@@ -89,6 +96,7 @@ export function useDashboardData() {
                 const resultBySection: Record<DashboardSection, PromiseSettledResult<unknown>> = {
                     statistics: statisticsResult,
                     telehealthStatus: telehealthResult,
+                    regionSummary: regionSummaryResult,
                     healthcare: healthcareResult,
                     performance: performanceResult,
                     dataGaps: dataGapsResult,

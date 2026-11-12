@@ -200,6 +200,38 @@ export default function DataCoveragePanel({
                             </section>
                         )}
 
+                        {summary.dataset_coverage && (
+                            <section className="data-coverage-section">
+                                <h5>Dataset join completeness ({summary.dataset_coverage.total_communities})</h5>
+                                <div className="data-coverage-gaps">
+                                    <div>
+                                        <span>FCC broadband</span>
+                                        <strong>
+                                            {summary.dataset_coverage.fcc_broadband.matched} ({summary.dataset_coverage.fcc_broadband.pct}%)
+                                        </strong>
+                                    </div>
+                                    <div>
+                                        <span>Ookla tiles (&le;{summary.dataset_coverage.ookla_performance.window_km} km)</span>
+                                        <strong>
+                                            {summary.dataset_coverage.ookla_performance.matched} ({summary.dataset_coverage.ookla_performance.pct}%)
+                                        </strong>
+                                    </div>
+                                    <div>
+                                        <span>ACS income (&le;{summary.dataset_coverage.acs_income.window_km} km)</span>
+                                        <strong>
+                                            {summary.dataset_coverage.acs_income.matched} ({summary.dataset_coverage.acs_income.pct}%)
+                                        </strong>
+                                    </div>
+                                    <div>
+                                        <span>Healthcare sites (linked)</span>
+                                        <strong>
+                                            {summary.dataset_coverage.healthcare_sites.linked} ({summary.dataset_coverage.healthcare_sites.pct}%)
+                                        </strong>
+                                    </div>
+                                </div>
+                            </section>
+                        )}
+
                         {onToggle && (
                             <Button size="small" variant="ghost" onClick={onToggle}>
                                 {isExpanded ? 'Show less detail' : 'Show more detail'}

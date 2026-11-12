@@ -62,7 +62,7 @@ export default function PerformanceLayer({ visible, onToggle }: PerformanceLayer
 
     const getScenarioBurden = (afford: AffordabilityZone | undefined, lat: number): number | null => {
         if (!afford || afford.monthly_income <= 0) return null;
-        const cost = getScenarioCost(lat, useStarlink);
+        const cost = getScenarioCost(lat, useStarlink, afford.internet_cost);
         return (cost / afford.monthly_income) * 100;
     };
 
@@ -119,7 +119,7 @@ export default function PerformanceLayer({ visible, onToggle }: PerformanceLayer
             setPartialWarning(null);
             const [performanceResult, affordabilityResult] = await Promise.allSettled([
                 fetchPerformance(undefined, undefined, 1, signal),
-                fetchAffordability(120, 2, signal),
+                fetchAffordability(null, 2, signal),
             ]);
             if (signal.aborted) return;
             if (performanceResult.status === 'rejected') {
@@ -157,14 +157,14 @@ export default function PerformanceLayer({ visible, onToggle }: PerformanceLayer
             if (!Number.isFinite(tile.lat) || !Number.isFinite(tile.lon)) return;
 
             const afford = getAffordabilityForTile(tile.lat, tile.lon);
-            const scenarioCost = getScenarioCost(tile.lat, useStarlink);
+            const scenarioCost = getScenarioCost(tile.lat, useStarlink, afford?.internet_cost);
             const burdenPct = getScenarioBurden(afford, tile.lat);
 
             let markerColor = '#ccc';
             let markerRadius = isDetailView ? 6 : Math.min(20, Math.max(4, (tile.tests / 5)));
             // --- FILTER LOGIC ---
             if (filterMode === 'affordability') {
-                const isRuralTier = scenarioCost >= 400;
+                const isRuralTier = scenarioCost > 400;
 
                 if (burdenPct === null) {
                     markerColor = '#94a3b8';

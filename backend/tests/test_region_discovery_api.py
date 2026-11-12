@@ -226,3 +226,52 @@ def test_regions_summary_matches_map_metrics_for_selected_season(client):
     for code in ("AK-ANCHORAGE", "AK-EARECKSON"):
         assert summaries[code]["cat_tier"] == map_regions[code]["tier_level"]
         assert summaries[code]["desert_score"] == map_regions[code]["necessity_score"]
+
+
+def test_data_gaps_reports_multi_dataset_join_completeness(client):
+    response = client.get("/api/cat/data-gaps")
+
+    assert response.status_code == 200
+    coverage = response.get_json()["dataset_coverage"]
+    assert coverage["total_communities"] == 3
+    assert coverage["fcc_broadband"]["matched"] == 2
+    assert coverage["acs_income"]["matched"] == 2
+    assert coverage["healthcare_sites"]["linked"] == 1
+    assert coverage["ookla_performance"]["window_km"] == 75.0
+
+
+def test_regions_search_supports_limited_telehealth_filter(client, db_session):
+    from database.models import OoklaPerformance
+
+    db_session.add(CATRegion(
+        region_code="AK-LIMITED",
+        region_name="Limited Village",
+        tier_level=3,
+        centroid_lat=58.30,
+        centroid_lon=-134.42,
+        properties={"primary_access_modes": "air"},
+    ))
+    db_session.add(CensusIncome(
+        zcta="99801",
+        median_income=200000,
+        acs_year=2022,
+        centroid_lat=58.30,
+        centroid_lon=-134.42,
+    ))
+    db_session.add(OoklaPerformance(
+        quadkey="limited-tile",
+        avg_d_kbps=10000,
+        avg_u_kbps=2000,
+        avg_lat_ms=50,
+        tests=10,
+        devices=5,
+        year=2025,
+        quarter=4,
+        centroid_lat=58.30,
+        centroid_lon=-134.42,
+    ))
+    db_session.commit()
+
+    response = client.get("/api/cat/regions/search?status=limited_telehealth")
+    assert response.status_code == 200
+    assert region_names(response.get_json()) == {"Limited Village"}

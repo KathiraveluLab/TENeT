@@ -10,7 +10,6 @@ from __future__ import annotations
 import math
 from datetime import datetime, timezone
 
-from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from database.models import (
@@ -23,11 +22,18 @@ from database.models import (
 from services.data_quality_service import DataQualityService
 from services.healthcare_desert_calculator import HealthcareDesertCalculator, haversine_km as _haversine_km
 from services.isp_config import get_internet_cost, get_affordability_threshold
-from services.season_constants import SEASON_YEAR_ROUND, VALID_SEASONS, get_season_display_name
+from services.season_constants import (
+    SEASON_YEAR_ROUND,
+    VALID_SEASONS,
+    calculate_seasonal_tier,
+    get_season_display_name,
+)
 from services.telehealth_classification import (
     ABSOLUTE_COST_LIMIT,
+    CLINICAL_FACILITY_SITE_TYPES,
     TelehealthClassification,
     TelehealthClassificationService,
+    normalize_fcc_pct,
 )
 
 
@@ -94,7 +100,6 @@ class ResearchProfileService:
             ookla,
             affordability.pop("isp_name", None),
         )
-        access_modes = (region.properties or {}).get("primary_access_modes", "")
         telehealth = ResearchProfileService._telehealth_payload(
             telehealth_context.classification,
             season,
@@ -110,6 +115,15 @@ class ResearchProfileService:
         if nearest_facility:
             sources.append("Healthcare sites")
 
+        adjusted_tier = None
+        if region.tier_level is not None:
+            adjusted_tier, _, _ = calculate_seasonal_tier(
+                region.tier_level,
+                region.access_score if region.access_score is not None else 50,
+                region.properties,
+                season,
+            )
+
         return {
             "region": {
                 "region_code": region.region_code,
@@ -122,7 +136,7 @@ class ResearchProfileService:
                     if region.population is not None
                     else getattr(income, "population", None)
                 ),
-                "cat_tier": region.tier_level if region.tier_level is not None else None,
+                "cat_tier": adjusted_tier,
                 "data_confidence": quality["data_confidence"],
                 "has_data_gap": quality["has_data_gap"],
                 "missing_fields": quality["missing_fields"],
@@ -237,9 +251,13 @@ class ResearchProfileService:
             HealthcareSite.latitude.isnot(None),
             HealthcareSite.longitude.isnot(None),
         ).all()
+        clinical_sites = [
+            site for site in sites
+            if (site.site_type or "").lower() in CLINICAL_FACILITY_SITE_TYPES
+        ] or sites
         nearest = None
         nearest_distance = float("inf")
-        for site in sites:
+        for site in clinical_sites:
             distance = _haversine_km(
                 region.centroid_lat,
                 region.centroid_lon,
@@ -270,7 +288,9 @@ class ResearchProfileService:
             reliability = "Constrained"
 
         return {
-            "fcc_coverage_25mbps_pct": _round(broadband.any_tech_25mbps_pct, 2) if broadband else None,
+            "fcc_coverage_25mbps_pct": (
+                _round(normalize_fcc_pct(broadband.any_tech_25mbps_pct), 2) if broadband else None
+            ),
             "ookla_download_mbps": download_mbps,
             "ookla_upload_mbps": upload_mbps,
             "latency_ms": latency_ms,
@@ -292,7 +312,7 @@ class ResearchProfileService:
             burden_pct = (float(cost) / (float(median_income) / 12.0)) * 100.0
             status = (
                 "affordable"
-                if burden_pct < threshold and float(cost) < ABSOLUTE_COST_LIMIT
+                if burden_pct < threshold and float(cost) <= ABSOLUTE_COST_LIMIT
                 else "unaffordable"
             )
 

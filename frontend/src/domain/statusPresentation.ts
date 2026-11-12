@@ -3,10 +3,11 @@ import type { StatusTone } from '../components/ui/StatusBadge';
 export type TelehealthStatusName =
     | 'TELEHEALTH_READY'
     | 'COMMUNITY_ANCHOR'
+    | 'LIMITED_TELEHEALTH'
     | 'CRITICAL_GAP'
     | 'DATA_UNAVAILABLE';
 
-export type ScenarioTelehealthStatusName = TelehealthStatusName | 'LIMITED_TELEHEALTH';
+export type ScenarioTelehealthStatusName = TelehealthStatusName;
 
 interface TelehealthStatusPresentation {
     label: string;
@@ -59,6 +60,7 @@ export const TELEHEALTH_STATUS_PRESENTATION: Record<ScenarioTelehealthStatusName
 export const BASE_TELEHEALTH_STATUSES: TelehealthStatusName[] = [
     'TELEHEALTH_READY',
     'COMMUNITY_ANCHOR',
+    'LIMITED_TELEHEALTH',
     'CRITICAL_GAP',
     'DATA_UNAVAILABLE',
 ];

@@ -1,9 +1,15 @@
 import { useEffect, useId, useMemo, useState } from 'react';
 import { Season } from '../api/catApi';
+import {
+    getTelehealthStatusLabel,
+    getTelehealthStatusTone,
+    isScenarioTelehealthStatus,
+} from '../domain/statusPresentation';
 import { useComparisonProfiles } from '../hooks/useComparisonProfiles';
 import { ResearchProfile } from '../types/research';
 import { DATA_UNAVAILABLE, formatResearchValue } from '../utils/formatResearchValue';
 import Button from './ui/Button';
+import StatusBadge from './ui/StatusBadge';
 import './ResearchComparisonPanel.css';
 
 interface ResearchComparisonPanelProps {
@@ -27,6 +33,27 @@ const METRICS: MetricConfig[] = [
         higherIsBetter: true,
         getValue: profile => profile.connectivity.ookla_download_mbps,
         format: value => formatResearchValue(value, { suffix: ' Mbps', digits: 1 }),
+    },
+    {
+        key: 'upload',
+        label: 'Upload',
+        higherIsBetter: true,
+        getValue: profile => profile.connectivity.ookla_upload_mbps,
+        format: value => formatResearchValue(value, { suffix: ' Mbps', digits: 1 }),
+    },
+    {
+        key: 'latency',
+        label: 'Latency',
+        higherIsBetter: false,
+        getValue: profile => profile.connectivity.latency_ms,
+        format: value => formatResearchValue(value, { suffix: ' ms', digits: 0 }),
+    },
+    {
+        key: 'fcc_coverage',
+        label: 'FCC 25 Mbps',
+        higherIsBetter: true,
+        getValue: profile => profile.connectivity.fcc_coverage_25mbps_pct,
+        format: value => formatResearchValue(value, { suffix: '%', digits: 1 }),
     },
     {
         key: 'burden',
@@ -163,6 +190,69 @@ export default function ResearchComparisonPanel({
                                     >
                                         {profile.region.name}
                                     </button>
+                                ))}
+                            </div>
+
+                            <div
+                                className="comparison-grid"
+                                style={{ gridTemplateColumns: `116px repeat(${profiles.length}, minmax(132px, 1fr))` }}
+                            >
+                                <span className="comparison-metric-label">Telehealth status</span>
+                                {profiles.map(profile => {
+                                    const statusKey = isScenarioTelehealthStatus(profile.telehealth.status)
+                                        ? profile.telehealth.status
+                                        : 'DATA_UNAVAILABLE';
+                                    return (
+                                        <div className="comparison-cell comparison-cell-meta" key={profile.region.region_code}>
+                                            <StatusBadge tone={getTelehealthStatusTone(statusKey)}>
+                                                {profile.telehealth.label || getTelehealthStatusLabel(statusKey)}
+                                            </StatusBadge>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div
+                                className="comparison-grid"
+                                style={{ gridTemplateColumns: `116px repeat(${profiles.length}, minmax(132px, 1fr))` }}
+                            >
+                                <span className="comparison-metric-label">Affordability</span>
+                                {profiles.map(profile => (
+                                    <div className="comparison-cell comparison-cell-meta" key={profile.region.region_code}>
+                                        <strong>
+                                            {profile.affordability.status === 'unknown'
+                                                ? DATA_UNAVAILABLE
+                                                : profile.affordability.status.charAt(0).toUpperCase()
+                                                    + profile.affordability.status.slice(1)}
+                                        </strong>
+                                        <small>
+                                            {profile.affordability.monthly_cost !== null
+                                                ? formatResearchValue(profile.affordability.monthly_cost, {
+                                                    prefix: '$',
+                                                    digits: 0,
+                                                    suffix: '/mo',
+                                                })
+                                                : DATA_UNAVAILABLE}
+                                        </small>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div
+                                className="comparison-grid"
+                                style={{ gridTemplateColumns: `116px repeat(${profiles.length}, minmax(132px, 1fr))` }}
+                            >
+                                <span className="comparison-metric-label">Clinic support</span>
+                                {profiles.map(profile => (
+                                    <div className="comparison-cell comparison-cell-meta" key={profile.region.region_code}>
+                                        <strong>
+                                            {profile.telehealth.clinic_supported === true
+                                                ? 'Clinic supported'
+                                                : profile.telehealth.clinic_supported === false
+                                                    ? 'No local clinic'
+                                                    : DATA_UNAVAILABLE}
+                                        </strong>
+                                    </div>
                                 ))}
                             </div>
 

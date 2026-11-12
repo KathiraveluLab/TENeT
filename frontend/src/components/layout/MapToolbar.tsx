@@ -24,7 +24,7 @@ export default function MapToolbar({
         <header className="map-toolbar" aria-label="Map tools">
             <div className="map-toolbar__brand">
                 <strong>TENeT</strong>
-                <span>Telehealth effectiveness and Necessity Tracker</span>
+                <span>Telehealth Effectiveness and Necessity Tracker</span>
             </div>
 
             <div className="map-toolbar__divider" aria-hidden="true" />
