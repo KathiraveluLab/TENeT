@@ -128,4 +128,3 @@ def test_performance_summary_handles_tiles_with_no_valid_speeds(db_session):
         "critical": 0,
     }
     assert payload["telehealth_viable_pct"] == 0
-

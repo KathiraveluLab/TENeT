@@ -362,23 +362,72 @@ class _ClinicPoint:
     is_active: Optional[bool]
 
 
+_BUCKET_STEPS_PER_DEGREE = 4
+_EARTH_DEG_TO_KM_MIN = 111.1
+
+
 def _bucket_key(lat: float, lon: float) -> Tuple[int, int]:
-    return math.floor(lat), math.floor(lon)
+    return (
+        math.floor(lat * _BUCKET_STEPS_PER_DEGREE),
+        math.floor(lon * _BUCKET_STEPS_PER_DEGREE),
+    )
+
+
+def _lat_lon_windows(lat: float, max_km: float) -> Tuple[float, float]:
+    lat_window = max_km / 110.5
+    furthest_lat = min(89.9, max(abs(lat - lat_window), abs(lat + lat_window)))
+    lon_window = max_km / (110.5 * max(math.cos(math.radians(furthest_lat)), 0.1))
+    return lat_window, lon_window
 
 
 def _candidate_buckets(lat: float, lon: float, max_km: float) -> Iterable[Tuple[int, int]]:
-    lat_window = max_km / 111.0
-    lon_window = max_km / (111.0 * max(math.cos(math.radians(lat)), 0.1))
-    for lat_key in range(math.floor(lat - lat_window), math.floor(lat + lat_window) + 1):
-        for lon_key in range(math.floor(lon - lon_window), math.floor(lon + lon_window) + 1):
-            yield lat_key, lon_key
+    lat_window, lon_window = _lat_lon_windows(lat, max_km)
+    min_lat_key = math.floor((lat - lat_window) * _BUCKET_STEPS_PER_DEGREE)
+    max_lat_key = math.floor((lat + lat_window) * _BUCKET_STEPS_PER_DEGREE)
+    min_lon_key = math.floor((lon - lon_window) * _BUCKET_STEPS_PER_DEGREE)
+    max_lon_key = math.floor((lon + lon_window) * _BUCKET_STEPS_PER_DEGREE)
+    center_lat_key, center_lon_key = _bucket_key(lat, lon)
+
+    coords = [
+        (lat_key, lon_key)
+        for lat_key in range(min_lat_key, max_lat_key + 1)
+        for lon_key in range(min_lon_key, max_lon_key + 1)
+    ]
+    coords.sort(
+        key=lambda item: (
+            max(abs(item[0] - center_lat_key), abs(item[1] - center_lon_key)),
+            abs(item[0] - center_lat_key) + abs(item[1] - center_lon_key),
+        )
+    )
+    return coords
+
+
+def _cell_min_lat_km(lat: float, lat_key: int) -> float:
+    cell_min = lat_key / _BUCKET_STEPS_PER_DEGREE
+    cell_max = (lat_key + 1) / _BUCKET_STEPS_PER_DEGREE
+    if lat < cell_min:
+        return (cell_min - lat) * _EARTH_DEG_TO_KM_MIN
+    if lat > cell_max:
+        return (lat - cell_max) * _EARTH_DEG_TO_KM_MIN
+    return 0.0
 
 
 def _nearest_record(buckets, lat: float, lon: float, max_km: float):
+    if not buckets:
+        return None
     nearest = None
     nearest_distance = float("inf")
-    for key in _candidate_buckets(lat, lon, max_km):
-        for record in buckets.get(key, []):
+    for lat_key, lon_key in _candidate_buckets(lat, lon, max_km):
+        cell_lat_km = _cell_min_lat_km(lat, lat_key)
+        if cell_lat_km > max_km or (nearest is not None and cell_lat_km >= nearest_distance):
+            continue
+        records = buckets.get((lat_key, lon_key))
+        if not records:
+            continue
+        for record in records:
+            dlat_km = abs(lat - record.centroid_lat) * _EARTH_DEG_TO_KM_MIN
+            if dlat_km > max_km or (nearest is not None and dlat_km >= nearest_distance):
+                continue
             distance = haversine_km(lat, lon, record.centroid_lat, record.centroid_lon)
             if distance < nearest_distance and distance <= max_km:
                 nearest = record
@@ -393,6 +442,16 @@ class TelehealthClassificationService:
     _ookla_bucket_cache: Dict[Tuple[int, str], Tuple[Tuple[Any, ...], Dict[Tuple[int, int], list[_OoklaPoint]]]] = {}
     _income_bucket_cache: Dict[Tuple[int, str], Tuple[Tuple[Any, ...], Dict[Tuple[int, int], list[_IncomePoint]]]] = {}
     _clinic_cache: Dict[Tuple[int, str], Tuple[Tuple[Any, ...], list[_ClinicPoint]]] = {}
+    _spatial_match_cache: Dict[
+        Tuple[int, str],
+        Tuple[
+            Tuple[Any, ...],
+            Dict[
+                Tuple[float, float],
+                Tuple[Optional[_IncomePoint], Optional[_OoklaPoint], Optional[_ClinicPoint], Optional[float]],
+            ],
+        ],
+    ] = {}
 
     @classmethod
     def clear_caches(cls) -> None:
@@ -400,6 +459,7 @@ class TelehealthClassificationService:
             cls._ookla_bucket_cache.clear()
             cls._income_bucket_cache.clear()
             cls._clinic_cache.clear()
+            cls._spatial_match_cache.clear()
 
     @staticmethod
     def _cache_key(db: Session) -> Tuple[int, str]:
@@ -427,41 +487,74 @@ class TelehealthClassificationService:
             if region.centroid_lat is not None and region.centroid_lon is not None
         ]
 
+        use_full_match_cache = False
+        spatial_cache_key = None
+        spatial_sig = None
+        spatial_matches = {}
+
         if valid_regions:
-            income_buckets = cls._income_buckets(db)
+            income_sig, income_buckets = cls._income_signature_and_buckets(db)
+            clinic_sig, clinics = cls._clinic_signature_and_list(db)
             if len(valid_regions) <= 8 and not cls._has_warm_ookla_cache(db):
                 ookla_buckets = cls._query_ookla_buckets_for_regions(db, valid_regions)
             else:
-                ookla_buckets = cls._latest_ookla_buckets(db)
-            clinics = cls._active_clinics(db)
+                ookla_sig, ookla_buckets = cls._ookla_signature_and_buckets(db)
+                use_full_match_cache = True
+                spatial_cache_key = cls._cache_key(db)
+                spatial_sig = (income_sig, ookla_sig, clinic_sig)
         else:
             income_buckets = {}
             ookla_buckets = {}
             clinics = []
 
+        new_spatial_matches = {}
+        if use_full_match_cache:
+            with cls._cache_lock:
+                cached_matches = cls._spatial_match_cache.get(spatial_cache_key)
+                if cached_matches is not None and cached_matches[0] == spatial_sig:
+                    spatial_matches = dict(cached_matches[1])
+                else:
+                    spatial_matches = {}
+                    cls._spatial_match_cache[spatial_cache_key] = (spatial_sig, {})
+
         contexts: Dict[str, TelehealthRegionContext] = {}
         for region in regions:
             lat = float(region.centroid_lat) if region.centroid_lat is not None else None
             lon = float(region.centroid_lon) if region.centroid_lon is not None else None
-            income = (
-                _nearest_record(income_buckets, lat, lon, MAX_INCOME_MATCH_KM)
-                if lat is not None and lon is not None else None
-            )
-            ookla = (
-                _nearest_record(ookla_buckets, lat, lon, MAX_OOKLA_MATCH_KM)
-                if lat is not None and lon is not None else None
-            )
-
-            nearest_clinic = None
-            nearest_clinic_distance = None
-            if lat is not None and lon is not None and clinics:
-                nearest_distance = float("inf")
-                for clinic in clinics:
-                    distance = haversine_km(lat, lon, clinic.latitude, clinic.longitude)
-                    if distance < nearest_distance:
-                        nearest_clinic = clinic
-                        nearest_distance = distance
-                nearest_clinic_distance = round(nearest_distance, 2)
+            if lat is not None and lon is not None:
+                coord_key = (lat, lon)
+                cached_hit = spatial_matches.get(coord_key) if use_full_match_cache else None
+                if cached_hit is not None:
+                    income, ookla, nearest_clinic, nearest_clinic_distance = cached_hit
+                else:
+                    income = _nearest_record(income_buckets, lat, lon, MAX_INCOME_MATCH_KM)
+                    ookla = _nearest_record(ookla_buckets, lat, lon, MAX_OOKLA_MATCH_KM)
+                    nearest_clinic = None
+                    nearest_clinic_distance = None
+                    if clinics:
+                        nearest_distance = float("inf")
+                        for clinic in clinics:
+                            if abs(lat - clinic.latitude) * _EARTH_DEG_TO_KM_MIN >= nearest_distance:
+                                continue
+                            distance = haversine_km(lat, lon, clinic.latitude, clinic.longitude)
+                            if distance < nearest_distance:
+                                nearest_clinic = clinic
+                                nearest_distance = distance
+                        nearest_clinic_distance = round(nearest_distance, 2)
+                    if use_full_match_cache:
+                        match_tuple = (
+                            income,
+                            ookla,
+                            nearest_clinic,
+                            nearest_clinic_distance,
+                        )
+                        spatial_matches[coord_key] = match_tuple
+                        new_spatial_matches[coord_key] = match_tuple
+            else:
+                income = None
+                ookla = None
+                nearest_clinic = None
+                nearest_clinic_distance = None
 
             monthly_cost = None
             isp_name = None
@@ -511,6 +604,15 @@ class TelehealthClassificationService:
                 classification=classification,
                 isp_name=isp_name,
             )
+
+        if use_full_match_cache and new_spatial_matches and spatial_cache_key is not None and spatial_sig is not None:
+            with cls._cache_lock:
+                entry = cls._spatial_match_cache.get(spatial_cache_key)
+                if entry is not None and entry[0] == spatial_sig:
+                    entry[1].update(new_spatial_matches)
+                else:
+                    cls._spatial_match_cache[spatial_cache_key] = (spatial_sig, new_spatial_matches)
+
         return contexts
 
     @staticmethod
@@ -530,7 +632,7 @@ class TelehealthClassificationService:
         return lookup
 
     @classmethod
-    def _active_clinics(cls, db: Session) -> list[_ClinicPoint]:
+    def _clinic_signature_and_list(cls, db: Session) -> Tuple[Tuple[Any, ...], list[_ClinicPoint]]:
         key = cls._cache_key(db)
         sig = db.query(
             func.count(HealthcareSite.id),
@@ -547,7 +649,7 @@ class TelehealthClassificationService:
         with cls._cache_lock:
             cached = cls._clinic_cache.get(key)
             if cached is not None and cached[0] == signature:
-                return cached[1]
+                return cached[0], cached[1]
 
         rows = db.query(
             HealthcareSite.id,
@@ -581,10 +683,14 @@ class TelehealthClassificationService:
         ]
         with cls._cache_lock:
             cls._clinic_cache[key] = (signature, clinics)
-        return clinics
+        return signature, clinics
 
     @classmethod
-    def _income_buckets(cls, db: Session):
+    def _active_clinics(cls, db: Session) -> list[_ClinicPoint]:
+        return cls._clinic_signature_and_list(db)[1]
+
+    @classmethod
+    def _income_signature_and_buckets(cls, db: Session):
         key = cls._cache_key(db)
         sig = db.query(
             func.count(CensusIncome.id),
@@ -603,7 +709,7 @@ class TelehealthClassificationService:
         with cls._cache_lock:
             cached = cls._income_bucket_cache.get(key)
             if cached is not None and cached[0] == signature:
-                return cached[1]
+                return cached[0], cached[1]
 
         buckets = defaultdict(list)
         rows = db.query(
@@ -636,7 +742,11 @@ class TelehealthClassificationService:
         result = dict(buckets)
         with cls._cache_lock:
             cls._income_bucket_cache[key] = (signature, result)
-        return result
+        return signature, result
+
+    @classmethod
+    def _income_buckets(cls, db: Session):
+        return cls._income_signature_and_buckets(db)[1]
 
     @classmethod
     def _has_warm_ookla_cache(cls, db: Session) -> bool:
@@ -734,10 +844,10 @@ class TelehealthClassificationService:
         return dict(buckets)
 
     @classmethod
-    def _latest_ookla_buckets(cls, db: Session):
+    def _ookla_signature_and_buckets(cls, db: Session):
         latest = cls._latest_ookla_period(db)
         if latest is None:
-            return {}
+            return (None, None), {}
 
         key = cls._cache_key(db)
         agg = db.query(
@@ -757,7 +867,7 @@ class TelehealthClassificationService:
         with cls._cache_lock:
             cached = cls._ookla_bucket_cache.get(key)
             if cached is not None and cached[0] == signature:
-                return cached[1]
+                return cached[0], cached[1]
 
         buckets = defaultdict(list)
         rows = db.query(
@@ -792,4 +902,8 @@ class TelehealthClassificationService:
         result = dict(buckets)
         with cls._cache_lock:
             cls._ookla_bucket_cache[key] = (signature, result)
-        return result
+        return signature, result
+
+    @classmethod
+    def _latest_ookla_buckets(cls, db: Session):
+        return cls._ookla_signature_and_buckets(db)[1]

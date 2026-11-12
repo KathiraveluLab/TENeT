@@ -148,6 +148,13 @@ def _build_desert_score_lookup(db, regions, season=SEASON_YEAR_ROUND):
 
     score_lookup = {}
     clinic_types = DESERT_CLINIC_SITE_TYPES
+    site_coords = []
+    for site in active_sites:
+        site_type = (site.site_type or '').lower()
+        is_clinic = site_type in clinic_types
+        is_hospital = site_type == 'hospital'
+        if is_clinic or is_hospital:
+            site_coords.append((float(site.latitude), float(site.longitude), is_clinic, is_hospital))
 
     for region in regions:
         if region.centroid_lat is None or region.centroid_lon is None:
@@ -164,18 +171,21 @@ def _build_desert_score_lookup(db, regions, season=SEASON_YEAR_ROUND):
             center_lon = region.centroid_lon
             travel_time = None
 
-        if active_sites:
+        if site_coords:
             clinic_dist = float('inf')
             hospital_dist = float('inf')
 
-            for site in active_sites:
-                distance = _haversine_km(center_lat, center_lon, site.latitude, site.longitude)
-
-                site_type = (site.site_type or '').lower()
-                if site_type in clinic_types:
-                    clinic_dist = min(clinic_dist, distance)
-                if site_type == 'hospital':
-                    hospital_dist = min(hospital_dist, distance)
+            for s_lat, s_lon, is_clinic, is_hospital in site_coords:
+                lat_bound_km = abs(center_lat - s_lat) * 111.1
+                need_clinic = is_clinic and lat_bound_km < clinic_dist
+                need_hospital = is_hospital and lat_bound_km < hospital_dist
+                if not need_clinic and not need_hospital:
+                    continue
+                distance = _haversine_km(center_lat, center_lon, s_lat, s_lon)
+                if is_clinic and distance < clinic_dist:
+                    clinic_dist = distance
+                if is_hospital and distance < hospital_dist:
+                    hospital_dist = distance
 
             clinic_dist = 999 if clinic_dist == float('inf') else clinic_dist
             hospital_dist = 999 if hospital_dist == float('inf') else hospital_dist
