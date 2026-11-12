@@ -13,7 +13,7 @@ It is built for public-sector planners, healthcare organizations, broadband prov
 - An affordability view that relates estimated internet costs to local income.
 - Research profiles that combine access, connectivity, healthcare, affordability, and data-quality signals for a community.
 - Downloadable PDF community reports and shareable map URLs.
-- A statewide insights dashboard covering telehealth status, healthcare, performance, affordability, and data quality.
+- A statewide insights dashboard covering telehealth status, CAT access tiers, healthcare desert severity and infrastructure, network performance, broadband modality mix, affordability, and data quality.
 - **Scenario Mode** for testing broadband, latency, clinic-proximity, and affordability assumptions without changing baseline data.
 
 ## Quick start
@@ -28,7 +28,6 @@ It is built for public-sector planners, healthcare organizations, broadband prov
 ```bash
 git clone https://github.com/KathiraveluLab/TENeT.git
 cd TENeT
-git checkout dev
 
 cp .env.example .env
 make dev
@@ -69,6 +68,7 @@ Baseline classifications are calculated from the project's canonical telehealth-
 | --- | --- |
 | Telehealth Ready | Video-capable broadband and affordable home access meet the baseline inputs. |
 | Community Anchor | Home access is not ready, but a nearby clinic provides a care-access safety net. |
+| Limited Telehealth | Audio-capable, affordable home access is available without full video readiness or a nearby clinic safety net. |
 | Critical Gap | Home access is not ready and no clinic is accessible within the applicable threshold. |
 | Data Unavailable | Required classification inputs are missing. |
 
@@ -110,7 +110,7 @@ Data availability is part of the product: missing or low-confidence inputs are s
 - **Operations:** Docker, Docker Compose, nginx, and GitHub Actions
 - **Testing:** pytest, Vitest/React Testing Library, and Playwright
 
-The frontend is served by nginx in the Docker stack and proxies `/api/cat` to the Flask backend. The backend exposes liveness and database-readiness health checks, while the local database is seeded deterministically from tracked data.
+The frontend is served by nginx in the Docker stack and proxies `/api/` requests to the Flask backend. The backend exposes liveness and database-readiness health checks, while the local database is seeded deterministically from tracked data.
 
 ## Repository layout
 
@@ -144,7 +144,10 @@ All application endpoints, except health checks, are under `/api/cat`.
 | `GET /api/cat/regions/<region_code>/research-profile` | Consolidated community research profile |
 | `GET /api/cat/regions/research-profiles` | Profiles for pinned-community comparison |
 | `GET /api/cat/telehealth-status/all` | Statewide baseline telehealth classifications |
+| `GET /api/cat/statistics` | Aggregate database counts and upload statistics |
+| `GET /api/cat/data-gaps` | Dataset completeness and confidence summary |
 | `GET /api/cat/performance` | Observed Ookla performance tiles |
+| `GET /api/cat/performance/summary` | Aggregate Ookla speed and latency summary |
 | `GET /api/cat/performance/gaps` | Network service-gap analysis |
 | `GET /api/cat/performance/affordability` | Broadband affordability analysis |
 | `GET /api/cat/healthcare/summary` | Healthcare infrastructure summary |
@@ -158,11 +161,13 @@ Explore the frontend API clients in `frontend/src/api/` and the backend route im
 | --- | --- |
 | `make dev` | Build, seed if necessary, and start the full application |
 | `make stop` | Stop the running stack |
+| `make down` | Alias for `make stop` |
 | `make build` | Rebuild images without cache |
 | `make seed` | Initialize and seed the SQLite database |
 | `make reset-db` | Remove the local database and seed it again |
 | `make test` | Run backend and frontend test suites |
 | `make backend-test` | Run pytest in the backend container |
+| `make backend-lint` | Run flake8 checks in the backend container |
 | `make frontend-test` | Run the Vitest suite |
 | `make frontend-typecheck` | Run TypeScript checks |
 | `make frontend-build` | Build the production frontend |
@@ -171,6 +176,7 @@ Explore the frontend API clients in `frontend/src/api/` and the backend route im
 | `make smoke` | Check Compose config, frontend build, and core live API routes |
 | `make logs` | Tail Compose service logs |
 | `make clean` | Remove local containers, volumes, and images |
+| `make shell` | Open a shell in the backend container |
 
 Run `make help` to list the available targets. `make clean` and `make reset-db` remove local Docker or SQLite state; use them only when that reset is intended.
 
@@ -193,7 +199,7 @@ For the checked-in Docker and nginx setup, leave `VITE_API_BASE_URL` at `/api/ca
 
 ## Quality and deployment
 
-GitHub Actions runs backend tests, frontend type checks, frontend tests, production builds, Docker build validation, and Playwright smoke coverage for pull requests. See [TESTING.md](./TESTING.md) for the full test strategy and [DEPLOY.md](./DEPLOY.md) for production deployment, readiness checks, and rollback guidance.
+GitHub Actions runs backend `flake8` linting, backend tests, frontend type checks, frontend tests, production builds, Docker build validation, and pull-request Playwright smoke coverage. See [TESTING.md](./TESTING.md) for the full test strategy and [DEPLOY.md](./DEPLOY.md) for production deployment, readiness checks, and rollback guidance.
 
 ## Limitations
 
