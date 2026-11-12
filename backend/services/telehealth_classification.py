@@ -36,10 +36,27 @@ ABSOLUTE_COST_LIMIT = 400.0
 ROAD_CLINIC_THRESHOLD_KM = 10.0
 NON_ROAD_CLINIC_THRESHOLD_KM = 50.0
 
+TELEHEALTH_CLINIC_SITE_TYPES = frozenset({"clinic", "hospital", "health_center"})
+CLINICAL_FACILITY_SITE_TYPES = frozenset(
+    {"clinic", "hospital", "health_center", "community_health_center"}
+)
+DESERT_CLINIC_SITE_TYPES = frozenset({"clinic", "health_center", "community_health_center"})
+
+
+def normalize_fcc_pct(value: Optional[float]) -> Optional[float]:
+    """Normalize FCC coverage values so fractional [0, 1] inputs become 0-100 percentages."""
+    if value is None:
+        return None
+    numeric = float(value)
+    if 0.0 < numeric <= 1.0:
+        return round(numeric * 100.0, 2)
+    return numeric
+
+
 STATUS_PRESENTATION = {
     "TELEHEALTH_READY": ("Telehealth Ready", "#22c55e"),
     "COMMUNITY_ANCHOR": ("Community Anchor", "#f59e0b"),
-    "LIMITED_TELEHEALTH": ("Limited Telehealth", "#f97316"),
+    "LIMITED_TELEHEALTH": ("Limited Telehealth", "#eab308"),
     "CRITICAL_GAP": ("Critical Gap", "#ef4444"),
     "DATA_UNAVAILABLE": ("Data Unavailable", "#6b7280"),
 }
@@ -218,7 +235,7 @@ def classify_telehealth(
     if has_income:
         affordable = bool(
             inputs.burden_pct < thresholds.affordability_burden_pct
-            and inputs.monthly_internet_cost < ABSOLUTE_COST_LIMIT
+            and inputs.monthly_internet_cost <= ABSOLUTE_COST_LIMIT
         )
         affordability_status = "affordable" if affordable else "unaffordable"
         reasons.append("AFFORDABLE" if affordable else "UNAFFORDABLE")
@@ -354,7 +371,7 @@ class TelehealthClassificationService:
         ).all()
         clinics = [
             site for site in clinics
-            if (site.site_type or "").lower() in {"clinic", "hospital", "health_center"}
+            if (site.site_type or "").lower() in TELEHEALTH_CLINIC_SITE_TYPES
         ]
 
         contexts: Dict[str, TelehealthRegionContext] = {}
@@ -409,8 +426,8 @@ class TelehealthClassificationService:
                     if ookla is not None and ookla.avg_lat_ms is not None else None
                 ),
                 fcc_coverage_pct=(
-                    float(coverage.any_tech_25mbps_pct)
-                    if coverage is not None and coverage.any_tech_25mbps_pct is not None else None
+                    normalize_fcc_pct(coverage.any_tech_25mbps_pct)
+                    if coverage is not None else None
                 ),
                 median_income=median_income,
                 monthly_internet_cost=monthly_cost,

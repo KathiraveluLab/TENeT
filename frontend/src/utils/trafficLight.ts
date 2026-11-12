@@ -6,8 +6,15 @@ export const CRITICAL_LATENCY_MS = 150;
 export const CRITICAL_SPEED_MBPS = 5;
 export const AFFORDABILITY_BURDEN_THRESHOLD = 2.0;
 
-export function getScenarioCost(lat: number, useStarlink: boolean): number {
+export function getScenarioCost(
+    lat: number,
+    useStarlink: boolean,
+    regionalCost?: number | null,
+): number {
     if (useStarlink) return 120;
+    if (regionalCost !== undefined && regionalCost !== null && Number.isFinite(regionalCost)) {
+        return regionalCost;
+    }
     return lat > 63 ? 450 : 125;
 }
 
@@ -17,7 +24,7 @@ export function getTrafficLightStatus(
     burden: number | null,
     scenarioCost: number,
 ): 'GREEN' | 'YELLOW' | 'ORANGE' | 'RED' | 'GRAY' {
-    const isRuralTier = scenarioCost >= 400;
+    const isRuralTier = scenarioCost > 400;
 
     if (latency > CRITICAL_LATENCY_MS || speed < CRITICAL_SPEED_MBPS) {
         return 'RED';

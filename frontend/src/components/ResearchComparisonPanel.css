@@ -2,7 +2,7 @@
     position: absolute;
     left: 24px;
     right: 24px;
-    bottom: 16px;
+    bottom: 68px;
     z-index: var(--z-overlay);
     max-height: min(34vh, 340px);
     display: flex;
@@ -23,7 +23,7 @@
 .research-comparison-reopen {
     position: absolute;
     right: 24px;
-    bottom: 16px;
+    bottom: 68px;
     z-index: var(--z-overlay);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
@@ -143,6 +143,19 @@
 
 .comparison-cell {
     min-width: 0;
+}
+
+.comparison-cell-meta {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+.comparison-cell-meta strong {
+    color: var(--color-text);
+    font-size: 12px;
 }
 
 .comparison-value-line {

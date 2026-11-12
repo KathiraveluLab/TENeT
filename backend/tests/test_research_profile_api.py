@@ -191,3 +191,51 @@ def test_income_lookup_filters_distant_records_before_distance_loop(db_session, 
 
     assert nearest.zcta == "99501"
     assert len(distance_calls) == 1
+
+
+def test_research_profile_applies_seasonal_cat_tier_and_excludes_pharmacies(db_session):
+    region = CATRegion(
+        region_code="AK-SEASONAL",
+        region_name="Seasonal Village",
+        tier_level=1,
+        centroid_lat=62.0,
+        centroid_lon=-150.0,
+        access_score=90.0,
+        properties={"primary_access_modes": "road,water", "region": "Interior Economic Region"},
+    )
+    db_session.add(region)
+    db_session.add(BroadbandCoverage(
+        place_id="seasonal",
+        place_name="Seasonal Village",
+        confidence="HIGH",
+        any_tech_25mbps_pct=0.85,
+        primary_access="WIRED",
+        region_code="AK-SEASONAL",
+        data_source="FCC",
+    ))
+    db_session.add(HealthcareSite(
+        name="Nearest Pharmacy",
+        site_type="pharmacy",
+        latitude=62.0,
+        longitude=-150.0,
+        region_code="AK-SEASONAL",
+        is_active=True,
+    ))
+    db_session.add(HealthcareSite(
+        name="Clinical Center",
+        site_type="clinic",
+        latitude=62.1,
+        longitude=-150.0,
+        region_code="AK-SEASONAL",
+        is_active=True,
+    ))
+    db_session.commit()
+
+    from app import app
+
+    response = app.test_client().get("/api/cat/regions/AK-SEASONAL/research-profile?season=winter")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["region"]["cat_tier"] == 3
+    assert payload["connectivity"]["fcc_coverage_25mbps_pct"] == 85.0
+    assert payload["healthcare"]["nearest_facility_name"] == "Clinical Center"

@@ -25,6 +25,8 @@ with app.app_context():
     print("Database initialized successfully")
 
 # Setup database session teardown
+
+
 @app.teardown_appcontext
 def shutdown_session(exception=None):
     """Close database session at the end of each request"""
@@ -32,9 +34,11 @@ def shutdown_session(exception=None):
     if db is not None:
         db.close()
 
+
 # Register blueprints
 app.register_blueprint(cat_bp)
 app.register_blueprint(performance_bp)
+
 
 @app.route('/api/health', methods=['GET'])
 def health():
@@ -61,6 +65,7 @@ def ready():
         }), 503
     finally:
         db.close()
+
 
 if __name__ == '__main__':
     os.makedirs(os.path.join('data', 'uploads'), exist_ok=True)

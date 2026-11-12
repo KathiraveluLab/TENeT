@@ -189,6 +189,7 @@ export function AffordabilityLegend({ summary }: { summary?: AllTelehealthStatus
     const counts = {
         TELEHEALTH_READY: summary?.telehealth_ready,
         COMMUNITY_ANCHOR: summary?.community_anchor,
+        LIMITED_TELEHEALTH: summary?.limited_telehealth,
         CRITICAL_GAP: summary?.critical_gap,
         DATA_UNAVAILABLE: summary?.data_unavailable,
     } as const;

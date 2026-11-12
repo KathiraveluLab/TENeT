@@ -5,19 +5,29 @@ from database.models import CATRegion, CATDataPoint, HealthcareSite, CensusIncom
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
 import os
-import math
 import json
 from database.config import SessionLocal
 from database.handlers import CATDataHandler
 from services.data_importer import CATDataImporter
 from services.healthcare_desert_calculator import HealthcareDesertCalculator, haversine_km as _haversine_km
-from services.isp_config import ISP_CONFIG as _ISP_CONFIG, get_internet_cost as _get_regional_internet_cost
+from services.isp_config import (
+    get_affordability_threshold,
+    get_internet_cost as _get_regional_internet_cost,
+)
 from services.research_profile_service import ResearchProfileService
-from services.telehealth_classification import TelehealthClassificationService
+from services.telehealth_classification import (
+    ABSOLUTE_COST_LIMIT,
+    DESERT_CLINIC_SITE_TYPES,
+    MAX_INCOME_MATCH_KM,
+    MAX_OOKLA_MATCH_KM,
+    TelehealthClassificationService,
+    normalize_fcc_pct,
+)
 from services.season_constants import (
-    SEASON_SUMMER, SEASON_WINTER, SEASON_YEAR_ROUND, VALID_SEASONS, 
+    SEASON_SUMMER, SEASON_WINTER, SEASON_YEAR_ROUND, VALID_SEASONS,
     ROAD_QUALITY_LOCAL, VALID_ROAD_QUALITIES,
-    get_season_display_name
+    calculate_seasonal_tier,
+    get_season_display_name,
 )
 
 cat_bp = Blueprint('cat', __name__, url_prefix='/api/cat')
@@ -33,6 +43,7 @@ ALLOWED_EXTENSIONS = {'csv', 'geojson', 'json'}
 
 # Ensure upload folder exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -114,7 +125,7 @@ def _build_desert_score_lookup(db, regions, season=SEASON_YEAR_ROUND):
 
     sites_by_region = {}
     specialist_regions = set()
-    for site in sites:
+    for site in active_sites:
         if not site.region_code:
             continue
         sites_by_region[site.region_code] = sites_by_region.get(site.region_code, 0) + 1
@@ -122,7 +133,7 @@ def _build_desert_score_lookup(db, regions, season=SEASON_YEAR_ROUND):
             specialist_regions.add(site.region_code)
 
     score_lookup = {}
-    clinic_types = {'clinic', 'health_center', 'community_health_center'}
+    clinic_types = DESERT_CLINIC_SITE_TYPES
 
     for region in regions:
         if region.centroid_lat is None or region.centroid_lon is None:
@@ -307,6 +318,8 @@ def _matches_status_filter(value, status_filter):
     allowed = {
         'telehealthready',
         'communityanchor',
+        'limitedtelehealth',
+        'limited',
         'criticalgap',
         'critical',
         'dataunavailable',
@@ -385,7 +398,7 @@ def _filter_region_summaries(summaries, filters):
 def get_regions():
     """
     Get all regions with optional season adjustment.
-    
+
     Query params:
         tier: Filter by base tier level
         season: 'summer', 'winter', or 'year_round' (adjusts tier levels)
@@ -394,7 +407,7 @@ def get_regions():
     try:
         tier_level = request.args.get('tier', type=int)
         season = request.args.get('season', SEASON_YEAR_ROUND)
-        
+
         if season not in VALID_SEASONS:
             season = SEASON_YEAR_ROUND
 
@@ -407,18 +420,18 @@ def get_regions():
         for region in regions:
             base_tier = region.tier_level
             base_score = region.access_score or 50
-            
+
             # Calculate season-adjusted tier and score
             adjusted_tier, adjusted_score, explanation = _calculate_seasonal_tier(
                 base_tier, base_score, region.properties, season
             )
-            
+
             # Calculate healthcare necessity score
             necessity_data = HealthcareDesertCalculator.calculate_healthcare_necessity_score(
                 db, region.region_code, season
             )
             necessity_score = necessity_data['necessity_score'] if necessity_data else 0
-            
+
             result.append({
                 'id': region.id,
                 'region_name': region.region_name,
@@ -438,7 +451,7 @@ def get_regions():
             })
 
         return jsonify({
-            'regions': result, 
+            'regions': result,
             'total': len(result),
             'season': season,
             'season_display': get_season_display_name(season)
@@ -587,102 +600,8 @@ def search_regions():
 
 
 def _calculate_seasonal_tier(base_tier: int, base_score: float, properties: dict, season: str):
-    """
-    Calculate season-adjusted CAT tier and access score.
-    
-    Winter: Reduces access (tiers can go up: worse)
-    Summer: Maintains or improves access (tiers can go down: better)
-    Year-round: Uses base values
-    
-    Returns: (adjusted_tier, adjusted_score, explanation)
-    """
-    # Get original justification
-    base_explanation = ''
-    if properties:
-        base_explanation = properties.get('tier_justification', '')
-    
-    if season == SEASON_YEAR_ROUND:
-        return base_tier, base_score, base_explanation
-    
-    # Check access modes from properties
-    primary_modes = []
-    if properties:
-        modes_str = properties.get('primary_access_modes', '')
-        primary_modes = [m.strip() for m in modes_str.split(',') if m.strip()]
-    
-    has_road = 'road' in primary_modes
-    has_air = 'air' in primary_modes
-    has_water = 'water' in primary_modes
-    
-    if season == SEASON_WINTER:
-        # Winter restricts seasonal transport
-        tier_penalty = 0
-        score_penalty = 0
-        restricted_modes = []
-        
-        # Water is mostly unavailable in winter
-        if has_water and not has_air:
-            score_penalty += 25
-            restricted_modes.append('water (frozen)')
-        elif has_water:
-            score_penalty += 10
-            restricted_modes.append('water (limited)')
-        
-        # Seasonal roads are harder, and if water freezes and they have no air, they rely solely on roads (Tier 3 max)
-        if has_road:
-            score_penalty += 5  # Roads harder but not impossible
-            if not has_air:
-                tier_penalty = max(tier_penalty, 3 - base_tier)
-        
-        # If a community has no road and no air, they are completely isolated in winter (water freezes)
-        elif not has_air:
-            tier_penalty = max(tier_penalty, 4 - base_tier)
-            
-        # No air = significant penalty for all tiers
-        if not has_air:
-            score_penalty += 20
-        
-        adjusted_tier = min(4, int(base_tier) + int(tier_penalty))
-        adjusted_score = max(0.0, float(base_score) - float(score_penalty))
-        
-        if tier_penalty > 0:
-            explanation = f"Winter access: {', '.join(restricted_modes) if restricted_modes else 'Limited transport'}"
-        else:
-            explanation = f"Winter access: Air available; {base_explanation}"
-        
-        return adjusted_tier, float(f"{adjusted_score:.1f}"), explanation
-    
-    elif season == SEASON_SUMMER:
-        # Summer can improve access slightly for communities with seasonal routes
-        tier_bonus = 0
-        score_bonus = 0
-        
-        # Multi-modal access in summer
-        if has_water and has_air:
-            score_bonus += 10
-        
-        if has_road and has_water:
-            score_bonus += 5
-        
-        # Tier 4 with some access can become Tier 3 in summer
-        if base_tier == 4 and (has_water or has_air):
-            tier_bonus = -1
-        
-        adjusted_tier = max(1, int(base_tier) + int(tier_bonus))
-        adjusted_score = min(100.0, float(base_score) + float(score_bonus))
-        
-        if tier_bonus < 0:
-            explanation = f"Summer access: Seasonal routes available; improved from Tier {base_tier}"
-        elif score_bonus > 0:
-            explanation = f"Summer access: All modes available; {base_explanation}"
-        else:
-            explanation = base_explanation
-        
-        return adjusted_tier, float(f"{adjusted_score:.1f}"), explanation
-    
-    return base_tier, base_score, base_explanation
-
-
+    """Calculate season-adjusted CAT tier and access score."""
+    return calculate_seasonal_tier(base_tier, base_score, properties, season)
 
 
 @cat_bp.route('/regions/<region_code>', methods=['GET'])
@@ -691,10 +610,10 @@ def get_region(region_code):
     db = SessionLocal()
     try:
         region = CATDataHandler.get_region_by_code(db, region_code)
-        
+
         if not region:
             return jsonify({'error': f'Region not found: {region_code}'}), 404
-        
+
         result = {
             'id': region.id,
             'region_name': region.region_name,
@@ -728,9 +647,9 @@ def get_data_points():
         lat = request.args.get('lat', type=float)
         lon = request.args.get('lon', type=float)
         radius_km = request.args.get('radius_km', type=float, default=10)
-        
+
         db = SessionLocal()
-        
+
         if lat and lon:
             data_points = CATDataHandler.get_data_points_in_radius(db, lat, lon, radius_km)
         elif region_code:
@@ -738,7 +657,7 @@ def get_data_points():
         else:
             from database.models import CATDataPoint
             data_points = db.query(CATDataPoint).limit(100).all()
-        
+
         result = []
         for point in data_points:
             result.append({
@@ -754,10 +673,10 @@ def get_data_points():
                 'is_active': point.is_active,
                 'verified': point.verified
             })
-        
+
         db.close()
         return jsonify({'data_points': result, 'count': len(result)}), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -769,25 +688,25 @@ def upload_file():
     try:
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400
-        
+
         file = request.files['file']
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
-        
+
         if not allowed_file(file.filename):
             return jsonify({'error': 'Invalid file type. Allowed: csv, geojson, json'}), 400
-        
+
         # Save file
         filename = secure_filename(file.filename)
         file_path = os.path.join(UPLOAD_FOLDER, filename)
         file.save(file_path)
-        
+
         # Get file info
         file_size = os.path.getsize(file_path)
         file_type = filename.rsplit('.', 1)[1].lower()
         if file_type == 'json':
             file_type = 'geojson'
-        
+
         # Create upload record
         db = SessionLocal()
         upload_data = {
@@ -797,7 +716,7 @@ def upload_file():
             'status': 'pending'
         }
         upload = CATDataHandler.create_upload_record(db, upload_data)
-        
+
         # Process file
         if file_type == 'csv':
             count, message = CATDataImporter.import_csv(db, file_path, upload.id)
@@ -806,15 +725,15 @@ def upload_file():
         else:
             db.close()
             return jsonify({'error': 'Unsupported file type'}), 400
-        
+
         db.close()
-        
+
         return jsonify({
             'message': message,
             'upload_id': upload.id,
             'records_processed': count
         }), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -827,23 +746,23 @@ def check_gating():
         data = request.json
         point_id = data.get('point_id')
         tier_level = data.get('tier_level')
-        
+
         if not point_id or not tier_level:
             return jsonify({'error': 'point_id and tier_level are required'}), 400
-        
+
         db = SessionLocal()
         from database.models import CATDataPoint
         data_point = db.query(CATDataPoint).filter(CATDataPoint.id == point_id).first()
-        
+
         if not data_point:
             db.close()
             return jsonify({'error': 'Data point not found'}), 404
-        
+
         result = CATDataHandler.check_access_gating(db, data_point, tier_level)
         db.close()
-        
+
         return jsonify(result), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -854,9 +773,9 @@ def get_gating_rules():
     try:
         tier_level = request.args.get('tier', type=int)
         db = SessionLocal()
-        
+
         rules = CATDataHandler.get_active_gating_rules(db, tier_level)
-        
+
         result = []
         for rule in rules:
             result.append({
@@ -870,10 +789,10 @@ def get_gating_rules():
                 'is_active': rule.is_active,
                 'priority': rule.priority
             })
-        
+
         db.close()
         return jsonify({'rules': result, 'count': len(result)}), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -884,19 +803,19 @@ def create_gating_rule():
     try:
         data = request.json
         db = SessionLocal()
-        
+
         rule = CATDataHandler.create_gating_rule(db, data)
-        
+
         result = {
             'id': rule.id,
             'rule_name': rule.rule_name,
             'tier_level': rule.tier_level,
             'created_at': rule.created_at.isoformat() if rule.created_at else None
         }
-        
+
         db.close()
         return jsonify(result), 201
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -909,9 +828,9 @@ def get_statistics():
         db = SessionLocal()
         stats = CATDataHandler.get_statistics(db)
         db.close()
-        
+
         return jsonify(stats), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -922,15 +841,16 @@ def get_statistics():
 
 # Path to Alaska boundaries GeoJSON
 BOUNDARIES_FILE = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), 
+    os.path.dirname(os.path.dirname(__file__)),
     'data', 'raw', 'Alaska_Borough_and_Census_Area_Boundaries.geojson'
 )
+
 
 @cat_bp.route('/boundaries', methods=['GET'])
 def get_boundaries():
     """
     Serve Alaska Borough and Census Area boundary polygons.
-    
+
     Returns GeoJSON FeatureCollection with properties:
     - CommunityName: Borough/Census Area name
     - EconomicRegion: Economic region grouping
@@ -943,12 +863,12 @@ def get_boundaries():
                 'error': 'Boundaries file not found',
                 'path': BOUNDARIES_FILE
             }), 404
-        
+
         with open(BOUNDARIES_FILE, 'r') as f:
             geojson = json.load(f)
-        
+
         return jsonify(geojson), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -961,10 +881,10 @@ def get_boundaries_summary():
     try:
         if not os.path.exists(BOUNDARIES_FILE):
             return jsonify({'error': 'Boundaries file not found'}), 404
-        
+
         with open(BOUNDARIES_FILE, 'r') as f:
             geojson = json.load(f)
-        
+
         regions = []
         for feature in geojson.get('features', []):
             props = feature.get('properties', {})
@@ -974,12 +894,12 @@ def get_boundaries_summary():
                 'economic_region': props.get('EconomicRegion'),
                 'is_census_area': props.get('Census_Area') == 'Y'
             })
-        
+
         return jsonify({
             'regions': regions,
             'count': len(regions)
         }), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -992,12 +912,12 @@ def get_boundaries_summary():
 def evaluate_feasibility(region_code):
     """
     Evaluate telehealth feasibility for a region.
-    
+
     This is the authoritative domain-level API for feasibility decisions.
-    
+
     Query params:
         telehealth_mode: Optional - 'video', 'audio', 'store_forward' (CAT-4 only)
-    
+
     Returns:
         Structured feasibility decision with explanation suitable for
         map visualization and policy interpretation.
@@ -1006,7 +926,7 @@ def evaluate_feasibility(region_code):
     try:
         # Get telehealth mode (only applies to CAT-4)
         telehealth_mode = request.args.get('telehealth_mode')
-        
+
         # Look up the region
         region = CATDataHandler.get_region_by_code(db, region_code)
         if not region:
@@ -1014,14 +934,14 @@ def evaluate_feasibility(region_code):
                 'error': f"Region '{region_code}' not found",
                 'decision': 'ERROR'
             }), 404
-        
+
         # Get representative data point for this region
         from database.models import CATDataPoint
         data_point = db.query(CATDataPoint).filter(
             CATDataPoint.region_code == region_code,
             CATDataPoint.is_active == True
         ).order_by(CATDataPoint.timestamp.desc()).first()
-        
+
         # Build base response
         response = {
             'region_code': region.region_code,
@@ -1030,7 +950,7 @@ def evaluate_feasibility(region_code):
             'telehealth_mode': telehealth_mode or 'all',
             'metrics_used': {}
         }
-        
+
         # No data point available
         if not data_point:
             response.update({
@@ -1040,25 +960,25 @@ def evaluate_feasibility(region_code):
                 'explanation': 'No connectivity data available for this region'
             })
             return jsonify(response), 200
-        
+
         # Add metrics to response
         response['metrics_used'] = {
             'bandwidth_mbps': data_point.throughput_mbps,
             'latency_ms': data_point.latency_ms,
             'access_score': data_point.access_quality
         }
-        
+
         # Apply tier-appropriate gating logic
         if region.tier_level == 4:
             # CAT-4: Use mode-aware telehealth feasibility
             result = CATDataHandler.check_cat4_telehealth_feasibility(
                 data_point, telehealth_mode
             )
-            
+
             response['feasible'] = result['feasible']
             response['decision'] = 'FEASIBLE' if result['feasible'] else 'NOT_FEASIBLE'
             response['mode_results'] = result['mode_results']
-            
+
             if not result['feasible'] and result['failure_reasons']:
                 expl_str = str(result['failure_reasons'][0])
                 response['explanation'] = expl_str
@@ -1078,20 +998,21 @@ def evaluate_feasibility(region_code):
         else:
             # CAT-1/2/3: Use standard gating logic
             result = CATDataHandler.check_access_gating(db, data_point, region.tier_level)
-            
+
             response['feasible'] = result['allowed']
             response['decision'] = 'FEASIBLE' if result['allowed'] else 'NOT_FEASIBLE'
-            
+
             if not result['allowed'] and result['failed_rules']:
                 first_failure = result['failed_rules'][0]
                 response['failed_gate'] = first_failure['rule']
-                response['explanation'] = first_failure['reasons'][0] if first_failure['reasons'] else 'Gating rule failed'
+                reasons = first_failure['reasons']
+                response['explanation'] = reasons[0] if reasons else 'Gating rule failed'
             else:
                 response['failed_gate'] = None
                 response['explanation'] = 'All gating rules passed'
-        
+
         return jsonify(response), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e), 'decision': 'ERROR'}), 500
     finally:
@@ -1109,16 +1030,16 @@ def get_healthcare_sites():
     try:
         region_code = request.args.get('region_code')
         site_type = request.args.get('site_type')
-        
+
         query = db.query(HealthcareSite)
-        
+
         if region_code:
             query = query.filter(HealthcareSite.region_code == region_code)
         if site_type:
             query = query.filter(HealthcareSite.site_type == site_type)
-        
+
         sites = query.all()
-        
+
         result = [{
             'id': site.id,
             'name': site.name,
@@ -1131,9 +1052,9 @@ def get_healthcare_sites():
             'services': site.services,
             'address': site.address
         } for site in sites]
-        
+
         return jsonify({'sites': result, 'count': len(result)}), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -1146,10 +1067,10 @@ def create_healthcare_site():
     db = SessionLocal()
     try:
         data = request.json
-        
+
         if not data.get('name') or not data.get('latitude') or not data.get('longitude'):
             return jsonify({'error': 'name, latitude, and longitude are required'}), 400
-        
+
         site = HealthcareSite(
             name=data['name'],
             site_type=data.get('site_type', 'clinic'),
@@ -1161,15 +1082,15 @@ def create_healthcare_site():
             services=data.get('services'),
             address=data.get('address')
         )
-        
+
         db.add(site)
         db.commit()
-        
+
         return jsonify({
             'id': site.id,
             'message': 'Healthcare site created'
         }), 201
-        
+
     except Exception as e:
         db.rollback()
         return jsonify({'error': str(e)}), 500
@@ -1182,7 +1103,7 @@ def get_healthcare_necessity(region_code):
     """
     Get healthcare necessity score for a region.
     Higher score = greater need for telehealth (0-100).
-    
+
     Query params:
         season: 'summer', 'winter', or 'year_round' (default: year_round)
         road_quality: 'highway', 'local', or 'seasonal' (default: local)
@@ -1193,17 +1114,17 @@ def get_healthcare_necessity(region_code):
         season = request.args.get('season', SEASON_YEAR_ROUND)
         if season not in VALID_SEASONS:
             season = SEASON_YEAR_ROUND
-        
+
         road_quality = request.args.get('road_quality', ROAD_QUALITY_LOCAL)
         if road_quality not in VALID_ROAD_QUALITIES:
             road_quality = ROAD_QUALITY_LOCAL
-        
+
         result = HealthcareDesertCalculator.calculate_healthcare_necessity_score(
             db, region_code, season, road_quality
         )
-        
+
         return jsonify(result), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -1214,7 +1135,7 @@ def get_healthcare_necessity(region_code):
 def get_all_healthcare_necessity():
     """
     Get necessity scores for all regions, sorted by score (highest first).
-    
+
     Query params:
         season: 'summer', 'winter', or 'year_round' (default: year_round)
         road_quality: 'highway', 'local', or 'seasonal' (default: local)
@@ -1224,20 +1145,20 @@ def get_all_healthcare_necessity():
         season = request.args.get('season', SEASON_YEAR_ROUND)
         if season not in VALID_SEASONS:
             season = SEASON_YEAR_ROUND
-        
+
         road_quality = request.args.get('road_quality', ROAD_QUALITY_LOCAL)
         if road_quality not in VALID_ROAD_QUALITIES:
             road_quality = ROAD_QUALITY_LOCAL
-        
+
         results = HealthcareDesertCalculator.get_all_region_scores(db, season, road_quality)
-        
+
         return jsonify({
             'regions': results,
             'count': len(results),
             'season_applied': season,
             'season_display': get_season_display_name(season)
         }), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -1250,11 +1171,11 @@ def get_telehealth_priority(region_code):
     Calculate telehealth deployment priority by combining:
     - Healthcare necessity (desert score) - season-adjusted
     - Internet feasibility (CAT tier score)
-    
+
     Query params:
         season: 'summer', 'winter', or 'year_round' (default: year_round)
         road_quality: 'highway', 'local', or 'seasonal' (default: local)
-    
+
     Returns priority classification: HIGH, CRITICAL, MODERATE, LOW
     """
     db = SessionLocal()
@@ -1263,22 +1184,22 @@ def get_telehealth_priority(region_code):
         season = request.args.get('season', SEASON_YEAR_ROUND)
         if season not in VALID_SEASONS:
             season = SEASON_YEAR_ROUND
-        
+
         road_quality = request.args.get('road_quality', ROAD_QUALITY_LOCAL)
         if road_quality not in VALID_ROAD_QUALITIES:
             road_quality = ROAD_QUALITY_LOCAL
-        
+
         # Get region
         region = CATDataHandler.get_region_by_code(db, region_code)
         if not region:
             return jsonify({'error': f'Region {region_code} not found'}), 404
-        
+
         # 1. Calculate healthcare necessity (season-adjusted)
         necessity = HealthcareDesertCalculator.calculate_healthcare_necessity_score(
             db, region_code, season, road_quality
         )
         necessity_score = necessity['necessity_score']
-        
+
         # 2. Get internet feasibility
         from database.models import CATDataPoint, BroadbandCoverage
         data_point = db.query(CATDataPoint).filter(
@@ -1293,21 +1214,25 @@ def get_telehealth_priority(region_code):
 
         if broadband and broadband.wired_25mbps_pct is not None and broadband.wired_25mbps_pct >= 0:
             # Prefer wired connectivity percentage to avoid 100% satellite false-positives in remote areas
-            connectivity_score = round(broadband.wired_25mbps_pct * 100)
-        elif broadband and broadband.any_tech_25mbps_pct is not None and broadband.primary_access != 'SATELLITE_DEPENDENT':
-            connectivity_score = round(broadband.any_tech_25mbps_pct * 100)
+            connectivity_score = round(normalize_fcc_pct(broadband.wired_25mbps_pct) or 0)
+        elif (
+            broadband
+            and broadband.any_tech_25mbps_pct is not None
+            and broadband.primary_access != 'SATELLITE_DEPENDENT'
+        ):
+            connectivity_score = round(normalize_fcc_pct(broadband.any_tech_25mbps_pct) or 0)
         elif data_point and data_point.throughput_mbps is not None:
             # Scale throughput mbps to a score (0 to 100) assuming 100 Mbps is an ideal connection
             connectivity_score = min(100, round((data_point.throughput_mbps / 100.0) * 100))
         elif broadband and broadband.any_tech_25mbps_pct is not None:
             # Fallback to any_tech but severely penalize if satellite dependent
-            connectivity_score = round((broadband.any_tech_25mbps_pct * 100) / 2)
+            connectivity_score = round((normalize_fcc_pct(broadband.any_tech_25mbps_pct) or 0) / 2)
         else:
             connectivity_score = 0
-        
+
         # 3. Determine priority classification with season-contextual recommendations
         season_display = get_season_display_name(season)
-        
+
         # Season-specific context for recommendations
         if season == SEASON_WINTER:
             season_context = "Winter conditions limit transport options. "
@@ -1318,7 +1243,7 @@ def get_telehealth_priority(region_code):
         else:
             season_context = "Year-round average conditions. "
             transport_note = "Conservative transport assumptions."
-        
+
         if necessity_score > HIGH_NECESSITY_THRESHOLD:
             if connectivity_score > HIGH_CONNECTIVITY_THRESHOLD:
                 priority = 'HIGH'
@@ -1329,70 +1254,88 @@ def get_telehealth_priority(region_code):
                 priority = 'CRITICAL'
                 color = '#ef4444'  # Red
                 label = f'Infrastructure Gap ({season_display})'
-                recommendation = f'{season_context}Critical need but insufficient connectivity. {transport_note} Prioritize infrastructure investment.'
+                recommendation = (
+                    f'{season_context}Critical need but insufficient connectivity. '
+                    f'{transport_note} Prioritize infrastructure investment.'
+                )
             else:  # Moderate connectivity (40-60)
                 priority = 'MODERATE'
                 color = '#f97316'  # Orange
                 label = f'Mixed Priority ({season_display})'
-                recommendation = f'{season_context}High need with moderate connectivity. Consider store-and-forward telehealth.'
-                
+                recommendation = (
+                    f'{season_context}High need with moderate connectivity. '
+                    'Consider store-and-forward telehealth.'
+                )
+
         elif necessity_score > MODERATE_NECESSITY_THRESHOLD:
             if connectivity_score > HIGH_CONNECTIVITY_THRESHOLD:
                 priority = 'MODERATE'
                 color = '#eab308'  # Yellow
                 label = f'Consider Telehealth ({season_display})'
-                recommendation = f'{season_context}Moderate need with good connectivity. Good candidate for pilot programs.'
+                recommendation = (
+                    f'{season_context}Moderate need with good connectivity. '
+                    'Good candidate for pilot programs.'
+                )
             else:
                 priority = 'LOW'
                 color = '#3b82f6'  # Blue
                 label = f'Lower Priority ({season_display})'
                 recommendation = f'{season_context}Moderate need with limited connectivity. {transport_note}'
-                
+
         else:
             priority = 'LOW'
             color = '#3b82f6'  # Blue
             label = f'Adequate Access ({season_display})'
             recommendation = f'{season_context}In-person care is accessible. Telehealth not priority.'
-        
+
         response = {
             'region_code': region_code,
             'region_name': region.region_name,
             'cat_tier': region.tier_level,
-            
+
             # Scores
             'necessity_score': necessity_score,
             'connectivity_score': connectivity_score,
             'combined_priority': round((necessity_score * connectivity_score) / 100, 2),
-            
+
             # Classification
             'priority': priority,
             'color': color,
             'label': label,
             'recommendation': recommendation,
-            
+
             # Season context (explicit)
             'season_scenario': {
                 'active_season': season,
                 'season_display': get_season_display_name(season),
                 'road_quality': road_quality,
-                'assumption': 'User-selected seasonal scenario for planning. '
-                             'Transport difficulty is adjusted based on season.'
+                'assumption': (
+                    'User-selected seasonal scenario for planning. '
+                    'Transport difficulty is adjusted based on season.'
+                )
             },
-            
+
             # Details
             'healthcare_details': necessity,
             'connectivity_details': {
                 'bandwidth_mbps': data_point.throughput_mbps if data_point else None,
                 'latency_ms': data_point.latency_ms if data_point else None,
                 'feasible_for_video': connectivity_score > 60,
-                'coverage_25mbps_pct': round(broadband.any_tech_25mbps_pct * 100) if broadband and broadband.any_tech_25mbps_pct is not None else None,
+                'coverage_25mbps_pct': (
+                    round(normalize_fcc_pct(broadband.any_tech_25mbps_pct))
+                    if broadband and broadband.any_tech_25mbps_pct is not None else None
+                ),
                 'primary_access': broadband.primary_access if broadband else None,
-                'data_source': 'ookla' if (data_point and data_point.throughput_mbps is not None) else ('fcc' if (broadband and broadband.any_tech_25mbps_pct is not None) else None)
+                'data_source': (
+                    'ookla'
+                    if (data_point and data_point.throughput_mbps is not None)
+                    else ('fcc' if (broadband and broadband.any_tech_25mbps_pct is not None) else None)
+                )
             }
         }
-        
+
         return jsonify(response), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -1407,42 +1350,42 @@ def get_telehealth_priority(region_code):
 def get_broadband_coverage():
     """
     Get broadband coverage data with data gap indicators.
-    
+
     Query params:
         confidence: Filter by confidence level (HIGH, MEDIUM, LOW)
         telehealth_viable: Filter by viability (YES, NO, UNCERTAIN)
         primary_access: Filter by access type (WIRED, SATELLITE, LIMITED)
         has_gaps: If 'true', return only places with data gaps
-    
+
     Returns:
         List of broadband coverage records with data quality flags
     """
     from database.models import BroadbandCoverage
-    
+
     db = SessionLocal()
     try:
         query = db.query(BroadbandCoverage)
-        
+
         # Apply filters
         confidence = request.args.get('confidence')
         if confidence:
             query = query.filter(BroadbandCoverage.confidence == confidence.upper())
-        
+
         telehealth_viable = request.args.get('telehealth_viable')
         if telehealth_viable:
             query = query.filter(BroadbandCoverage.telehealth_viable == telehealth_viable.upper())
-        
+
         primary_access = request.args.get('primary_access')
         if primary_access:
             query = query.filter(BroadbandCoverage.primary_access == primary_access.upper())
-        
+
         has_gaps = request.args.get('has_gaps')
         if has_gaps and has_gaps.lower() == 'true':
             query = query.filter(BroadbandCoverage.data_gaps.isnot(None))
-        
+
         # Order by place name
         records = query.order_by(BroadbandCoverage.place_name).all()
-        
+
         result = []
         for r in records:
             result.append({
@@ -1450,11 +1393,11 @@ def get_broadband_coverage():
                 'place_name': r.place_name,
                 'residential_units': r.residential_units,
                 'coverage': {
-                    'any_tech_25mbps_pct': r.any_tech_25mbps_pct,
-                    'any_tech_100mbps_pct': r.any_tech_100mbps_pct,
-                    'wired_25mbps_pct': r.wired_25mbps_pct,
-                    'ngso_satellite_25mbps_pct': r.ngso_satellite_25mbps_pct,
-                    'fiber_25mbps_pct': r.fiber_25mbps_pct
+                    'any_tech_25mbps_pct': normalize_fcc_pct(r.any_tech_25mbps_pct),
+                    'any_tech_100mbps_pct': normalize_fcc_pct(r.any_tech_100mbps_pct),
+                    'wired_25mbps_pct': normalize_fcc_pct(r.wired_25mbps_pct),
+                    'ngso_satellite_25mbps_pct': normalize_fcc_pct(r.ngso_satellite_25mbps_pct),
+                    'fiber_25mbps_pct': normalize_fcc_pct(r.fiber_25mbps_pct),
                 },
                 'confidence': r.confidence,
                 'data_gaps': r.data_gaps.split(';') if r.data_gaps else [],
@@ -1463,7 +1406,7 @@ def get_broadband_coverage():
                 'region_code': r.region_code,
                 'data_source': r.data_source
             })
-        
+
         # Summary statistics
         total = len(result)
         by_confidence = {
@@ -1472,7 +1415,7 @@ def get_broadband_coverage():
             'LOW': sum(1 for r in result if r['confidence'] == 'LOW')
         }
         with_gaps = sum(1 for r in result if r['data_gaps'])
-        
+
         return jsonify({
             'broadband': result,
             'count': total,
@@ -1483,7 +1426,7 @@ def get_broadband_coverage():
                 'low_confidence': by_confidence['LOW']
             }
         }), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -1494,26 +1437,26 @@ def get_broadband_coverage():
 def get_broadband_by_place(place_id):
     """Get broadband coverage for a specific place by ID."""
     from database.models import BroadbandCoverage
-    
+
     db = SessionLocal()
     try:
         record = db.query(BroadbandCoverage).filter(
             BroadbandCoverage.place_id == place_id
         ).first()
-        
+
         if not record:
             return jsonify({'error': f'Place not found: {place_id}'}), 404
-        
+
         return jsonify({
             'place_id': record.place_id,
             'place_name': record.place_name,
             'residential_units': record.residential_units,
             'coverage': {
-                'any_tech_25mbps_pct': record.any_tech_25mbps_pct,
-                'any_tech_100mbps_pct': record.any_tech_100mbps_pct,
-                'wired_25mbps_pct': record.wired_25mbps_pct,
-                'ngso_satellite_25mbps_pct': record.ngso_satellite_25mbps_pct,
-                'fiber_25mbps_pct': record.fiber_25mbps_pct
+                'any_tech_25mbps_pct': normalize_fcc_pct(record.any_tech_25mbps_pct),
+                'any_tech_100mbps_pct': normalize_fcc_pct(record.any_tech_100mbps_pct),
+                'wired_25mbps_pct': normalize_fcc_pct(record.wired_25mbps_pct),
+                'ngso_satellite_25mbps_pct': normalize_fcc_pct(record.ngso_satellite_25mbps_pct),
+                'fiber_25mbps_pct': normalize_fcc_pct(record.fiber_25mbps_pct),
             },
             'confidence': record.confidence,
             'data_gaps': record.data_gaps.split(';') if record.data_gaps else [],
@@ -1522,7 +1465,7 @@ def get_broadband_by_place(place_id):
             'region_code': record.region_code,
             'data_source': record.data_source
         }), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -1533,16 +1476,16 @@ def get_broadband_by_place(place_id):
 def get_data_gaps_summary():
     """
     Get a summary of all data gaps across the system.
-    
+
     Returns counts and lists of places with specific data quality issues,
     supporting the 'data coverage/confidence' layer visualization.
     """
     from database.models import BroadbandCoverage
-    
+
     db = SessionLocal()
     try:
         all_records = db.query(BroadbandCoverage).all()
-        
+
         # Aggregate gap statistics
         gap_stats = {
             'SATELLITE_DEPENDENT': [],
@@ -1552,7 +1495,7 @@ def get_data_gaps_summary():
             'MISSING_WIRED_DATA': [],
             'MISSING_SATELLITE_DATA': []
         }
-        
+
         for r in all_records:
             if r.data_gaps:
                 gaps = r.data_gaps.split(';')
@@ -1565,14 +1508,14 @@ def get_data_gaps_summary():
                             'place_name': r.place_name,
                             'confidence': r.confidence
                         })
-        
+
         # Build response
         summary = {
             'total_places': len(all_records),
             'places_with_gaps': sum(1 for r in all_records if r.data_gaps),
             'gap_breakdown': {}
         }
-        
+
         for gap_type, places in gap_stats.items():
             pct = len(places) / max(1, len(all_records)) * 100.0 if all_records else 0.0
             bd = summary['gap_breakdown']
@@ -1582,30 +1525,76 @@ def get_data_gaps_summary():
                     'percentage': round(float(pct), 1),  # type: ignore
                     'places': list(places)[:10]  # type: ignore
                 }
-        
+
         # Confidence distribution
         summary['confidence_distribution'] = {
             'HIGH': sum(1 for r in all_records if r.confidence == 'HIGH'),
             'MEDIUM': sum(1 for r in all_records if r.confidence == 'MEDIUM'),
             'LOW': sum(1 for r in all_records if r.confidence == 'LOW')
         }
-        
+
         # Telehealth viability
         summary['telehealth_viability'] = {
             'YES': sum(1 for r in all_records if r.telehealth_viable == 'YES'),
             'NO': sum(1 for r in all_records if r.telehealth_viable == 'NO'),
             'UNCERTAIN': sum(1 for r in all_records if r.telehealth_viable == 'UNCERTAIN')
         }
-        
+
         # Primary access type
         summary['primary_access'] = {
             'WIRED': sum(1 for r in all_records if r.primary_access == 'WIRED'),
             'SATELLITE': sum(1 for r in all_records if r.primary_access == 'SATELLITE'),
             'LIMITED': sum(1 for r in all_records if r.primary_access == 'LIMITED')
         }
-        
+
+        # Multi-dataset join completeness across CAT communities
+        regions = db.query(CATRegion).all()
+        total_communities = len(regions)
+        if regions:
+            contexts = TelehealthClassificationService.classify_regions(db, regions)
+            fcc_matched = sum(1 for ctx in contexts.values() if ctx.broadband is not None)
+            ookla_matched = sum(1 for ctx in contexts.values() if ctx.ookla is not None)
+            acs_matched = sum(1 for ctx in contexts.values() if ctx.income is not None)
+            linked_codes = {
+                code for (code,) in db.query(HealthcareSite.region_code).filter(
+                    HealthcareSite.region_code.isnot(None),
+                    HealthcareSite.is_active == True,
+                ).distinct().all()
+            }
+            healthcare_linked = sum(1 for region in regions if region.region_code in linked_codes)
+        else:
+            fcc_matched = 0
+            ookla_matched = 0
+            acs_matched = 0
+            healthcare_linked = 0
+
+        def _pct(matched: int, total: int) -> float:
+            return round((matched / total) * 100.0, 1) if total > 0 else 0.0
+
+        summary['dataset_coverage'] = {
+            'total_communities': total_communities,
+            'fcc_broadband': {
+                'matched': fcc_matched,
+                'pct': _pct(fcc_matched, total_communities),
+            },
+            'ookla_performance': {
+                'matched': ookla_matched,
+                'pct': _pct(ookla_matched, total_communities),
+                'window_km': MAX_OOKLA_MATCH_KM,
+            },
+            'acs_income': {
+                'matched': acs_matched,
+                'pct': _pct(acs_matched, total_communities),
+                'window_km': MAX_INCOME_MATCH_KM,
+            },
+            'healthcare_sites': {
+                'linked': healthcare_linked,
+                'pct': _pct(healthcare_linked, total_communities),
+            },
+        }
+
         return jsonify(summary), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -1620,7 +1609,7 @@ def get_data_gaps_summary():
 def get_region_affordability(region_code):
     """
     Get affordability analysis for a specific region.
-    
+
     Uses ZCTA income data with fallback to nearest ZCTA if exact match not found.
     """
     db = SessionLocal()
@@ -1628,29 +1617,29 @@ def get_region_affordability(region_code):
         region = CATDataHandler.get_region_by_code(db, region_code)
         if not region or not region.centroid_lat:
             return jsonify({'error': 'Region not found'}), 404
-        
+
         # Find nearest ZCTA with income data
         lat_range = 0.5  # ~55km
         lon_range = 1.0  # ~55km at high latitudes
-        
+
         candidates = db.query(CensusIncome).filter(
             CensusIncome.median_income.isnot(None),
             CensusIncome.median_income > 0,
             CensusIncome.centroid_lat.between(region.centroid_lat - lat_range, region.centroid_lat + lat_range),
             CensusIncome.centroid_lon.between(region.centroid_lon - lon_range, region.centroid_lon + lon_range)
         ).all()
-        
+
         # Find closest ZCTA
         best = None
         min_dist = float('inf')
-        
+
         for c in candidates:
             if c.centroid_lat and c.centroid_lon:
                 dist = _haversine_km(region.centroid_lat, region.centroid_lon, c.centroid_lat, c.centroid_lon)
                 if dist < min_dist:
                     min_dist = dist
                     best = c
-        
+
         if best is None:
             # No income data found - return unavailable status
             return jsonify({
@@ -1660,7 +1649,7 @@ def get_region_affordability(region_code):
                 'region_code': region_code,
                 'region_name': region.region_name
             }), 200
-        
+
         # Calculate affordability
         assert best is not None
         zcta_str = str(best.zcta) if hasattr(best, 'zcta') and best.zcta else ""
@@ -1668,13 +1657,13 @@ def get_region_affordability(region_code):
         med_inc = float(getattr(best, 'median_income', 0) or 0)
         monthly_income = med_inc / 12.0
         burden_pct = float((cost / monthly_income) * 100.0) if monthly_income > 0 else 100.0
-        
-        t_conf = _ISP_CONFIG.get('thresholds', {})
-        t_val = t_conf.get('affordability_burden_pct', 2.0) if isinstance(t_conf, dict) else 2.0
-        threshold = float(t_val) if isinstance(t_val, (int, float)) else 2.0
-        
-        is_affordable = bool(burden_pct < threshold)
-        
+
+        threshold = get_affordability_threshold()
+
+        is_affordable = bool(
+            burden_pct < threshold and float(cost) <= ABSOLUTE_COST_LIMIT
+        )
+
         return jsonify({
             'has_income_data': True,
             'income_source': 'ZCTA',
@@ -1691,7 +1680,7 @@ def get_region_affordability(region_code):
             'region_code': region_code,
             'region_name': region.region_name
         }), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -1702,7 +1691,7 @@ def get_region_affordability(region_code):
 def get_region_safety_net(region_code):
     """
     Get safety net classification for a region based on clinic proximity.
-    
+
     Classifications:
     - COMMUNITY_SUPPORTED: Clinic within threshold distance
     - CRITICAL: No clinic nearby AND unaffordable home internet
@@ -1713,28 +1702,28 @@ def get_region_safety_net(region_code):
         region = CATDataHandler.get_region_by_code(db, region_code)
         if not region or not region.centroid_lat:
             return jsonify({'error': 'Region not found'}), 404
-        
+
         # Determine distance threshold based on access mode
         properties = region.properties or {}
         access_modes = properties.get('primary_access_modes', '')
-        
+
         # Air-only communities need larger radius (50km), road-connected use 10km
         if 'road' in access_modes.lower():
             distance_threshold_km = 10
         else:
             distance_threshold_km = 50  # Air/water access communities
-        
+
         # Find nearby healthcare facilities
         facilities = db.query(HealthcareSite).filter(
             HealthcareSite.is_active == True,
             HealthcareSite.latitude.isnot(None),
             HealthcareSite.longitude.isnot(None)
         ).all()
-        
+
         # Calculate distances and find nearest clinic
         nearest_clinic = None
         nearest_distance = float('inf')
-        
+
         for facility in facilities:
             dist = _haversine_km(
                 region.centroid_lat, region.centroid_lon,
@@ -1743,9 +1732,9 @@ def get_region_safety_net(region_code):
             if dist < nearest_distance and facility.site_type in ['clinic', 'hospital', 'health_center']:
                 nearest_distance = dist
                 nearest_clinic = facility
-        
+
         has_nearby_clinic = nearest_distance <= distance_threshold_km
-        
+
         # Determine classification
         if has_nearby_clinic:
             classification = 'COMMUNITY_SUPPORTED'
@@ -1760,24 +1749,29 @@ def get_region_safety_net(region_code):
                 CensusIncome.median_income > 0,
                 CensusIncome.centroid_lat.between(region.centroid_lat - lat_range, region.centroid_lat + lat_range),
                 CensusIncome.centroid_lon.between(region.centroid_lon - lon_range, region.centroid_lon + lon_range)
-            ).first() # Simplified lookup for speed
-            
+            ).first()  # Simplified lookup for speed
+
             is_affordable = False
             if candidate:
                 cost, _ = _get_regional_internet_cost(candidate.zcta)
                 monthly_income = candidate.median_income / 12
-                if monthly_income > 0 and (cost / monthly_income) * 100 < 2.0:
+                threshold = get_affordability_threshold()
+                if (
+                    monthly_income > 0
+                    and (cost / monthly_income) * 100 < threshold
+                    and float(cost) <= ABSOLUTE_COST_LIMIT
+                ):
                     is_affordable = True
 
             if is_affordable:
                 classification = 'AT_RISK'
-                color = '#f97316' # Orange
+                color = '#f97316'  # Orange
                 description = f'Affordable internet but no nearby healthcare ({distance_threshold_km}km)'
             else:
                 classification = 'CRITICAL'
-                color = '#ef4444' # Red
+                color = '#ef4444'  # Red
                 description = f'No healthcare facility within {distance_threshold_km}km and unaffordable internet'
-        
+
         return jsonify({
             'region_code': region_code,
             'region_name': region.region_name,
@@ -1793,7 +1787,7 @@ def get_region_safety_net(region_code):
             'classification_color': color,
             'description': description
         }), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -1804,7 +1798,7 @@ def get_region_safety_net(region_code):
 def get_region_telehealth_status(region_code):
     """
     Get composite telehealth access status for a region.
-    
+
     Uses the canonical Ookla/FCC, affordability, and clinic-access classifier.
     """
     db = SessionLocal()
@@ -1841,7 +1835,7 @@ def get_region_telehealth_status(region_code):
                 'threshold_km': classification.clinic_threshold_km,
             },
         }), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -1898,7 +1892,7 @@ def get_all_telehealth_status():
             'count': len(results),
             'summary': summary
         }), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -1908,11 +1902,12 @@ def get_all_telehealth_status():
 # Healthcare Facility Endpoints
 # =============================================================================
 
+
 @cat_bp.route('/healthcare', methods=['GET'])
 def get_healthcare_facilities():
     """
     Get all healthcare facilities with optional filtering.
-    
+
     Query params:
         type: Filter by facility type (hospital, clinic, pharmacy)
         region: Filter by CAT region code
@@ -1922,23 +1917,23 @@ def get_healthcare_facilities():
     db = SessionLocal()
     try:
         query = db.query(HealthcareSite).filter(HealthcareSite.is_active == True)
-        
+
         # Apply filters
         facility_type = request.args.get('type')
         if facility_type:
             query = query.filter(HealthcareSite.site_type == facility_type)
-        
+
         region_code = request.args.get('region')
         if region_code:
             query = query.filter(HealthcareSite.region_code == region_code)
-        
+
         emergency_only = request.args.get('emergency')
         if emergency_only and emergency_only.lower() == 'true':
             query = query.filter(HealthcareSite.has_emergency == True)
-        
+
         limit = request.args.get('limit', 100, type=int)
         sites = query.limit(limit).all()
-        
+
         result = []
         for s in sites:
             result.append({
@@ -1957,7 +1952,7 @@ def get_healthcare_facilities():
                 'beds': s.beds,
                 'services': s.services
             })
-        
+
         # Summary stats
         all_sites = db.query(HealthcareSite).filter(HealthcareSite.is_active == True).all()
         summary = {
@@ -1968,13 +1963,13 @@ def get_healthcare_facilities():
             'with_emergency': sum(1 for s in all_sites if s.has_emergency),
             'with_telehealth': sum(1 for s in all_sites if s.has_telehealth)
         }
-        
+
         return jsonify({
             'facilities': result,
             'count': len(result),
             'summary': summary
         }), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -1987,10 +1982,10 @@ def get_healthcare_facility(facility_id):
     db = SessionLocal()
     try:
         site = db.query(HealthcareSite).filter(HealthcareSite.id == facility_id).first()
-        
+
         if not site:
             return jsonify({'error': 'Facility not found'}), 404
-        
+
         return jsonify({
             'id': site.id,
             'name': site.name,
@@ -2010,7 +2005,7 @@ def get_healthcare_facility(facility_id):
             'is_active': site.is_active,
             'verified': site.verified
         }), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -2026,37 +2021,37 @@ def get_healthcare_by_region(region_code):
     db = SessionLocal()
     try:
         from math import radians, sin, cos, sqrt, atan2
-        
+
         def haversine(lat1, lon1, lat2, lon2):
             R = 6371  # km
             lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
             dlat, dlon = lat2 - lat1, lon2 - lon1
             a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
             return R * 2 * atan2(sqrt(a), sqrt(1-a))
-        
+
         # Get region
         region = db.query(CATRegion).filter(CATRegion.region_code == region_code).first()
         if not region:
             return jsonify({'error': 'Region not found'}), 404
-        
+
         if not region.centroid_lat or not region.centroid_lon:
             return jsonify({'error': 'Region has no centroid coordinates'}), 400
-        
+
         # Get all facilities
         facilities = db.query(HealthcareSite).filter(HealthcareSite.is_active == True).all()
-        
+
         # Calculate distances and sort
         facilities_with_dist = []
         for f in facilities:
             dist = haversine(region.centroid_lat, region.centroid_lon, f.latitude, f.longitude)
             facilities_with_dist.append((f, dist))
-        
+
         # Sort by distance
         facilities_with_dist.sort(key=lambda x: x[1])
-        
+
         # Return top limit nearest
         limit = request.args.get('limit', 20, type=int)
-        
+
         result = []
         for f, dist in list(facilities_with_dist)[:limit]:  # type: ignore
             result.append({
@@ -2070,11 +2065,11 @@ def get_healthcare_by_region(region_code):
                 'has_specialists': f.has_specialists,
                 'phone': f.phone
             })
-        
+
         # Summary - find nearest hospital and clinic with their distances
         nearest_hospital_tuple = next(((f, d) for f, d in facilities_with_dist if f.site_type == 'hospital'), None)
         nearest_clinic_tuple = next(((f, d) for f, d in facilities_with_dist if f.site_type == 'clinic'), None)
-        
+
         return jsonify({
             'region_code': region_code,
             'region_name': region.region_name,
@@ -2090,7 +2085,6 @@ def get_healthcare_by_region(region_code):
             } if nearest_clinic_tuple else None
         }), 200
 
-        
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -2103,7 +2097,7 @@ def get_healthcare_summary():
     db = SessionLocal()
     try:
         facilities = db.query(HealthcareSite).filter(HealthcareSite.is_active == True).all()
-        
+
         summary = {
             'total_facilities': len(facilities),
             'by_type': {
@@ -2111,7 +2105,10 @@ def get_healthcare_summary():
                 'clinic': sum(1 for f in facilities if f.site_type == 'clinic'),
                 'pharmacy': sum(1 for f in facilities if f.site_type == 'pharmacy'),
                 'health_center': sum(1 for f in facilities if f.site_type == 'health_center'),
-                'other': sum(1 for f in facilities if f.site_type not in ['hospital', 'clinic', 'pharmacy', 'health_center'])
+                'other': sum(
+                    1 for f in facilities
+                    if f.site_type not in ['hospital', 'clinic', 'pharmacy', 'health_center']
+                )
             },
             'features': {
                 'with_emergency': sum(1 for f in facilities if f.has_emergency),
@@ -2126,9 +2123,9 @@ def get_healthcare_summary():
                 'unverified': sum(1 for f in facilities if not f.verified)
             }
         }
-        
+
         return jsonify(summary), 200
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
@@ -2221,8 +2218,10 @@ def scenario_preview():
         # Coerce provided threshold values to proper types. Omitted keys should
         # remain omitted so ScenarioEngine can apply baseline defaults.
         thresholds = {}
-        for key in ('min_download_mbps', 'min_upload_mbps', 'max_latency_ms',
-                     'clinic_proximity_km', 'affordability_burden_pct'):
+        for key in (
+            'min_download_mbps', 'min_upload_mbps', 'max_latency_ms',
+            'clinic_proximity_km', 'affordability_burden_pct',
+        ):
             if key not in thresholds_raw:
                 continue
             value = thresholds_raw.get(key)

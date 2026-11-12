@@ -7,9 +7,9 @@ from database.models import HealthcareSite
 
 def seed_sample_healthcare_sites():
     """Add sample Alaska healthcare sites for testing"""
-    
+
     db = SessionLocal()
-    
+
     sample_sites = [
         {
             'name': 'Alaska Native Medical Center',
@@ -112,14 +112,14 @@ def seed_sample_healthcare_sites():
             'services': ['primary_care']
         }
     ]
-    
+
     count = 0
     for site_data in sample_sites:
         # Check if exists
         existing = db.query(HealthcareSite).filter(
             HealthcareSite.name == site_data['name']
         ).first()
-        
+
         if not existing:
             site = HealthcareSite(**site_data)
             db.add(site)
@@ -127,10 +127,10 @@ def seed_sample_healthcare_sites():
             count += 1
         else:
             print(f"  - Skipped {site_data['name']} (already exists)")
-    
+
     db.commit()
     db.close()
-    
+
     print(f"\n✓ Healthcare sites seeding complete! Added {count} new sites.")
     return count
 
