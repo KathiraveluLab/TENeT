@@ -127,7 +127,7 @@ TENeT/
 │   ├── routes/               CAT and network-performance API routes
 │   ├── services/             Classification, profiles, scenarios, and data logic
 │   ├── database/             Models, initialization, and seeders
-│   ├── data/                 Tracked inputs, samples, and ingestion scripts
+│   ├── data/                 Tracked inputs, samples, ingestion, and evaluation scripts
 │   └── tests/                Backend unit and API tests
 ├── docs/diagrams/            Architecture and geospatial workflow SVG diagrams
 ├── docker-compose.yml        Local multi-container stack
@@ -207,6 +207,41 @@ For the checked-in Docker and nginx setup, leave `VITE_API_BASE_URL` at `/api/ca
 ## Quality and deployment
 
 GitHub Actions runs backend `flake8` linting, backend tests, frontend type checks, frontend tests, production builds, Docker build validation, and pull-request Playwright smoke coverage. See [TESTING.md](./TESTING.md) for the full test strategy and [DEPLOY.md](./DEPLOY.md) for production deployment, readiness checks, and rollback guidance.
+
+## Scientific reproducibility
+
+The evaluation suite and cross-endpoint consistency checks are tracked directly in the repository so metrics, policy sensitivity sweeps, and latency benchmarks can be reproduced from any SQLite snapshot:
+
+1. **Optional full-dataset refresh:** Ingest external Ookla tiles and Census ACS records before reseeding:
+
+   ```bash
+   python backend/data/scripts/ingest_ookla.py
+   python backend/data/scripts/ingest_census.py
+   ```
+
+2. **Cross-endpoint classification audit:** Verify that all map, profile, comparison, and scenario routes report consistent telehealth classifications:
+
+   ```bash
+   python backend/data/scripts/audit_telehealth_consistency.py
+   ```
+
+3. **Single-command evaluation and benchmark suite:** Generate deterministic JSON metrics and LaTeX-ready table summaries covering dataset inventory and proximity metrics (`tab:tenet_metrics`), readiness stratification and missingness bottlenecks, FCC-vs-Ookla concordance, what-if scenario and Starlink `$120/mo` cost sensitivity (`tab:scenario_sensitivity`), spatial join radius ablations (`tab:radius_ablation`), and Flask API latency benchmarks (`tab:latency_bench`):
+
+   ```bash
+   python backend/data/scripts/reproduce_paper_evaluation.py \
+     --db backend/data/tenet.db \
+     --json-out evaluation_summary.json \
+     --tex-out evaluation_tables.tex
+   ```
+
+   Pass `--skip-benchmarks` (and optional `--format json` or `--format tex`) to emit deterministic offline metrics without timed endpoint runs:
+
+   ```bash
+   python backend/data/scripts/reproduce_paper_evaluation.py \
+     --db backend/data/tenet.db \
+     --skip-benchmarks \
+     --format json
+   ```
 
 ## Limitations
 
