@@ -1,7 +1,7 @@
 """
 API routes for Ookla Performance data (Measured Network Performance Layer)
 """
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from sqlalchemy import and_, case, func
 from database.config import SessionLocal
 from database.models import OoklaPerformance, BroadbandCoverage, CATRegion, CensusIncome
@@ -220,8 +220,9 @@ def get_performance():
             'summary': summary
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get performance data")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -333,8 +334,9 @@ def get_service_gaps():
             }
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get service gaps")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -425,8 +427,9 @@ def get_performance_by_region(region_code):
             }
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get performance by region")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -549,8 +552,9 @@ def get_performance_summary():
             ) if speed_count else 0
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get performance summary")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -661,8 +665,9 @@ def get_top_gaps():
             'threshold_mbps': 25
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get top gaps")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -709,8 +714,9 @@ def get_location_name():
 
         return jsonify({'name': 'Remote Alaska Area', 'region': 'Alaska', 'lat': lat, 'lon': lon}), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get location name")
+        return jsonify({'error': 'An internal error occurred'}), 500
 
 
 # =============================================================================
@@ -849,8 +855,9 @@ def get_affordability():
             }
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get affordability")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -979,7 +986,8 @@ def get_combined_analysis():
             }
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get combined analysis")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()

@@ -481,8 +481,9 @@ def get_regions():
             'season_display': get_season_display_name(season)
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get regions")
+        return jsonify({'error': 'An internal error occurred'}), 500
 
     finally:
         db.close()
@@ -658,8 +659,9 @@ def get_region(region_code):
 
         return jsonify(result), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get region")
+        return jsonify({'error': 'An internal error occurred'}), 500
 
     finally:
         db.close()
@@ -705,8 +707,9 @@ def get_data_points():
         db.close()
         return jsonify({'data_points': result, 'count': len(result)}), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get data points")
+        return jsonify({'error': 'An internal error occurred'}), 500
 
 
 # Upload endpoints
@@ -762,8 +765,9 @@ def upload_file():
             'records_processed': count
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to upload file")
+        return jsonify({'error': 'An internal error occurred'}), 500
 
 
 # Gating logic endpoints
@@ -791,8 +795,9 @@ def check_gating():
 
         return jsonify(result), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to check gating")
+        return jsonify({'error': 'An internal error occurred'}), 500
 
 
 @cat_bp.route('/gating/rules', methods=['GET'])
@@ -821,8 +826,9 @@ def get_gating_rules():
         db.close()
         return jsonify({'rules': result, 'count': len(result)}), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get gating rules")
+        return jsonify({'error': 'An internal error occurred'}), 500
 
 
 @cat_bp.route('/gating/rules', methods=['POST'])
@@ -844,8 +850,9 @@ def create_gating_rule():
         db.close()
         return jsonify(result), 201
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to create gating rule")
+        return jsonify({'error': 'An internal error occurred'}), 500
 
 
 # Statistics endpoint
@@ -859,8 +866,9 @@ def get_statistics():
 
         return jsonify(stats), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get statistics")
+        return jsonify({'error': 'An internal error occurred'}), 500
 
 
 # =============================================================================
@@ -897,8 +905,9 @@ def get_boundaries():
 
         return jsonify(geojson), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get boundaries")
+        return jsonify({'error': 'An internal error occurred'}), 500
 
 
 @cat_bp.route('/boundaries/summary', methods=['GET'])
@@ -928,8 +937,9 @@ def get_boundaries_summary():
             'count': len(regions)
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get boundaries summary")
+        return jsonify({'error': 'An internal error occurred'}), 500
 
 
 # =============================================================================
@@ -1041,8 +1051,12 @@ def evaluate_feasibility(region_code):
 
         return jsonify(response), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e), 'decision': 'ERROR'}), 500
+    except Exception:
+        current_app.logger.exception("Failed to evaluate feasibility")
+        return jsonify({
+            'error': 'An internal error occurred',
+            'decision': 'ERROR'
+        }), 500
     finally:
         db.close()
 
@@ -1083,8 +1097,9 @@ def get_healthcare_sites():
 
         return jsonify({'sites': result, 'count': len(result)}), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get healthcare sites")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -1119,9 +1134,10 @@ def create_healthcare_site():
             'message': 'Healthcare site created'
         }), 201
 
-    except Exception as e:
+    except Exception:
         db.rollback()
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.exception("Failed to create healthcare site")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -1153,8 +1169,9 @@ def get_healthcare_necessity(region_code):
 
         return jsonify(result), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get healthcare necessity")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -1187,8 +1204,9 @@ def get_all_healthcare_necessity():
             'season_display': get_season_display_name(season)
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get all healthcare necessity")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -1364,8 +1382,9 @@ def get_telehealth_priority(region_code):
 
         return jsonify(response), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get telehealth priority")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -1455,8 +1474,9 @@ def get_broadband_coverage():
             }
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get broadband coverage")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -1494,8 +1514,9 @@ def get_broadband_by_place(place_id):
             'data_source': record.data_source
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get broadband by place")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -1623,8 +1644,9 @@ def get_data_gaps_summary():
 
         return jsonify(summary), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get data gaps summary")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -1709,8 +1731,9 @@ def get_region_affordability(region_code):
             'region_name': region.region_name
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get region affordability")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -1816,8 +1839,9 @@ def get_region_safety_net(region_code):
             'description': description
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get region safety net")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -1864,8 +1888,9 @@ def get_region_telehealth_status(region_code):
             },
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get region telehealth status")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -1921,8 +1946,9 @@ def get_all_telehealth_status():
             'summary': summary
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get all telehealth status")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -1998,8 +2024,9 @@ def get_healthcare_facilities():
             'summary': summary
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get healthcare facilities")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -2034,8 +2061,9 @@ def get_healthcare_facility(facility_id):
             'verified': site.verified
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get healthcare facility")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -2113,8 +2141,9 @@ def get_healthcare_by_region(region_code):
             } if nearest_clinic_tuple else None
         }), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get healthcare by region")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -2154,8 +2183,9 @@ def get_healthcare_summary():
 
         return jsonify(summary), 200
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception:
+        current_app.logger.exception("Failed to get healthcare summary")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
 
@@ -2280,8 +2310,8 @@ def scenario_preview():
 
         return jsonify(result), 200
 
-    except Exception as e:
-        cat_bp.logger.exception("Unhandled error in scenario_preview: %s", e)
-        return jsonify({'error': 'An internal error occurred.'}), 500
+    except Exception:
+        current_app.logger.exception("Failed to preview scenario")
+        return jsonify({'error': 'An internal error occurred'}), 500
     finally:
         db.close()
