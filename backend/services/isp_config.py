@@ -16,7 +16,7 @@ _CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "config", "isp_pric
 _FALLBACK_CONFIG = {
     "isp_pricing": {
         "gci": {"name": "GCI", "cost": 125.0},
-        "fastwyre": {"name": "FastWyre/Rural", "cost": 350.0},
+        "fastwyre": {"name": "FastWyre/Rural", "cost": 450.0},
         "starlink": {"name": "Starlink", "cost": 120.0},
         "extreme_rural": {"name": "Extreme Rural", "cost": 450.0},
     },
@@ -70,12 +70,12 @@ def get_internet_cost(zcta: str) -> Tuple[float, str]:
     elif zcta in starlink_satellite:
         p = pricing.get("starlink", {"cost": 120.0, "name": "Starlink"})
     else:
-        p = pricing.get("fastwyre", {"cost": 350.0, "name": "FastWyre"})
+        p = pricing.get("fastwyre", {"cost": 450.0, "name": "FastWyre/Rural"})
 
     if not isinstance(p, dict):
-        p = {"cost": 350.0, "name": "FastWyre"}
+        p = {"cost": 450.0, "name": "FastWyre/Rural"}
 
-    return float(p.get("cost", 350.0)), str(p.get("name", "FastWyre"))
+    return float(p.get("cost", 450.0)), str(p.get("name", "FastWyre/Rural"))
 
 
 def get_affordability_threshold() -> float:

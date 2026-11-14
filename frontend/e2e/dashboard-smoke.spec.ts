@@ -50,7 +50,7 @@ test.describe('Public dashboard smoke', () => {
     await expect(page).toHaveURL(/season=winter/);
   });
 
-  test('pinned communities open the comparison panel', async ({ page }) => {
+  test('pinned communities open the comparison panel with aligned metrics and deltas', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('community-search')).toBeVisible();
 
@@ -60,7 +60,32 @@ test.describe('Public dashboard smoke', () => {
     await page.getByTestId('community-search').fill('Bethel');
     await page.getByRole('button', { name: 'Pin Bethel' }).click();
 
-    await expect(page.getByTestId('comparison-panel')).toBeVisible();
-    await expect(page.getByText('Community Comparison')).toBeVisible();
+    const comparisonPanel = page.getByTestId('comparison-panel');
+    await expect(comparisonPanel).toBeVisible();
+    await expect(comparisonPanel.getByText('Community Comparison')).toBeVisible();
+    await expect(comparisonPanel.getByText('2 pinned communities')).toBeVisible();
+    await expect(comparisonPanel.getByText('Telehealth status')).toBeVisible();
+    await expect(comparisonPanel.getByText('Affordability')).toBeVisible();
+    await expect(comparisonPanel.getByText('Clinic support')).toBeVisible();
+    await expect(comparisonPanel.getByText('Download')).toBeVisible();
+    await expect(comparisonPanel.getByText('Cost burden')).toBeVisible();
+    await expect(comparisonPanel.getByText('Desert score')).toBeVisible();
+    await expect(comparisonPanel.getByText(/vs group avg/).first()).toBeVisible();
+  });
+
+  test('shareable URL restores community selection, season, scenario thresholds, and pins', async ({ page }) => {
+    await page.goto('/?region=AK-ANCHORAGE&season=winter&scenario=1&bd=75&pins=AK-ANCHORAGE,AK-BETHEL');
+
+    await expect(page.getByRole('heading', { name: 'Anchorage' })).toBeVisible();
+    await expect(page.getByTestId('season-selector')).toHaveValue('winter');
+    await expect(page.getByTestId('scenario-panel')).toBeVisible();
+    await expect(page.getByLabel('Download threshold')).toHaveValue('75');
+    await expect(page.getByTestId('scenario-summary')).toBeVisible();
+
+    const comparisonPanel = page.getByTestId('comparison-panel');
+    await expect(comparisonPanel).toBeVisible();
+    await expect(comparisonPanel.getByText('2 pinned communities')).toBeVisible();
+    await expect(comparisonPanel.getByRole('button', { name: 'Select Anchorage' })).toBeVisible();
+    await expect(comparisonPanel.getByRole('button', { name: 'Select Bethel' })).toBeVisible();
   });
 });

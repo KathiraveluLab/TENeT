@@ -1,5 +1,6 @@
 from database.models import CATRegion, CensusIncome
 from routes.cat_routes import _get_regional_internet_cost
+from routes.performance_routes import get_regional_internet_cost
 
 
 def test_isp_pricing_lookup_for_known_provider_buckets():
@@ -7,6 +8,8 @@ def test_isp_pricing_lookup_for_known_provider_buckets():
     assert _get_regional_internet_cost("99723") == (450.0, "Extreme Rural")
     assert _get_regional_internet_cost("99654") == (120.0, "Starlink")
     assert _get_regional_internet_cost("99615") == (450.0, "FastWyre/Rural")
+    assert get_regional_internet_cost("99654")[:2] == (120.0, "Starlink")
+    assert get_regional_internet_cost("99615")[:2] == (450.0, "FastWyre/Rural")
 
 
 def test_itu_two_percent_threshold_boundary_is_exclusive():
@@ -67,3 +70,24 @@ def test_region_affordability_matches_nearest_zcta_income(db_session):
     assert payload["isp"] == "Starlink"
     assert payload["burden_pct"] == 2.0
     assert payload["is_affordable"] is False
+
+
+def test_performance_affordability_enforces_400_ceiling(db_session):
+    db_session.add(CensusIncome(
+        zcta="99723",
+        median_income=400000,
+        acs_year=2022,
+        centroid_lat=71.29,
+        centroid_lon=-156.78,
+    ))
+    db_session.commit()
+
+    from app import app
+
+    response = app.test_client().get("/api/cat/performance/affordability?use_regional=true")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["zones"][0]["zcta"] == "99723"
+    assert payload["zones"][0]["internet_cost"] == 450.0
+    assert payload["zones"][0]["burden_pct"] < 2.0
+    assert payload["zones"][0]["is_affordable"] is False

@@ -36,6 +36,16 @@ interface ChoroplethLayerProps {
     useStarlink: boolean;
 }
 
+const findAffordabilityZone = (
+    lat: number,
+    lon: number,
+    affordabilityData: AffordabilityZone[],
+): AffordabilityZone | undefined =>
+    affordabilityData.find(a =>
+        a.lat != null && a.lon != null &&
+        Math.abs(a.lat - lat) < 0.1 && Math.abs(a.lon - lon) < 0.1,
+    );
+
 // Get burden percentage for a tile location
 const getBurden = (
     lat: number,
@@ -43,12 +53,9 @@ const getBurden = (
     affordabilityData: AffordabilityZone[],
     useStarlink: boolean
 ): number | null => {
-    const afford = affordabilityData.find(a =>
-        a.lat != null && a.lon != null &&
-        Math.abs(a.lat - lat) < 0.1 && Math.abs(a.lon - lon) < 0.1
-    );
+    const afford = findAffordabilityZone(lat, lon, affordabilityData);
     if (!afford?.median_income) return null;
-    const cost = getScenarioCost(lat, useStarlink);
+    const cost = getScenarioCost(lat, useStarlink, afford.internet_cost);
     const monthlyIncome = afford.median_income / 12;
     return (cost / monthlyIncome) * 100;
 };
@@ -153,21 +160,29 @@ export const ChoroplethLayer: React.FC<ChoroplethLayerProps> = ({
                 ? measuredLatencies.reduce((sum, latency) => sum + latency, 0) / measuredLatencies.length
                 : null;
 
-            // Calculate average burden
+            // Calculate average burden and regional internet cost
             let totalBurden = 0;
             let burdenCount = 0;
+            let totalRegionalCost = 0;
+            let regionalCostCount = 0;
             for (const tile of regionTiles) {
                 const burden = getBurden(tile.lat, tile.lon, affordabilityData, useStarlink);
                 if (burden !== null) {
                     totalBurden += burden;
                     burdenCount++;
                 }
+                const afford = findAffordabilityZone(tile.lat, tile.lon, affordabilityData);
+                if (afford && Number.isFinite(afford.internet_cost)) {
+                    totalRegionalCost += afford.internet_cost;
+                    regionalCostCount++;
+                }
             }
             const avgBurden = burdenCount > 0 ? totalBurden / burdenCount : null;
+            const avgRegionalCost = regionalCostCount > 0 ? totalRegionalCost / regionalCostCount : null;
 
             // Get center lat for cost calculation
             const centerLat = (minLat + maxLat) / 2;
-            const scenarioCost = getScenarioCost(centerLat, useStarlink);
+            const scenarioCost = getScenarioCost(centerLat, useStarlink, avgRegionalCost);
 
             const status = avgSpeed === null || avgLatency === null
                 ? 'GRAY'

@@ -1,242 +1,120 @@
-TENeT Database Setup Guide
-Overview
-The TENeT project utilizes a lightweight SQLite database with geospatial support to manage Community Access Tier (CAT) data. This system enables the import, management, and querying of CSV and GeoJSON data without requiring PostgreSQL or PostGIS infrastructure.
+# TENeT Database Setup Guide
 
-Database Architecture
-Table Structure
-The database consists of four primary tables:
-cat_regions stores geographic regions with their associated tier classifications. cat_data_points maintains individual access points including healthcare facilities, educational institutions, and transportation hubs. cat_uploads tracks file upload history and processing status. cat_gating_rules defines access control criteria organized by tier level.
+## Overview
 
-File Locations
-Development database: backend/data/tenet.db
-Upload directory: backend/data/uploads/
-Sample data: backend/data/samples/
+TENeT uses SQLite with SQLAlchemy for storing Community Access Tier (CAT) regions, transport access points, healthcare facilities, FCC broadband coverage, Ookla speed test tiles, and Census income estimates without requiring PostgreSQL or PostGIS during local development or demo deployments.
 
-Installation and Setup
-Dependency Installation
-Navigate to the backend directory and install the required dependencies:
+## Database Schema
 
+[`models.py`](./models.py) defines **8 tables**:
+
+| Table | Purpose |
+| --- | --- |
+| `cat_regions` | Community records, CAT tier (`1`–`4`), centroid coordinates, GeoJSON geometry, and seasonal/access properties |
+| `cat_data_points` | Individual transport/access data points linked to regions and uploads |
+| `cat_uploads` | Upload job tracking and processing status for CSV and GeoJSON imports |
+| `cat_gating_rules` | Access control rules for CAT Tiers `1`–`4` |
+| `healthcare_sites` | Active clinics, hospitals, pharmacies, and health centers with telehealth capability flags |
+| `broadband_coverage` | Place-level FCC broadband availability metrics, primary access technology, confidence, and data-gap flags |
+| `ookla_performance` | Zoom-16 Ookla fixed performance tiles (`avg_d_kbps`, `avg_u_kbps`, `avg_lat_ms`, `tests`, `devices`) |
+| `census_income` | ZCTA-level ACS 5-year median household income records used in affordability burden calculations |
+
+## File Locations
+
+- **Default database:** `backend/data/tenet.db` (configurable via `DB_PATH`)
+- **Uploads directory:** `backend/data/uploads/`
+- **Processed datasets:** `backend/data/processed_data/`
+- **Sample datasets:** `backend/data/samples/`
+- **Preprocessing & ingestion scripts:** `backend/data/scripts/`
+
+## Installation and Setup
+
+### 1. Install backend dependencies
+
+```bash
 cd backend
 pip install -r requirements.txt
-Database Initialization
-Execute the initialization script to create the database schema:
+```
 
+### 2. Initialize and seed the database
+
+Run the deterministic initialization workflow from `backend/`:
+
+```bash
 python database/init_db.py
-This command will create all required tables, establish three sample gating rules (Tier 1, 2, and 3), and display initial database statistics.
+```
 
-Sample Data Import
-To test the system with sample data, use the following commands:
-Import sample regions (GeoJSON format):
+This creates all 8 tables, inserts the 4 default gating rules (`Tier 1 Basic Access` through `Tier 4 Extreme Access`), and seeds:
 
-curl -X POST http://localhost:5000/api/cat/upload \
--F "file=@data/samples/sample_cat_regions.geojson"
-Import sample data points (CSV format):
+1. `seed_cat_data.py` — 421 CAT regions and transport profiles from `backend/data/processed_data/clean_transport_profiles_fixed.csv`
+2. `seed_healthcare_data.py` — 325 healthcare facilities from `backend/data/processed_data/healthcare_facilities.csv`
+3. `seed_broadband_data.py` — 354 broadband coverage/data-gap records from `backend/data/processed_data/broadband_data_gaps.csv`
+4. `seed_census_data.py` — 13 sample Alaska ZCTA income records
+5. `seed_ookla_data.py` — 60 curated sample Ookla Open Data tiles from `backend/data/samples/ookla_performance_sample.csv`
 
-curl -X POST http://localhost:5000/api/cat/upload \
--F "file=@data/samples/sample_cat_data.csv"
-API Reference
-Region Endpoints
-Retrieve all regions: GET /api/cat/regions
-Filter regions by tier: GET /api/cat/regions?tier=1
-Retrieve specific region: GET /api/cat/regions/{region_code}
+For broader Alaska Ookla coverage beyond the offline sample tiles, run `backend/data/scripts/ingest_ookla.py` (uses `pyarrow` to stream public Ookla Open Data parquet tiles from S3). Use `backend/data/scripts/ingest_census.py` for Census income ingestion updates.
 
-Data Point Endpoints
-Retrieve all data points: GET /api/cat/data-points (maximum 100 results per request)
-Filter by region: GET /api/cat/data-points?region_code=AK001
-Radius-based search: GET /api/cat/data-points?lat=61.2181&lon=-149.9003&radius_km=10
-Filter by access type: GET /api/cat/data-points?access_type=healthcare
+## API Reference
 
-Upload Management
-Upload data files: POST /api/cat/upload
-Supported formats: .csv, .geojson, .json
-Files are automatically processed and imported upon upload.
+Default local backend URL is `http://localhost:5001`. Core database-backed endpoints include:
 
-Gating Rule Management
-Retrieve all active rules: GET /api/cat/gating/rules
-Filter rules by tier: GET /api/cat/gating/rules?tier=2
-Create new rule: POST /api/cat/gating/rules
-Validate against rules: POST /api/cat/gating/check
+- **Health & readiness:** `GET /api/health`, `GET /api/ready`
+- **Regions & profiles:** `GET /api/cat/regions`, `GET /api/cat/regions/summary`, `GET /api/cat/regions/search`, `GET /api/cat/regions/<region_code>`, `GET /api/cat/regions/<region_code>/research-profile`, `GET /api/cat/regions/research-profiles`
+- **Data points & uploads:** `GET /api/cat/data-points`, `POST /api/cat/upload`
+- **Gating rules & stats:** `GET /api/cat/gating/rules`, `POST /api/cat/gating/rules`, `POST /api/cat/gating/check`, `GET /api/cat/statistics`, `GET /api/cat/data-gaps`
+- **Telehealth, healthcare & scenarios:** `GET /api/cat/telehealth-status/all`, `GET /api/cat/healthcare`, `GET /api/cat/healthcare/summary`, `POST /api/cat/scenarios/preview`
+- **Performance & affordability:** `GET /api/cat/performance`, `GET /api/cat/performance/summary`, `GET /api/cat/performance/gaps`, `GET /api/cat/performance/affordability`
 
-Statistical Information
-Retrieve database statistics: GET /api/cat/statistics
+### Gating rule validation example
 
-Data Format Specifications
-CSV Format Requirements
-Required columns:
+```bash
+curl -X POST http://localhost:5001/api/cat/gating/check \
+  -H "Content-Type: application/json" \
+  -d '{"point_id": 1, "tier_level": 2}'
+```
 
-region_code - Region identifier
-latitude - Decimal degrees
-longitude - Decimal degrees
-Optional columns:
+## CSV & GeoJSON Upload Formats
 
-location_name - Location designation
-access_type - Service category (healthcare, education, transport, etc.)
-access_quality - Quality metric (0-100 scale)
-distance_km - Distance measurement in kilometers
-travel_time_minutes - Estimated travel duration in minutes
-Example structure:
+`POST /api/cat/upload` delegates to [`CATDataImporter`](../services/data_importer.py):
 
-region_code,latitude,longitude,location_name,access_type,access_quality,distance_km,travel_time_minutes
-AK001,61.2181,-149.9003,Anchorage Medical Center,healthcare,85.5,2.3,15
-GeoJSON Format Requirements
-Required properties:
+- **CSV imports (`CATDataImporter.import_csv`):**
+  - Required columns: `region_code`, `latitude`, `longitude`
+  - Optional columns: `location_name`, `access_type`, `access_quality`, `distance_km`, `travel_time_minutes` (additional columns are stored in `data_metadata`)
+- **GeoJSON imports (`CATDataImporter.import_geojson`):**
+  - Required properties: `region_name`, `region_code`, `tier_level` (`1`–`4`)
+  - Optional properties: `population`, `area_sqkm`, `access_score`
 
-region_name - Region designation
-region_code - Unique region identifier
-tier_level - Tier classification (1, 2, or 3)
-Optional properties:
+## Programmatic Usage
 
-population - Population count
-area_sqkm - Area measurement in square kilometers
-access_score - Aggregate access metric
-Example structure:
+### Data Import and Export
 
-{
-"type": "Feature",
-"geometry": {
-"type": "Polygon",
-"coordinates": [[[-150.0, 61.0], [-149.5, 61.0], [-149.5, 61.5], [-150.0, 61.5], [-150.0, 61.0]]]
-},
-"properties": {
-"region_name": "Anchorage Region",
-"region_code": "AK001",
-"tier_level": 1,
-"population": 291538,
-"area_sqkm": 5079.0,
-"access_score": 85.0
-}
-}
-Access Tier Classification System
-Tier Definitions
-Tier 1 (High Access) represents urban areas with well-developed infrastructure. Classification criteria include a minimum access score of 60.0, maximum distance of 50 kilometers, and maximum travel time of 60 minutes.
-Tier 2 (Moderate Access) encompasses suburban areas and small cities. Requirements include a minimum access score of 40.0, maximum distance of 100 kilometers, and maximum travel time of 120 minutes.
-Tier 3 (Limited Access) designates rural and remote areas. Criteria include a minimum access score of 20.0, maximum distance of 200 kilometers, and maximum travel time of 180 minutes.
-
-Gating Rule Validation
-To validate a data point against tier criteria:
-
-curl -X POST http://localhost:5000/api/cat/gating/check \
--H "Content-Type: application/json" \
--d '{
-"point_id": 1,
-"tier_level": 2
-}'
-Expected response:
-
-{
-"allowed": true,
-"passed_rules": ["Tier 2 Moderate Access"],
-"failed_rules": []
-}
-Programmatic Data Management
-Data Import Operations
+```python
 from database.config import SessionLocal
 from services.data_importer import CATDataImporter
 
 db = SessionLocal()
-
-# CSV import operation
-count, message = CATDataImporter.import_csv(
-db,
-'data/samples/sample_cat_data.csv'
-)
-print(f"Imported {count} data points")
-
-# GeoJSON import operation
-count, message = CATDataImporter.import_geojson(
-db,
-'data/samples/sample_cat_regions.geojson'
-)
-print(f"Imported {count} regions")
-
+count, message = CATDataImporter.import_csv(db, "path/to/points.csv")
+csv_path = CATDataImporter.export_to_csv(db, region_code="AK-ANCHORAGE")
+geojson_path = CATDataImporter.export_to_geojson(db, tier_level=1)
 db.close()
-Data Query Operations
+```
+
+### Data Querying
+
+```python
 from database.config import SessionLocal
 from database.handlers import CATDataHandler
 
 db = SessionLocal()
-
-# Retrieve regions by tier level
-regions = CATDataHandler.get_regions_by_tier(db, tier_level=1)
-for region in regions:
-print(f"{region.region_name} - Tier {region.tier_level}")
-
-# Retrieve data points by region code
-points = CATDataHandler.get_data_points_by_region(db, 'AK001')
-print(f"Retrieved {len(points)} data points in region AK001")
-
-# Perform radius-based search
-nearby = CATDataHandler.get_data_points_in_radius(
-db,
-lat=61.2181,
-lon=-149.9003,
-radius_km=10
-)
-print(f"Located {len(nearby)} points within 10-kilometer radius")
-
+tier1_regions = CATDataHandler.get_regions_by_tier(db, tier_level=1)
+points = CATDataHandler.get_data_points_by_region(db, "AK-ANCHORAGE")
+nearby = CATDataHandler.get_data_points_in_radius(db, lat=61.2181, lon=-149.9003, radius_km=10)
+stats = CATDataHandler.get_statistics(db)
 db.close()
-Data Export Operations
-from database.config import SessionLocal
-from services.data_importer import CATDataImporter
+```
 
-db = SessionLocal()
+## Operational Notes
 
-# Export to CSV format
-csv_path = CATDataImporter.export_to_csv(db, region_code='AK001')
-print(f"Data exported to {csv_path}")
-
-# Export to GeoJSON format
-geojson_path = CATDataImporter.export_to_geojson(db, tier_level=1)
-print(f"Data exported to {geojson_path}")
-
-db.close()
-Database Schema
-CATRegion Model
-id: Integer (Primary Key)
-region_name: String(255)
-region_code: String(50) (Unique)
-tier_level: Integer
-geometry: Text (GeoJSON)
-population: Integer
-area_sqkm: Float
-access_score: Float
-properties: JSON
-created_at: DateTime
-updated_at: DateTime
-CATDataPoint Model
-id: Integer (Primary Key)
-region_code: String(50)
-latitude: Float
-longitude: Float
-location_name: String(255)
-access_type: String(100)
-access_quality: Float
-distance_km: Float
-travel_time_minutes: Float
-is_active: Boolean
-verified: Boolean
-metadata: JSON
-created_at: DateTime
-updated_at: DateTime
-Troubleshooting
-Database Lock Errors
-SQLite may encounter concurrency limitations when multiple processes attempt simultaneous write operations. Ensure that only one process performs write operations at any given time. For production environments requiring higher concurrency, consider migrating to PostgreSQL with PostGIS extensions.
-
-Import Failures
-Verify that CSV and GeoJSON files conform to the specified schema requirements. Ensure all required columns and properties are present. Confirm that coordinate values are expressed in decimal degrees using the WGS84 datum.
-
-Performance Optimization
-The database includes indexes on frequently queried fields. For large datasets exceeding 100,000 records, consider implementing additional spatial indexes. Utilize pagination for queries returning large result sets to optimize performance.
-
-Implementation Roadmap
-Customize gating rules by modifying the database/init_db.py file or utilizing the API endpoints to create custom rule sets.
-Import production data by preparing CSV or GeoJSON files according to the format specifications outlined in this guide.
-Develop frontend interface by connecting to the provided API endpoints for data visualization and user interaction.
-Implement authentication by integrating with existing authentication systems to control access and permissions.
-Scale to production database by migrating to PostgreSQL with PostGIS when ready to deploy to production environments.
-
-Additional Resources
-API documentation is available at: GET /api/cat/statistics
-Sample data files are located in: backend/data/samples/
-Database model definitions are found in: backend/database/models.py
-
+- Coordinates use WGS84 decimal degrees (`latitude`, `longitude`).
+- Set `DB_PATH` (default `backend/data/tenet.db`) to point the backend at an alternate SQLite file.
+- For production multi-writer workloads requiring spatial database concurrency, PostgreSQL with PostGIS is the planned migration target (`psycopg2-binary` and `geoalchemy2` are noted in `backend/requirements.txt`).

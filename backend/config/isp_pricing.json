@@ -3,22 +3,22 @@
         "gci": {
             "name": "GCI",
             "cost": 125,
-            "description": "Major city pricing (GCI unlimited)"
+            "description": "Urban mid-tier reference (GCI Faster $124.99/mo, 800 GB)"
         },
         "fastwyre": {
             "name": "FastWyre/Rural",
             "cost": 450,
-            "description": "Rural Interior Alaska (capped plans)"
+            "description": "Rural upper-bound stress anchor (base Fastwyre DSL is $45-$125/mo; reflects high capped-overage or commercial ceiling)"
         },
         "starlink": {
             "name": "Starlink",
             "cost": 120,
-            "description": "Satellite (available everywhere)"
+            "description": "LEO satellite residential baseline (hardware excluded)"
         },
         "extreme_rural": {
             "name": "Extreme Rural",
             "cost": 450,
-            "description": "Very remote villages (capped, expensive)"
+            "description": "Extreme rural upper-bound stress ceiling (e.g., GCI capped rural overages / commercial tiers)"
         }
     },
     "zcta_mappings": {
@@ -91,13 +91,13 @@
         "speed_telehealth_mbps": 25
     },
     "metadata": {
-        "version": "1.0",
-        "last_updated": "2024-01-06",
+        "version": "1.1",
+        "last_updated": "2026-11-12",
         "sources": {
-            "gci_pricing": "https://www.gci.com",
-            "fastwyre_pricing": "FastWyre Alaska",
-            "starlink_pricing": "https://www.starlink.com"
+            "gci_pricing": "https://www.gci.com/internet (FCC Broadband Facts CSV: Faster $124.99/mo, Rural Broadband 10 Premium $314.99/mo + $7.68/GB overage, Rural Business Premier $450.00/mo)",
+            "fastwyre_pricing": "https://fastwyre.com/broadbandlabels/interior-telephone-company/ (FCC Broadband Facts: $45-$125/mo unmetered DSL + $4.95 fee)",
+            "starlink_pricing": "https://www.starlink.com/residential ($120/mo residential)"
         },
-        "notes": "Fort Yukon ($450/mo) used as extreme rural reference case per maintainer guidance"
+        "notes": "Anchorage $125/mo matches GCI Faster ($124.99/mo); $450/mo is an upper-bound rural stress anchor reflecting capped rural overages / commercial tiers rather than Fastwyre base DSL tariffs"
     }
 }

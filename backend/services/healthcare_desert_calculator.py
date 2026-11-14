@@ -23,28 +23,28 @@ from services.season_constants import (
 class HealthcareDesertCalculator:
     """
     Calculate healthcare desert metrics for CAT regions.
-    
+
     Necessity score ranges from 0-100:
     - 0-30: Good healthcare access
     - 31-50: Moderate access challenges
     - 51-70: Significant healthcare desert
     - 71-100: Severe healthcare desert - high telehealth priority
     """
-    
+
     @staticmethod
     def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         """Calculate haversine distance in km"""
         R = 6371  # Earth radius in km
-        
+
         lat1_rad = math.radians(lat1)
         lat2_rad = math.radians(lat2)
         delta_lat = math.radians(lat2 - lat1)
         delta_lon = math.radians(lon2 - lon1)
-        
-        a = (math.sin(delta_lat/2)**2 + 
+
+        a = (math.sin(delta_lat/2)**2 +
              math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(delta_lon/2)**2)
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-        
+
         return R * c
 
     @staticmethod
@@ -177,7 +177,7 @@ class HealthcareDesertCalculator:
             key: (999 if value == float("inf") else value)
             for key, value in distances.items()
         }
-    
+
     @staticmethod
     def get_nearest_clinic_distance(db: Session, region_code: str) -> Optional[float]:
         """
@@ -187,10 +187,10 @@ class HealthcareDesertCalculator:
         return HealthcareDesertCalculator.get_nearest_facility_distances(
             db, region_code
         )["clinic"]
-    
+
     @staticmethod
     def calculate_healthcare_necessity_score(
-        db: Session, 
+        db: Session,
         region_code: str,
         season: str = SEASON_YEAR_ROUND,
         road_quality: str = ROAD_QUALITY_LOCAL
@@ -198,20 +198,20 @@ class HealthcareDesertCalculator:
         """
         Calculate compound healthcare desert metric (0-100).
         Higher score = greater need for telehealth.
-        
+
         Args:
             db: Database session
             region_code: The CAT region code to evaluate
             season: 'summer', 'winter', or 'year_round' (user-selected)
             road_quality: 'highway', 'local', or 'seasonal'
-        
+
         Factors:
         1. Distance to nearest clinic/hospital (50% weight)
         2. Number of health sites in region (15% weight)
         3. Specialist availability (15% weight)
         4. Transportation difficulty - season-adjusted (20% weight)
         """
-        
+
         # 1. Distance factor (0-100) incorporates both clinic and hospital
         facility_distances = HealthcareDesertCalculator.get_nearest_facility_distances(
             db, region_code
@@ -224,36 +224,38 @@ class HealthcareDesertCalculator:
             clinic_dist = facility_distances['clinic']
             hospital_dist = facility_distances['hospital']
             nearest_dist = facility_distances['nearest']
-            
+
         # Normalize: 0km=0 points, 300+km=100 points for clinic
         clinic_score = HealthcareDesertCalculator.score_distance_component(clinic_dist)
         # Hospital distance is more vital, scales over 500km
         hospital_score = min(100.0, (hospital_dist / 500.0) * 100.0)
-        
+
         # Strong penalty for lacking hospital access
         distance_score = (0.6 * hospital_score) + (0.4 * clinic_score)
-        
+
         # 2. Health site density (0-100)
         num_sites = db.query(HealthcareSite).filter(
-            HealthcareSite.region_code == region_code
+            HealthcareSite.region_code == region_code,
+            HealthcareSite.is_active == True,
         ).count()
-        
+
         density_score = HealthcareDesertCalculator.score_density_component(num_sites)
-        
+
         # 3. Specialist availability (0-100)
         has_specialists = db.query(HealthcareSite).filter(
             HealthcareSite.region_code == region_code,
-            HealthcareSite.has_specialists == True
+            HealthcareSite.is_active == True,
+            HealthcareSite.has_specialists == True,
         ).count() > 0
-        
+
         specialist_score = HealthcareDesertCalculator.score_specialist_component(has_specialists)
-        
+
         # Validate season and road_quality inputs
         if season not in VALID_SEASONS:
             season = SEASON_YEAR_ROUND
         if road_quality not in VALID_ROAD_QUALITIES:
             road_quality = ROAD_QUALITY_LOCAL
-        
+
         # 4. Transportation difficulty (0-100) - SEASON ADJUSTED
         # Use travel_time from CAT data points with seasonal modifiers
         data_point = db.query(CATDataPoint).filter(
@@ -266,14 +268,14 @@ class HealthcareDesertCalculator:
             region,
             data_point,
         )
-        
+
         transport_score = HealthcareDesertCalculator.score_transport_component(
             data_point.travel_time_minutes if data_point else None,
             season,
             road_quality,
             transport_mode,
         )
-        
+
         # Calculate weighted score
         necessity_score = float(
             0.50 * distance_score +
@@ -281,7 +283,7 @@ class HealthcareDesertCalculator:
             0.15 * specialist_score +
             0.20 * transport_score
         )
-        
+
         return {
             'necessity_score': round(necessity_score, 2),
             'distance_to_nearest_clinic_km': round(float(clinic_dist), 2),
@@ -295,8 +297,10 @@ class HealthcareDesertCalculator:
                 'season_display': get_season_display_name(season),
                 'road_quality': road_quality,
                 'transport_mode': transport_mode,
-                'assumption': 'User-selected seasonal scenario for planning purposes. '
-                             'Actual conditions may vary.'
+                'assumption': (
+                    'User-selected seasonal scenario for planning purposes. '
+                    'Actual conditions may vary.'
+                )
             },
             'breakdown': {
                 'distance_component': round(float(distance_score), 2),  # type: ignore
@@ -306,7 +310,7 @@ class HealthcareDesertCalculator:
                 'transport_season_adjusted': True
             }
         }
-    
+
     @staticmethod
     def get_all_region_scores(
         db: Session,
@@ -315,13 +319,13 @@ class HealthcareDesertCalculator:
     ) -> list:
         """
         Get necessity scores for all regions, sorted by score (highest first).
-        
+
         Args:
             season: 'summer', 'winter', or 'year_round'
             road_quality: 'highway', 'local', or 'seasonal'
         """
         regions = db.query(CATRegion).all()
-        
+
         results = []
         for region in regions:
             score_data = HealthcareDesertCalculator.calculate_healthcare_necessity_score(
@@ -336,10 +340,10 @@ class HealthcareDesertCalculator:
                 'has_specialist_access': score_data['has_specialist_access'],
                 'season_applied': season
             })
-        
+
         # Sort by necessity score (highest first = most in need)
         results.sort(key=lambda x: x['necessity_score'], reverse=True)
-        
+
         return results
 
 

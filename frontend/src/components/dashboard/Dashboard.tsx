@@ -4,7 +4,13 @@ import Button from '../ui/Button';
 import MetricCard from '../ui/MetricCard';
 import Panel from '../ui/Panel';
 import StatusBadge from '../ui/StatusBadge';
-import { SATELLITE_PRIMARY_METRIC } from '../../domain/metrics';
+import {
+    CAT_TIER_PRESENTATION,
+    CAT_TIERS,
+    SATELLITE_PRIMARY_METRIC,
+    getDesertScorePresentation,
+    type CatTier,
+} from '../../domain/metrics';
 import { getTelehealthStatusLabel } from '../../domain/statusPresentation';
 import type { BaseMapLayer } from '../../domain/mapMode';
 import './Dashboard.css';
@@ -20,11 +26,26 @@ interface DashboardProps {
 const SECTION_LABELS: Record<DashboardSection, string> = {
     statistics: 'statewide totals',
     telehealthStatus: 'telehealth status',
+    regionSummary: 'community access and desert scores',
     healthcare: 'healthcare infrastructure',
     performance: 'network performance',
     dataGaps: 'data quality',
     affordability: 'affordability',
 };
+
+const CAT_TIER_BAR_CLASS: Record<CatTier, string> = {
+    1: 'is-excellent',
+    2: 'is-good',
+    3: 'is-moderate',
+    4: 'is-critical',
+};
+
+const DESERT_SEVERITY_LEVELS = [
+    { level: 'adequate', label: 'Adequate Need (<25)', barClass: 'is-excellent' },
+    { level: 'moderate', label: 'Moderate Need (25–49.9)', barClass: 'is-moderate' },
+    { level: 'high', label: 'High Need (50–74.9)', barClass: 'is-poor' },
+    { level: 'critical', label: 'Critical Need (75+)', barClass: 'is-critical' },
+] as const;
 
 function displayNumber(value: number | null | undefined, digits = 0): string {
     if (value === null || value === undefined || !Number.isFinite(value)) return '—';
@@ -91,7 +112,15 @@ export default function Dashboard({ onClose, onViewMap, onViewRegion }: Dashboar
         );
     }
 
-    const { statistics, telehealthStatus, healthcare, performance, dataGaps, affordability } = data;
+    const {
+        statistics,
+        telehealthStatus,
+        regionSummary,
+        healthcare,
+        performance,
+        dataGaps,
+        affordability,
+    } = data;
     const totalCommunities = telehealthStatus?.count ?? null;
     const criticalCount = telehealthStatus?.summary.critical_gap;
     const readyCount = telehealthStatus?.summary.telehealth_ready;
@@ -102,6 +131,19 @@ export default function Dashboard({ onClose, onViewMap, onViewRegion }: Dashboar
     const speedTileCount = speedDistribution
         ? Object.values(speedDistribution).reduce((sum, count) => sum + count, 0)
         : 0;
+    const catTierCounts: Record<CatTier, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
+    const desertSeverityCounts = { adequate: 0, moderate: 0, high: 0, critical: 0 };
+    let desertScoredCount = 0;
+    for (const region of regionSummary ?? []) {
+        if (region.cat_tier && region.cat_tier >= 1 && region.cat_tier <= 4) {
+            catTierCounts[region.cat_tier] += 1;
+        }
+        if (region.desert_score !== null && Number.isFinite(region.desert_score)) {
+            desertSeverityCounts[getDesertScorePresentation(region.desert_score).level] += 1;
+            desertScoredCount += 1;
+        }
+    }
+    const catClassifiedCount = CAT_TIERS.reduce((sum, tier) => sum + catTierCounts[tier], 0);
     const unavailableSections = (Object.keys(sectionErrors) as DashboardSection[])
         .map(section => SECTION_LABELS[section]);
 
@@ -304,6 +346,111 @@ export default function Dashboard({ onClose, onViewMap, onViewRegion }: Dashboar
                                         <span>{SATELLITE_PRIMARY_METRIC.label}</span>
                                     </div>
                                     <p>{SATELLITE_PRIMARY_METRIC.description}</p>
+                                </div>
+                                <div className="insights-summary-list" aria-label="Broadband modality shares">
+                                    <SummaryRow
+                                        label="Satellite-primary"
+                                        value={`${displayNumber(dataGaps.primary_access.SATELLITE)} (${percentage(ratioPercent(dataGaps.primary_access.SATELLITE, dataGaps.total_places), 1)})`}
+                                    />
+                                    <SummaryRow
+                                        label="Wired / terrestrial"
+                                        value={`${displayNumber(dataGaps.primary_access.WIRED)} (${percentage(ratioPercent(dataGaps.primary_access.WIRED, dataGaps.total_places), 1)})`}
+                                    />
+                                    <SummaryRow
+                                        label="Limited access"
+                                        value={`${displayNumber(dataGaps.primary_access.LIMITED)} (${percentage(ratioPercent(dataGaps.primary_access.LIMITED, dataGaps.total_places), 1)})`}
+                                    />
+                                </div>
+                            </>
+                        )}
+                    </Panel>
+
+                    <Panel className="insights-panel">
+                        <SectionHeading
+                            eyebrow="Transport access"
+                            title="Community access tiers"
+                            description="Distribution of Alaska communities across Community Access Tier (CAT) multimodal isolation classes."
+                            action={<Button size="small" onClick={() => viewMap('cat')}>View CAT map</Button>}
+                        />
+                        {!regionSummary ? (
+                            <SectionUnavailable message={sectionErrors.regionSummary} />
+                        ) : (
+                            <>
+                                <div className="insights-distribution" aria-label="Community access tier distribution">
+                                    <div className="insights-distribution__bar">
+                                        {CAT_TIERS.filter(tier => catTierCounts[tier] > 0).map(tier => (
+                                            <span
+                                                key={tier}
+                                                className={CAT_TIER_BAR_CLASS[tier]}
+                                                style={{ flexGrow: catTierCounts[tier] }}
+                                                title={`Tier ${tier}: ${catTierCounts[tier]} communities`}
+                                            />
+                                        ))}
+                                    </div>
+                                    <div className="insights-distribution__legend">
+                                        {CAT_TIERS.map(tier => (
+                                            <span key={tier}>
+                                                <i className={CAT_TIER_BAR_CLASS[tier]} />
+                                                {`Tier ${tier} ${displayNumber(catTierCounts[tier])}`}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="insights-summary-list">
+                                    {CAT_TIERS.map(tier => (
+                                        <SummaryRow
+                                            key={tier}
+                                            label={`Tier ${tier}: ${CAT_TIER_PRESENTATION[tier].label}`}
+                                            value={`${displayNumber(catTierCounts[tier])} (${percentage(ratioPercent(catTierCounts[tier], catClassifiedCount), 1)})`}
+                                        />
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </Panel>
+
+                    <Panel className="insights-panel">
+                        <SectionHeading
+                            eyebrow="Desert severity"
+                            title="Healthcare desert severity"
+                            description="Year-round Healthcare Desert Score (HDS 0–100) distribution combining facility proximity, density, specialists, and transport."
+                            action={<Button size="small" onClick={() => viewMap('cat')}>View priority need</Button>}
+                        />
+                        {!regionSummary ? (
+                            <SectionUnavailable message={sectionErrors.regionSummary} />
+                        ) : (
+                            <>
+                                <div className="insights-distribution" aria-label="Healthcare desert severity distribution">
+                                    <div className="insights-distribution__bar">
+                                        {DESERT_SEVERITY_LEVELS.filter(item => desertSeverityCounts[item.level] > 0).map(item => (
+                                            <span
+                                                key={item.level}
+                                                className={item.barClass}
+                                                style={{ flexGrow: desertSeverityCounts[item.level] }}
+                                                title={`${item.label}: ${desertSeverityCounts[item.level]} communities`}
+                                            />
+                                        ))}
+                                    </div>
+                                    <div className="insights-distribution__legend">
+                                        {DESERT_SEVERITY_LEVELS.map(item => (
+                                            <span key={item.level}>
+                                                <i className={item.barClass} />
+                                                {`${item.level} ${displayNumber(desertSeverityCounts[item.level])}`}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="insights-summary-list">
+                                    {DESERT_SEVERITY_LEVELS.map(item => (
+                                        <SummaryRow
+                                            key={item.level}
+                                            label={item.label}
+                                            value={`${displayNumber(desertSeverityCounts[item.level])} (${percentage(ratioPercent(desertSeverityCounts[item.level], desertScoredCount), 1)})`}
+                                        />
+                                    ))}
+                                    {regionSummary.length > desertScoredCount && (
+                                        <small>{displayNumber(regionSummary.length - desertScoredCount)} communities have no desert score.</small>
+                                    )}
                                 </div>
                             </>
                         )}

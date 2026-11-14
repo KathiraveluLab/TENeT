@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 430" width="100%" role="img" aria-label="TENeT System Architecture Diagram">
+<defs>
+  <style>
+    .title { font: 700 13px "Segoe UI", Arial, sans-serif; text-anchor: middle; }
+    .node-t { font: 700 12px "Segoe UI", Arial, sans-serif; fill: #0f172a; text-anchor: middle; }
+    .node-s { font: 400 11px "Segoe UI", Arial, sans-serif; fill: #334155; text-anchor: middle; }
+    .node-m { font: 400 10.5px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #334155; text-anchor: middle; }
+  </style>
+  <marker id="arrow" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M 1 1.5 L 8.5 5 L 1 8.5 z" fill="#334155" />
+  </marker>
+</defs>
+<rect x="1" y="1" width="1198" height="428" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2"/>
+<rect x="20" y="18" width="265" height="394" rx="8" fill="#eff6ff" stroke="#1d4ed8" stroke-width="1.4" stroke-dasharray="6,4"/>
+<text x="152.5" y="42" class="title" fill="#1d4ed8">1. Source Datasets</text>
+<rect x="32" y="58" width="241" height="58" rx="5" fill="#ffffff" stroke="#1d4ed8" stroke-width="1.2"/>
+<text x="152.5" y="82.4" class="node-t">CAT Classifications</text>
+<text x="152.5" y="100.9" class="node-s">Transport modes (CSV)</text>
+<rect x="32" y="128" width="241" height="58" rx="5" fill="#ffffff" stroke="#1d4ed8" stroke-width="1.2"/>
+<text x="152.5" y="152.4" class="node-t">Healthcare Sites</text>
+<text x="152.5" y="170.9" class="node-s">Facilities &amp; flags (OSM)</text>
+<rect x="32" y="198" width="241" height="58" rx="5" fill="#ffffff" stroke="#1d4ed8" stroke-width="1.2"/>
+<text x="152.5" y="222.4" class="node-t">Broadband &amp; Speed</text>
+<text x="152.5" y="240.9" class="node-s">FCC (CSV) &amp; Ookla (JSON)</text>
+<rect x="32" y="268" width="241" height="58" rx="5" fill="#ffffff" stroke="#1d4ed8" stroke-width="1.2"/>
+<text x="152.5" y="292.4" class="node-t">Income &amp; Polygons</text>
+<text x="152.5" y="310.9" class="node-s">ACS (CSV) &amp; GeoJSON</text>
+<rect x="32" y="338" width="241" height="58" rx="5" fill="#ffffff" stroke="#1d4ed8" stroke-width="1.2"/>
+<text x="152.5" y="362.4" class="node-t">ISP Pricing Config</text>
+<text x="152.5" y="380.9" class="node-s">Regional tariff rules (JSON)</text>
+<rect x="318" y="18" width="265" height="394" rx="8" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.4" stroke-dasharray="6,4"/>
+<text x="450.5" y="42" class="title" fill="#0f766e">2. Backend &amp; SQL/ORM</text>
+<rect x="330" y="64" width="241" height="68" rx="5" fill="#ffffff" stroke="#0f766e" stroke-width="1.2"/>
+<text x="450.5" y="92.6" class="node-t">Ingestion &amp; Seeding</text>
+<text x="450.5" y="114.3" class="node-s">SQLite schema &amp; ORM models</text>
+<rect x="330" y="150" width="241" height="68" rx="5" fill="#ffffff" stroke="#0f766e" stroke-width="1.2"/>
+<text x="450.5" y="178.6" class="node-t">Healthcare Desert Model</text>
+<text x="450.5" y="200.3" class="node-s">Haversine &amp; seasonal weights</text>
+<rect x="330" y="236" width="241" height="68" rx="5" fill="#ffffff" stroke="#0f766e" stroke-width="1.2"/>
+<text x="450.5" y="264.6" class="node-t">Data Quality Service</text>
+<text x="450.5" y="286.3" class="node-s">Gap flags &amp; confidence tiers</text>
+<rect x="330" y="322" width="241" height="68" rx="5" fill="#ffffff" stroke="#0f766e" stroke-width="1.2"/>
+<text x="450.5" y="350.6" class="node-t">Classifier &amp; Scenarios</text>
+<text x="450.5" y="372.3" class="node-s">Profiles, burden &amp; preview</text>
+<line x1="450.5" y1="132" x2="450.5" y2="148" stroke="#334155" stroke-width="1.4" marker-end="url(#arrow)"/>
+<line x1="450.5" y1="218" x2="450.5" y2="234" stroke="#334155" stroke-width="1.4" marker-end="url(#arrow)"/>
+<line x1="450.5" y1="304" x2="450.5" y2="320" stroke="#334155" stroke-width="1.4" marker-end="url(#arrow)"/>
+<rect x="616" y="18" width="265" height="394" rx="8" fill="#fff7ed" stroke="#c2410c" stroke-width="1.4" stroke-dasharray="6,4"/>
+<text x="748.5" y="42" class="title" fill="#c2410c">3. REST API (/api/cat)</text>
+<rect x="628" y="64" width="241" height="68" rx="5" fill="#ffffff" stroke="#c2410c" stroke-width="1.2"/>
+<text x="748.5" y="92.6" class="node-t">Region Discovery</text>
+<text x="748.5" y="114.3" class="node-m">/regions, /summary, /search</text>
+<rect x="628" y="150" width="241" height="68" rx="5" fill="#ffffff" stroke="#c2410c" stroke-width="1.2"/>
+<text x="748.5" y="178.6" class="node-t">Profiles &amp; Readiness</text>
+<text x="748.5" y="200.3" class="node-m">/research-profile*, /telehealth-status</text>
+<rect x="628" y="236" width="241" height="68" rx="5" fill="#ffffff" stroke="#c2410c" stroke-width="1.2"/>
+<text x="748.5" y="264.6" class="node-t">Network &amp; Gaps</text>
+<text x="748.5" y="286.3" class="node-m">/performance/*, /data-gaps</text>
+<rect x="628" y="322" width="241" height="68" rx="5" fill="#ffffff" stroke="#c2410c" stroke-width="1.2"/>
+<text x="748.5" y="350.6" class="node-t">Scenarios &amp; Health</text>
+<text x="748.5" y="372.3" class="node-m">/scenarios/preview, /health, /ready</text>
+<rect x="914" y="18" width="266" height="394" rx="8" fill="#faf5ff" stroke="#7e22ce" stroke-width="1.4" stroke-dasharray="6,4"/>
+<text x="1047.0" y="42" class="title" fill="#7e22ce">4. Interactive Web Client</text>
+<rect x="926" y="64" width="242" height="68" rx="5" fill="#ffffff" stroke="#7e22ce" stroke-width="1.2"/>
+<text x="1047.0" y="92.6" class="node-t">Leaflet Map Layers</text>
+<text x="1047.0" y="114.3" class="node-s">CAT, Gap Hunter, Affordability</text>
+<rect x="926" y="150" width="242" height="68" rx="5" fill="#ffffff" stroke="#7e22ce" stroke-width="1.2"/>
+<text x="1047.0" y="178.6" class="node-t">Sidebar &amp; Comparison</text>
+<text x="1047.0" y="200.3" class="node-s">Community details &amp; 2-3 pins</text>
+<rect x="926" y="236" width="242" height="68" rx="5" fill="#ffffff" stroke="#7e22ce" stroke-width="1.2"/>
+<text x="1047.0" y="264.6" class="node-t">Statewide Insights</text>
+<text x="1047.0" y="286.3" class="node-s">Aggregated tiers &amp; coverage</text>
+<rect x="926" y="322" width="242" height="68" rx="5" fill="#ffffff" stroke="#7e22ce" stroke-width="1.2"/>
+<text x="1047.0" y="350.6" class="node-t">What-If &amp; Export</text>
+<text x="1047.0" y="372.3" class="node-s">Sliders, presets, PDF &amp; URL state</text>
+<line x1="285" y1="215" x2="316" y2="215" stroke="#334155" stroke-width="1.8" marker-end="url(#arrow)"/>
+<line x1="583" y1="215" x2="614" y2="215" stroke="#334155" stroke-width="1.8" marker-end="url(#arrow)"/>
+<line x1="883" y1="215" x2="912" y2="215" stroke="#334155" stroke-width="1.8" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+</svg>

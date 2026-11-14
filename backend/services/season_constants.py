@@ -97,6 +97,7 @@ WINTER_ROAD_PENALTY: Dict[str, float] = {
 # Helper Functions
 # =============================================================================
 
+
 def get_seasonal_modifier(
     transport_mode: str,
     season: str,
@@ -104,20 +105,20 @@ def get_seasonal_modifier(
 ) -> float:
     """
     Get the combined seasonal availability modifier for a transport mode.
-    
+
     Args:
         transport_mode: 'air', 'road', or 'water'
         season: One of VALID_SEASONS
         road_quality: One of VALID_ROAD_QUALITIES (only applies to road)
-    
+
     Returns:
         Float modifier between 0.0 and 1.0
     """
     if season not in VALID_SEASONS:
         season = SEASON_YEAR_ROUND  # Safe default
-    
+
     modifiers = TRANSPORT_SEASONAL_MODIFIERS[season]
-    
+
     if transport_mode == 'air':
         return modifiers['air']
     elif transport_mode == 'water':
@@ -135,24 +136,24 @@ def get_seasonal_modifier(
 def get_road_friction(road_quality: str, season: str) -> float:
     """
     Get the travel friction multiplier for a road type and season.
-    
+
     Args:
         road_quality: One of VALID_ROAD_QUALITIES
         season: One of VALID_SEASONS
-    
+
     Returns:
         Float multiplier >= 1.0 (higher = more difficult)
     """
     if road_quality not in VALID_ROAD_QUALITIES:
         road_quality = ROAD_QUALITY_LOCAL
-    
+
     base_friction = ROAD_QUALITY_FRICTION[road_quality]
-    
+
     # Apply winter penalty
     if season == SEASON_WINTER:
         winter_penalty = WINTER_ROAD_PENALTY.get(road_quality, 1.0)
         return base_friction * winter_penalty
-    
+
     return base_friction
 
 
@@ -163,3 +164,83 @@ def get_season_display_name(season: str) -> str:
         SEASON_WINTER: 'Winter',
         SEASON_YEAR_ROUND: 'Year-Round Average'
     }.get(season, 'Unknown')
+
+
+def calculate_seasonal_tier(base_tier: int, base_score: float, properties: dict, season: str):
+    """Calculate season-adjusted CAT tier, access score, and explanation."""
+    base_explanation = ''
+    if properties:
+        base_explanation = properties.get('tier_justification', '')
+
+    if season == SEASON_YEAR_ROUND or base_tier is None:
+        return base_tier, base_score, base_explanation
+
+    primary_modes = []
+    if properties:
+        modes_str = properties.get('primary_access_modes', '')
+        primary_modes = [m.strip() for m in modes_str.split(',') if m.strip()]
+
+    has_road = 'road' in primary_modes
+    has_air = 'air' in primary_modes
+    has_water = 'water' in primary_modes
+
+    if season == SEASON_WINTER:
+        tier_penalty = 0
+        score_penalty = 0
+        restricted_modes = []
+
+        if has_water and not has_air:
+            score_penalty += 25
+            restricted_modes.append('water (frozen)')
+        elif has_water:
+            score_penalty += 10
+            restricted_modes.append('water (limited)')
+
+        if has_road:
+            score_penalty += 5
+            if not has_air:
+                tier_penalty = max(tier_penalty, 3 - base_tier)
+        elif not has_air:
+            tier_penalty = max(tier_penalty, 4 - base_tier)
+
+        if not has_air:
+            score_penalty += 20
+
+        adjusted_tier = min(4, int(base_tier) + int(tier_penalty))
+        adjusted_score = max(0.0, float(base_score) - float(score_penalty))
+
+        if tier_penalty > 0:
+            explanation = (
+                f"Winter access: {', '.join(restricted_modes) if restricted_modes else 'Limited transport'}"
+            )
+        else:
+            explanation = f"Winter access: Air available; {base_explanation}"
+
+        return adjusted_tier, float(f"{adjusted_score:.1f}"), explanation
+
+    if season == SEASON_SUMMER:
+        tier_bonus = 0
+        score_bonus = 0
+
+        if has_water and has_air:
+            score_bonus += 10
+
+        if has_road and has_water:
+            score_bonus += 5
+
+        if base_tier == 4 and (has_water or has_air):
+            tier_bonus = -1
+
+        adjusted_tier = max(1, int(base_tier) + int(tier_bonus))
+        adjusted_score = min(100.0, float(base_score) + float(score_bonus))
+
+        if tier_bonus < 0:
+            explanation = f"Summer access: Seasonal routes available; improved from Tier {base_tier}"
+        elif score_bonus > 0:
+            explanation = f"Summer access: All modes available; {base_explanation}"
+        else:
+            explanation = base_explanation
+
+        return adjusted_tier, float(f"{adjusted_score:.1f}"), explanation
+
+    return base_tier, base_score, base_explanation

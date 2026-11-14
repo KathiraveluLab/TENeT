@@ -20,6 +20,7 @@ from database.handlers import (
     CAT4_STORE_FORWARD_MIN_BANDWIDTH_MBPS
 )
 
+
 def create_sample_gating_rules(db):
     """Create sample gating rules for each tier"""
     db.query(CATGatingRule).delete()
@@ -86,7 +87,6 @@ def create_sample_gating_rules(db):
         }
     ]
 
-    
     for rule_data in rules:
         try:
             CATDataHandler.create_gating_rule(db, rule_data)
@@ -94,16 +94,17 @@ def create_sample_gating_rules(db):
         except Exception as e:
             print(f"Error creating rule {rule_data['rule_name']}: {e}")
 
+
 def main():
     print("=" * 60)
     print("TENeT Database Initialization")
     print("=" * 60)
-    
+
     # Initialize database
     print("\n1. Initializing database tables...")
     init_db()
     print("✓ Database tables created")
-    
+
     # Create sample gating rules
     print("\n2. Creating sample gating rules...")
     db = SessionLocal()
@@ -112,7 +113,7 @@ def main():
         print("✓ Sample gating rules created")
     finally:
         db.close()
-    
+
     # Seed CAT data from preprocessed CSV first so other datasets can map to regions
     print("\n3. Seeding CAT regions and data points...")
     try:
@@ -120,7 +121,7 @@ def main():
         seed_cat_data()
     except Exception as e:
         print(f"   Warning: Could not seed CAT data: {e}")
-    
+
     print("\n4. Seeding healthcare facilities...")
     try:
         from database.seed_healthcare_data import seed_healthcare_data
@@ -148,7 +149,7 @@ def main():
         seed_ookla_data()
     except Exception as e:
         print(f"   Warning: Could not seed Ookla performance data: {e}")
-    
+
     # Get statistics
     print("\n8. Database Statistics:")
     db = SessionLocal()
@@ -166,7 +167,7 @@ def main():
         print(f"   - Ookla performance tiles: {db.query(OoklaPerformance).count()}")
     finally:
         db.close()
-    
+
     print("\n" + "=" * 60)
     print("✓ Database initialization completed successfully!")
     print("=" * 60)
@@ -176,6 +177,7 @@ def main():
     print("3. View healthcare sites: GET /api/cat/healthcare-sites")
     print("\nSample data templates are available in data/samples/")
     print("=" * 60)
+
 
 if __name__ == '__main__':
     main()
