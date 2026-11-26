@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from database.models import (
     CATDataPoint,
@@ -42,6 +42,7 @@ class ScenarioInputCache:
     def clear(cls) -> None:
         cls._cache.clear()
         cls._build_counts.clear()
+        TelehealthClassificationService.clear_caches()
 
     @classmethod
     def build_count(cls, db: Session, season: str = SEASON_YEAR_ROUND) -> int:
@@ -69,7 +70,12 @@ class ScenarioInputCache:
 
     @classmethod
     def _build(cls, db: Session, season: str) -> List[Dict[str, Any]]:
-        regions = db.query(CATRegion).order_by(CATRegion.region_name).all()
+        regions = (
+            db.query(CATRegion)
+            .options(defer(CATRegion.geometry))
+            .order_by(CATRegion.region_name)
+            .all()
+        )
         region_codes = [region.region_code for region in regions]
 
         facilities = db.query(HealthcareSite).filter(
