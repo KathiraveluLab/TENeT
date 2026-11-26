@@ -66,7 +66,7 @@ test.describe('Public dashboard smoke', () => {
     await expect(comparisonPanel.getByText('2 pinned communities')).toBeVisible();
     await expect(comparisonPanel.getByText('Telehealth status')).toBeVisible();
     await expect(comparisonPanel.getByText('Affordability')).toBeVisible();
-    await expect(comparisonPanel.getByText('Clinic support')).toBeVisible();
+    await expect(comparisonPanel.getByText('Clinic support', { exact: true })).toBeVisible();
     await expect(comparisonPanel.getByText('Download')).toBeVisible();
     await expect(comparisonPanel.getByText('Cost burden')).toBeVisible();
     await expect(comparisonPanel.getByText('Desert score')).toBeVisible();
